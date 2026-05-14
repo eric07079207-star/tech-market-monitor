@@ -3,4 +3,5 @@ __pycache__/
 *.pyc
 .DS_Store
 .streamlit/secrets.toml
-data/cache/
+data/cache/*.log
+tools/
