@@ -7,6 +7,10 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+try:
+    from streamlit_autorefresh import st_autorefresh
+except ImportError:  # pragma: no cover - optional local dependency
+    st_autorefresh = None
 
 from src.ai_summary import build_ai_summary
 from src.config import ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
@@ -21,6 +25,7 @@ from src.indicators import (
     regime_summary,
 )
 from src.news import fetch_news_batch
+from src.portfolio import build_portfolio_view, fetch_portfolio_prices, load_portfolio_config
 
 
 st.set_page_config(page_title="Tech Market Monitor", layout="wide")
@@ -61,6 +66,16 @@ def load_news(force_refresh: bool, days: int) -> pd.DataFrame:
     if not news.empty:
         news.to_parquet(news_path, index=False)
     return news
+
+
+@st.cache_data(show_spinner=False, ttl=60 * 5)
+def load_portfolio_prices(tickers: tuple[str, ...]) -> pd.DataFrame:
+    return fetch_portfolio_prices(list(tickers), period="1y")
+
+
+@st.cache_data(show_spinner=False, ttl=60 * 10)
+def load_portfolio_news(tickers: tuple[str, ...], days: int) -> pd.DataFrame:
+    return fetch_news_batch(symbols=list(tickers), days=days, limit_per_symbol=8)
 
 
 def pct(value: float | int | None) -> str:
@@ -116,8 +131,8 @@ top[3].metric("VIX", num(vix.get("close") if isinstance(vix, pd.Series) else np.
 if regime["drivers"]:
     st.caption(" / ".join(regime["drivers"]))
 
-tab_overview, tab_anomaly, tab_analog, tab_news, tab_charts = st.tabs(
-    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "走勢圖"]
+tab_overview, tab_anomaly, tab_analog, tab_news, tab_charts, tab_portfolio = st.tabs(
+    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "走勢圖", "我的持倉"]
 )
 
 with tab_overview:
@@ -343,3 +358,187 @@ with tab_charts:
                 fig2.add_trace(go.Scatter(x=one["date"], y=one[ma], name=ma.upper(), mode="lines"))
         fig2.update_layout(height=430, margin=dict(l=10, r=10, t=30, b=10))
         st.plotly_chart(fig2, width="stretch")
+
+with tab_portfolio:
+    st.subheader("我的持倉")
+    portfolio_config = load_portfolio_config(st.secrets)
+    if portfolio_config is None or portfolio_config.positions.empty:
+        st.info("尚未設定持倉資料。請在 Streamlit Secrets 新增 `[portfolio]` 設定。")
+        st.code(
+            """
+[portfolio]
+password = "your-password"
+cash_usd = 0
+max_position_weight = 0.15
+refresh_seconds = 900
+positions_csv = '''
+ticker,shares,avg_cost,market_value_usd
+AMD,20,110,
+VOO,,,500
+'''
+            """.strip(),
+            language="toml",
+        )
+    else:
+        portfolio_unlocked = True
+        if portfolio_config.password:
+            if "portfolio_unlocked" not in st.session_state:
+                st.session_state["portfolio_unlocked"] = False
+            if not st.session_state["portfolio_unlocked"]:
+                password = st.text_input("持倉頁密碼", type="password")
+                if st.button("解鎖持倉", width="stretch"):
+                    st.session_state["portfolio_unlocked"] = password == portfolio_config.password
+                    if not st.session_state["portfolio_unlocked"]:
+                        st.error("密碼不正確。")
+                portfolio_unlocked = st.session_state["portfolio_unlocked"]
+
+        if not portfolio_unlocked:
+            st.info("請輸入密碼後查看私人持倉資料。")
+        else:
+            if st_autorefresh is not None:
+                st_autorefresh(
+                    interval=portfolio_config.refresh_seconds * 1000,
+                    key="portfolio_refresh",
+                )
+            else:
+                st.caption("目前環境尚未安裝 streamlit-autorefresh，雲端部署後會依 requirements 自動安裝。")
+
+            tickers = tuple(portfolio_config.positions["ticker"].dropna().astype(str).str.upper().drop_duplicates())
+            refresh_portfolio = st.button("立即刷新持倉資料", width="stretch")
+            if refresh_portfolio:
+                load_portfolio_prices.clear()
+                load_portfolio_news.clear()
+
+            with st.spinner("更新持倉價格與新聞..."):
+                portfolio_history = load_portfolio_prices(tickers)
+                portfolio_news = load_portfolio_news(tickers, news_days)
+                portfolio_view, portfolio_summary, portfolio_alerts = build_portfolio_view(
+                    portfolio_config.positions,
+                    portfolio_history,
+                    portfolio_news,
+                    cash_usd=portfolio_config.cash_usd,
+                    max_position_weight=portfolio_config.max_position_weight,
+                )
+
+            st.markdown("#### A. 投資組合總覽")
+            if not portfolio_alerts.empty:
+                st.error("目前有持倉觸發風險警示，請先查看下方風險警示區。")
+
+            overview_cols = st.columns(7)
+            overview_cols[0].metric("總市值", f"${num(portfolio_summary['total_market_value'], 0)}")
+            overview_cols[1].metric("總投入成本", f"${num(portfolio_summary['total_cost'], 0)}")
+            overview_cols[2].metric("未實現損益", f"${num(portfolio_summary['total_pnl'], 0)}")
+            overview_cols[3].metric("總報酬率", pct(portfolio_summary["total_return"]))
+            overview_cols[4].metric("最大持倉", portfolio_summary["largest_position"])
+            overview_cols[5].metric("風險最高", portfolio_summary["riskiest_position"])
+            overview_cols[6].metric("今日建議操作", f"{portfolio_summary['action_count']} 檔")
+            st.caption(f"現金：${num(portfolio_summary['cash_usd'], 0)}｜總資產：${num(portfolio_summary['total_assets'], 0)}")
+
+            if portfolio_view.empty:
+                st.info("目前沒有可顯示的持倉資料。")
+            else:
+                st.markdown("#### B. 持倉明細表")
+                detail = portfolio_view[
+                [
+                    "ticker",
+                    "shares",
+                    "avg_cost",
+                    "current_price",
+                    "market_value",
+                    "unrealized_pnl",
+                    "unrealized_return",
+                    "position_weight",
+                    "market_heat_score",
+                    "market_heat_label",
+                    "risk_score",
+                    "suggestion",
+                ]
+                ].rename(
+                    columns={
+                        "ticker": "股票代號",
+                        "shares": "持股數量",
+                        "avg_cost": "平均成本",
+                        "current_price": "現價",
+                        "market_value": "市值",
+                        "unrealized_pnl": "未實現損益",
+                        "unrealized_return": "未實現報酬率",
+                        "position_weight": "持倉占總資產比例",
+                        "market_heat_score": "市場熱度分數",
+                        "market_heat_label": "熱度解讀",
+                        "risk_score": "風險分數",
+                        "suggestion": "操作建議",
+                    }
+                )
+                st.dataframe(
+                    detail,
+                    hide_index=True,
+                    width="stretch",
+                    column_config={
+                        "持股數量": st.column_config.NumberColumn(format="%.4f"),
+                        "平均成本": st.column_config.NumberColumn(format="$%.2f"),
+                        "現價": st.column_config.NumberColumn(format="$%.2f"),
+                        "市值": st.column_config.NumberColumn(format="$%.0f"),
+                        "未實現損益": st.column_config.NumberColumn(format="$%.0f"),
+                        "未實現報酬率": st.column_config.NumberColumn(format="%.2%"),
+                        "持倉占總資產比例": st.column_config.NumberColumn(format="%.2%"),
+                        "市場熱度分數": st.column_config.NumberColumn(format="%.0f"),
+                        "風險分數": st.column_config.NumberColumn(format="%.0f"),
+                    },
+                )
+
+                st.markdown("#### C. 操作建議")
+                advice = portfolio_view[
+                [
+                    "ticker",
+                    "suggestion",
+                    "suggestion_reason",
+                    "add_price",
+                    "trim_price",
+                    "stop_loss_price",
+                    "ret_1d",
+                    "ret_5d",
+                    "ret_20d",
+                    "volume_ratio_20d",
+                    "news_count",
+                    "news_sentiment",
+                    "negative_keywords",
+                ]
+                ].rename(
+                    columns={
+                        "ticker": "股票代號",
+                        "suggestion": "建議",
+                        "suggestion_reason": "理由",
+                        "add_price": "加倉價",
+                        "trim_price": "減碼價",
+                        "stop_loss_price": "停損價",
+                        "ret_1d": "今日漲跌",
+                        "ret_5d": "5日漲跌",
+                        "ret_20d": "20日漲跌",
+                        "volume_ratio_20d": "量/20日均量",
+                        "news_count": "最新新聞數量",
+                        "news_sentiment": "新聞情緒分數",
+                        "negative_keywords": "負面關鍵字",
+                    }
+                )
+                st.dataframe(
+                    advice,
+                    hide_index=True,
+                    width="stretch",
+                    column_config={
+                        "加倉價": st.column_config.NumberColumn(format="$%.2f"),
+                        "減碼價": st.column_config.NumberColumn(format="$%.2f"),
+                        "停損價": st.column_config.NumberColumn(format="$%.2f"),
+                        "今日漲跌": st.column_config.NumberColumn(format="%.2%"),
+                        "5日漲跌": st.column_config.NumberColumn(format="%.2%"),
+                        "20日漲跌": st.column_config.NumberColumn(format="%.2%"),
+                        "量/20日均量": st.column_config.NumberColumn(format="%.2fx"),
+                        "新聞情緒分數": st.column_config.NumberColumn(format="%.2f"),
+                    },
+                )
+
+                st.markdown("#### D. 風險警示")
+                if portfolio_alerts.empty:
+                    st.success("目前沒有觸發主要持倉警示。")
+                else:
+                    for alert in portfolio_alerts.itertuples():
+                        st.error(f"{alert.ticker}：{alert.alerts}")
