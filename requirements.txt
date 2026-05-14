@@ -1,0 +1,8 @@
+streamlit>=1.57
+yfinance>=1.3
+plotly>=6.7
+openai>=2.36
+pandas>=2.3
+numpy>=2.0
+requests>=2.34
+pyarrow>=18

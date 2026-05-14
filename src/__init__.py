@@ -1,0 +1,1 @@
+"""Tech market monitor package."""
