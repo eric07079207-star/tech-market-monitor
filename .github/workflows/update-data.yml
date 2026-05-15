@@ -2,8 +2,8 @@ name: Update market data
 
 on:
   schedule:
-    # 22:30 UTC is after the regular US market close in both EST and EDT.
-    - cron: "30 22 * * 1-5"
+    # Refresh every 6 hours so Streamlit Cloud can pick up fresh market/news cache.
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 permissions:
