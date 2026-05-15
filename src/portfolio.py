@@ -367,6 +367,7 @@ def recommendation(row: dict, max_position_weight: float, market_context: dict |
         reason = "目前訊號未達明確調整條件，維持追蹤，等待趨勢、量能或消息面提供更清楚方向。"
 
     market_link = _market_link_text(row, market_context)
+    zone_text = _action_zone_text(add_price, trim_price, stop_loss, action)
 
     return {
         "position_state": state,
@@ -374,10 +375,40 @@ def recommendation(row: dict, max_position_weight: float, market_context: dict |
         "suggestion_intensity": intensity,
         "suggestion_reason": reason,
         "market_link": market_link,
+        "action_zone": zone_text,
         "add_price": add_price,
         "trim_price": trim_price,
         "stop_loss_price": stop_loss,
     }
+
+
+def attention_positions(view: pd.DataFrame, limit: int = 3) -> pd.DataFrame:
+    if view.empty:
+        return pd.DataFrame()
+    data = view.copy()
+    intensity_score = data.get("suggestion_intensity", pd.Series(index=data.index, dtype=object)).map(
+        {"高": 30, "中": 18, "低": 6}
+    ).fillna(0)
+    pnl_risk = data["unrealized_return"].fillna(0).clip(upper=0).abs() * 80 if "unrealized_return" in data else 0
+    heat_risk = (data["market_heat_score"].fillna(50) - 70).clip(lower=0) * 0.8 if "market_heat_score" in data else 0
+    weight_risk = data["position_weight"].fillna(0) * 60 if "position_weight" in data else 0
+    base_risk = data["risk_score"].fillna(0) * 0.5 if "risk_score" in data else 0
+    data["attention_score"] = base_risk + intensity_score + pnl_risk + heat_risk + weight_risk
+    data["attention_reason"] = data.apply(_attention_reason, axis=1)
+    columns = [
+        "ticker",
+        "attention_score",
+        "attention_reason",
+        "position_state",
+        "suggestion",
+        "suggestion_intensity",
+        "market_heat_score",
+        "risk_score",
+        "position_weight",
+        "unrealized_return",
+        "action_zone",
+    ]
+    return data.sort_values("attention_score", ascending=False)[[col for col in columns if col in data.columns]].head(limit)
 
 
 def summary_metrics(view: pd.DataFrame, cash_usd: float) -> dict:
@@ -558,3 +589,34 @@ def _market_link_text(row: dict, market_context: dict) -> str:
     if label in {"風險升溫", "防守"}:
         return "大盤風險偏高，個股加倉訊號需更保守解讀。"
     return "大盤環境未明顯拖累，主要依個股趨勢與持倉比例判斷。"
+
+
+def _action_zone_text(add_price: float, trim_price: float, stop_loss: float, action: str) -> str:
+    parts = []
+    if pd.notna(add_price):
+        parts.append(f"分批觀察 ${add_price:.2f} 附近")
+    if pd.notna(trim_price):
+        parts.append(f"過熱/鎖利觀察 ${trim_price:.2f} 以上")
+    if pd.notna(stop_loss):
+        parts.append(f"風險控管 ${stop_loss:.2f} 下方")
+    prefix = "目前偏操作：" if action in {"可分批加倉", "風險控管", "停損觀察"} else "目前偏觀察："
+    return prefix + "；".join(parts)
+
+
+def _attention_reason(row: pd.Series) -> str:
+    reasons = []
+    if row.get("suggestion_intensity") == "高":
+        reasons.append("建議強度高")
+    elif row.get("suggestion_intensity") == "中":
+        reasons.append("建議強度中")
+    if pd.notna(row.get("position_weight")) and row.get("position_weight") >= 0.12:
+        reasons.append("持倉占比較高")
+    if pd.notna(row.get("market_heat_score")) and row.get("market_heat_score") >= 80:
+        reasons.append("市場熱度偏高")
+    if pd.notna(row.get("unrealized_return")) and row.get("unrealized_return") <= -0.08:
+        reasons.append("接近或超過虧損警戒")
+    if bool(row.get("negative_event")):
+        reasons.append("偵測到負面消息關鍵字")
+    if not reasons:
+        reasons.append("綜合風險分數相對較高")
+    return "；".join(reasons[:3])

@@ -188,6 +188,62 @@ def rule_based_news_summary(news: pd.DataFrame, max_items: int = 12) -> str:
     return f"近期新聞集中在 {leading_tags}，主要覆蓋 {symbols}。\n{bullets}"
 
 
+def portfolio_news_impact(news: pd.DataFrame, portfolio_view: pd.DataFrame | None = None, max_items: int = 8) -> pd.DataFrame:
+    columns = ["ticker", "impact_level", "impact", "headline_count", "key_tags", "sample_headline"]
+    if news.empty:
+        return pd.DataFrame(columns=columns)
+
+    tickers = None
+    if portfolio_view is not None and not portfolio_view.empty and "ticker" in portfolio_view:
+        tickers = set(portfolio_view["ticker"].dropna().astype(str).str.upper())
+
+    data = news.copy()
+    data["symbol"] = data["symbol"].astype(str).str.upper()
+    if tickers:
+        data = data[data["symbol"].isin(tickers)]
+    if data.empty:
+        return pd.DataFrame(columns=columns)
+
+    rows = []
+    for ticker, group in data.groupby("symbol", sort=False):
+        titles = " ".join(group["title"].fillna("").astype(str).str.lower().tolist())
+        tags = (
+            group.assign(tag=group["tags"].fillna("").astype(str).str.split("；"))
+            .explode("tag")["tag"]
+            .replace("", pd.NA)
+            .dropna()
+            .value_counts()
+        )
+        negative = any(word in titles for word in ["offering", "dilution", "guidance cut", "miss", "downgrade", "lawsuit", "probe"])
+        semis = any(tag in tags.index for tag in ["AI/晶片", "國際/貿易"])
+        earnings = "財報/財測" in tags.index
+        if negative:
+            level = "高"
+            impact = "消息面偏負，需優先確認是否影響基本面或籌碼。"
+        elif earnings:
+            level = "中"
+            impact = "財報/財測相關消息增加，短線波動可能放大。"
+        elif semis:
+            level = "中"
+            impact = "AI、晶片或貿易消息可能影響科技股風險偏好。"
+        else:
+            level = "低"
+            impact = "目前多為一般消息，先列入觀察。"
+        rows.append(
+            {
+                "ticker": ticker,
+                "impact_level": level,
+                "impact": impact,
+                "headline_count": len(group),
+                "key_tags": "、".join(tags.head(3).index.tolist()) if not tags.empty else "未分類",
+                "sample_headline": group.sort_values("published", ascending=False).iloc[0]["title"],
+            }
+        )
+    result = pd.DataFrame(rows)
+    result["_rank"] = result["impact_level"].map({"高": 0, "中": 1, "低": 2}).fillna(3)
+    return result.sort_values(["_rank", "headline_count"], ascending=[True, False]).drop(columns="_rank").head(max_items)
+
+
 def _node_text(item: ET.Element, name: str) -> str:
     node = item.find(name)
     return node.text if node is not None and node.text else ""

@@ -208,21 +208,70 @@ def today_conclusion(regime: dict, snapshot: pd.DataFrame, anomalies: pd.DataFra
     if pd.isna(score):
         label = "資料不足"
         sentence = "目前資料不足，先不要把模型結論當成主要依據。"
+        action = "先等待資料同步"
+        primary_reason = "市場資料不足"
+        main_risk = "資料缺口"
     elif score >= 68 and q_dist_50 > 0 and anomaly_count <= 4:
         label = "偏多"
         sentence = "科技股主趨勢仍偏多，但仍需留意短線過熱與成交量異常。"
+        action = "續抱為主，不追高"
+        primary_reason = "QQQ 維持在關鍵均線上方"
+        main_risk = "短線過熱或放量震盪"
     elif score >= 50 and (pd.isna(vix_level) or vix_level < 25):
         label = "觀望偏多"
         sentence = "大方向尚未轉弱，適合續抱觀察，等待更明確的突破或回檔訊號。"
+        action = "持有觀察，分批處理"
+        primary_reason = "多頭結構尚未破壞"
+        main_risk = "波動升溫但尚未轉成系統性風險"
     elif score >= 35 or anomaly_count >= 6 or q_ret < -0.05:
         label = "風險升溫"
         sentence = "市場仍有支撐，但波動與風險線索增加，短線不適合追高。"
+        action = "降低追高，檢查高風險部位"
+        primary_reason = "異常訊號或短線轉弱增加"
+        main_risk = "跌破短期均線後引發連鎖賣壓"
     else:
         label = "防守"
         sentence = "趨勢與風險指標偏弱，優先控管部位與觀察支撐是否守住。"
+        action = "優先控管倉位"
+        primary_reason = "趨勢與風險指標偏弱"
+        main_risk = "修正延伸或流動性風險升高"
 
     confidence = confidence_level(sample=252, dispersion=0.0, conflict_count=anomaly_count)
-    return {"label": label, "sentence": sentence, "confidence": confidence}
+    return {
+        "label": label,
+        "sentence": sentence,
+        "confidence": confidence,
+        "action": action,
+        "primary_reason": primary_reason,
+        "main_risk": main_risk,
+    }
+
+
+def conclusion_cards(regime: dict, conclusion: dict, market_prediction: dict, anomalies: pd.DataFrame) -> list[dict]:
+    score = regime.get("score", np.nan)
+    anomaly_count = 0 if anomalies.empty else len(anomalies)
+    return [
+        {
+            "title": "市場狀態",
+            "value": conclusion.get("label", "資料不足"),
+            "detail": f"Regime {score:.0f}/100" if pd.notna(score) else "Regime n/a",
+        },
+        {
+            "title": "建議行為",
+            "value": conclusion.get("action", "觀察"),
+            "detail": conclusion.get("primary_reason", ""),
+        },
+        {
+            "title": "信心等級",
+            "value": conclusion.get("confidence", "低"),
+            "detail": f"異常訊號 {anomaly_count} 個",
+        },
+        {
+            "title": "最大風險",
+            "value": conclusion.get("main_risk", "n/a"),
+            "detail": f"模型方向：{market_prediction.get('prediction_direction', 'n/a')}",
+        },
+    ]
 
 
 def detect_anomalies(snapshot: pd.DataFrame) -> pd.DataFrame:
@@ -285,6 +334,7 @@ def risk_clue_table(indicators: pd.DataFrame, macro: pd.DataFrame, snapshot: pd.
             _row_value(qqq, "dist_ma_200"),
             "低於 200DMA 或 200DMA 斜率轉負",
             _row_value(qqq, "dist_ma_200") < 0 or _row_value(qqq, "ma200_slope_20d") < 0,
+            pd.notna(_row_value(qqq, "dist_ma_200")) and _row_value(qqq, "dist_ma_200") < 0.03,
             "長期趨勢轉弱時，科技股回撤通常會更深、更久。",
             value_format="pct",
         )
@@ -295,6 +345,7 @@ def risk_clue_table(indicators: pd.DataFrame, macro: pd.DataFrame, snapshot: pd.
             _relative_return(wide, "QQQ", "SPY", 63),
             "近 3 個月相對報酬轉負",
             _relative_return(wide, "QQQ", "SPY", 63) < 0,
+            pd.notna(_relative_return(wide, "QQQ", "SPY", 63)) and _relative_return(wide, "QQQ", "SPY", 63) < 0.02,
             "科技股失去領先地位，代表資金可能從成長股轉向防守或價值股。",
             value_format="pct",
         )
@@ -305,6 +356,7 @@ def risk_clue_table(indicators: pd.DataFrame, macro: pd.DataFrame, snapshot: pd.
             _relative_return(wide, "SMH", "QQQ", 63),
             "近 3 個月相對報酬轉負",
             _relative_return(wide, "SMH", "QQQ", 63) < 0,
+            pd.notna(_relative_return(wide, "SMH", "QQQ", 63)) and _relative_return(wide, "SMH", "QQQ", 63) < 0.02,
             "半導體常是科技股風險偏好的核心，轉弱時需要降低追高意願。",
             value_format="pct",
         )
@@ -315,6 +367,7 @@ def risk_clue_table(indicators: pd.DataFrame, macro: pd.DataFrame, snapshot: pd.
             _row_value(vix, "close"),
             "高於 25 留意，高於 30 代表壓力升高",
             _row_value(vix, "close") >= 25,
+            _row_value(vix, "close") >= 22,
             "波動率上升通常代表避險需求增加，容易放大下跌。",
             value_format="number",
         )
@@ -332,6 +385,7 @@ def risk_clue_table(indicators: pd.DataFrame, macro: pd.DataFrame, snapshot: pd.
             hy_change,
             "3 個月擴大超過 0.75",
             pd.notna(hy_change) and hy_change > 0.75,
+            pd.notna(hy_change) and hy_change > 0.35,
             f"信用市場變緊會壓抑風險資產；最新利差約 {hy_value:.2f}。" if pd.notna(hy_value) else "信用資料不足。",
             value_format="number",
         )
@@ -347,6 +401,7 @@ def risk_clue_table(indicators: pd.DataFrame, macro: pd.DataFrame, snapshot: pd.
             breadth,
             "低於 50% 站上 50DMA",
             pd.notna(breadth) and breadth < 0.5,
+            pd.notna(breadth) and breadth < 0.65,
             "少數大型股撐盤而多數個股轉弱，是大跌前常見的隱性分歧。",
             value_format="pct",
         )
@@ -459,6 +514,29 @@ def analog_stats(analogs: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def analog_interpretation(stats: pd.DataFrame) -> str:
+    if stats.empty:
+        return "歷史樣本不足，暫時不解讀。"
+    focus = stats[stats["horizon"].eq("1M")]
+    if focus.empty:
+        focus = stats.head(1)
+    row = focus.iloc[0]
+    avg_return = row.get("avg_return", np.nan)
+    median_return = row.get("median_return", np.nan)
+    worst_decile = row.get("worst_decile_avg", np.nan)
+    conservative = row.get("win_rate_conservative", np.nan)
+    confidence = row.get("confidence", "低")
+    if pd.notna(avg_return) and avg_return > 0.03 and pd.notna(conservative) and conservative >= 0.55:
+        bias = "歷史相似情境偏多"
+    elif pd.notna(avg_return) and avg_return < -0.02:
+        bias = "歷史相似情境偏防守"
+    else:
+        bias = "歷史相似情境偏震盪"
+    risk = "壞情境回撤壓力不高" if pd.notna(worst_decile) and worst_decile > -0.05 else "壞情境仍需防範明顯回撤"
+    typical = f"中位數 {median_return:.1%}" if pd.notna(median_return) else "中位數 n/a"
+    return f"{bias}，{typical}，{risk}；信心等級 {confidence}。"
+
+
 def confidence_level(sample: int, dispersion: float | None = None, conflict_count: int = 0) -> str:
     score = 0
     if sample >= 80:
@@ -532,6 +610,7 @@ def _risk_row(
     value: float,
     threshold: str,
     triggered: bool,
+    warning: bool,
     implication: str,
     value_format: str,
 ) -> dict:
@@ -541,10 +620,20 @@ def _risk_row(
         display_value = f"{value:.2%}"
     else:
         display_value = f"{value:.2f}"
+    if triggered:
+        light = "紅"
+        status = "觸發"
+    elif warning:
+        light = "黃"
+        status = "接近"
+    else:
+        light = "綠"
+        status = "正常"
     return {
         "indicator": name,
+        "light": light,
         "current": display_value,
         "risk_threshold": threshold,
-        "status": "觸發" if triggered else "未觸發",
+        "status": status,
         "implication": implication,
     }

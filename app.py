@@ -25,10 +25,21 @@ from src.indicators import (
     regime_summary,
 )
 try:
-    from src.indicators import categorize_anomalies, risk_clue_table, today_conclusion
+    from src.indicators import analog_interpretation, categorize_anomalies, conclusion_cards, risk_clue_table, today_conclusion
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def analog_interpretation(stats: pd.DataFrame) -> str:
+        return "雲端模組正在同步，暫時顯示基礎相似情境。"
+
     def categorize_anomalies(anomalies: pd.DataFrame) -> dict[str, pd.DataFrame]:
         return {"價格異常": anomalies, "成交量異常": pd.DataFrame(), "趨勢異常": pd.DataFrame()}
+
+    def conclusion_cards(regime: dict, conclusion: dict, market_prediction: dict, anomalies: pd.DataFrame) -> list[dict]:
+        return [
+            {"title": "市場狀態", "value": conclusion.get("label", "資料同步中"), "detail": "等待雲端部署完成"},
+            {"title": "建議行為", "value": "先觀察", "detail": "基礎模式"},
+            {"title": "信心等級", "value": conclusion.get("confidence", "低"), "detail": ""},
+            {"title": "最大風險", "value": "資料同步", "detail": ""},
+        ]
 
     def risk_clue_table(indicators: pd.DataFrame, macro: pd.DataFrame, snapshot: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(
@@ -52,7 +63,7 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 
 from src.news import fetch_news_batch
 try:
-    from src.news import fetch_international_news, international_news_selection
+    from src.news import fetch_international_news, international_news_selection, portfolio_news_impact
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def fetch_international_news(days: int = 3, limit_per_topic: int = 8) -> pd.DataFrame:
         return pd.DataFrame(columns=["symbol", "title", "source", "published", "tags", "link", "is_major", "priority"])
@@ -60,7 +71,15 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
     def international_news_selection(news: pd.DataFrame, random_count: int = 3) -> tuple[pd.DataFrame, pd.DataFrame]:
         return news.copy(), news.copy()
 
+    def portfolio_news_impact(news: pd.DataFrame, portfolio_view: pd.DataFrame | None = None, max_items: int = 8) -> pd.DataFrame:
+        return pd.DataFrame(columns=["ticker", "impact_level", "impact", "headline_count", "key_tags", "sample_headline"])
+
 from src.portfolio import build_portfolio_view, fetch_portfolio_prices, load_portfolio_config
+try:
+    from src.portfolio import attention_positions
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def attention_positions(view: pd.DataFrame, limit: int = 3) -> pd.DataFrame:
+        return pd.DataFrame()
 try:
     from src.predictions import build_market_prediction, load_prediction_log, prediction_validation_summary
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
@@ -88,6 +107,19 @@ st.markdown(
         padding: 12px 14px;
     }
     .small-muted {color: #6b7280; font-size: 0.86rem;}
+    .insight-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 14px 16px;
+        min-height: 116px;
+    }
+    .insight-card .label {color: #6b7280; font-size: 0.82rem; margin-bottom: 8px;}
+    .insight-card .value {font-size: 1.12rem; font-weight: 700; line-height: 1.25; color: #111827;}
+    .insight-card .detail {color: #4b5563; font-size: 0.84rem; margin-top: 8px; line-height: 1.35;}
+    .light-green {color: #15803d; font-weight: 700;}
+    .light-yellow {color: #a16207; font-weight: 700;}
+    .light-red {color: #b91c1c; font-weight: 700;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -147,6 +179,27 @@ def num(value: float | int | None, digits: int = 2) -> str:
     if value is None or pd.isna(value):
         return "n/a"
     return f"{value:.{digits}f}"
+
+
+def render_insight_card(container, title: str, value: str, detail: str = "") -> None:
+    container.markdown(
+        f"""
+        <div class="insight-card">
+            <div class="label">{title}</div>
+            <div class="value">{value}</div>
+            <div class="detail">{detail}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def light_class(value: str) -> str:
+    if value == "紅":
+        return "light-red"
+    if value == "黃":
+        return "light-yellow"
+    return "light-green"
 
 
 def _show_anomaly_table(data: pd.DataFrame) -> None:
@@ -226,7 +279,11 @@ top[3].metric("VIX", num(vix.get("close") if isinstance(vix, pd.Series) else np.
 if regime["drivers"]:
     st.caption(" / ".join(regime["drivers"]))
 
-st.info(f"今日結論：{conclusion['sentence']}｜信心等級：{conclusion['confidence']}｜模型方向：{market_prediction['prediction_direction']}")
+st.markdown("### 今日結論")
+st.info(conclusion["sentence"])
+card_cols = st.columns(4)
+for card_col, card in zip(card_cols, conclusion_cards(regime, conclusion, market_prediction, anomalies)):
+    render_insight_card(card_col, card["title"], card["value"], card.get("detail", ""))
 
 tab_overview, tab_anomaly, tab_analog, tab_news, tab_charts, tab_portfolio = st.tabs(
     ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "走勢圖", "我的持倉"]
@@ -382,10 +439,23 @@ with tab_anomaly:
                     st.markdown(f"**{row.symbol}** · `{row.tags}` · {row.source} · {published}  \n[{row.title}]({row.link})")
 
     st.subheader("下跌前風險線索")
+    risk_table = risk_clue_table(indicators, macro, snapshot)
+    light_counts = risk_table["light"].value_counts() if "light" in risk_table else pd.Series(dtype=int)
+    st.markdown(
+        "｜".join(
+            [
+                f"<span class='{light_class('紅')}'>紅 {int(light_counts.get('紅', 0))}</span>",
+                f"<span class='{light_class('黃')}'>黃 {int(light_counts.get('黃', 0))}</span>",
+                f"<span class='{light_class('綠')}'>綠 {int(light_counts.get('綠', 0))}</span>",
+            ]
+        ),
+        unsafe_allow_html=True,
+    )
     st.dataframe(
-        risk_clue_table(indicators, macro, snapshot).rename(
+        risk_table.rename(
             columns={
                 "indicator": "線索",
+                "light": "燈號",
                 "current": "目前數值",
                 "risk_threshold": "風險門檻",
                 "status": "狀態",
@@ -406,6 +476,7 @@ with tab_analog:
         st.info("資料量不足，暫時無法計算歷史相似情境。")
     else:
         stats = analog_stats(analogs)
+        st.success(f"一句話解讀：{analog_interpretation(stats)}")
         st.caption(
             "核心 50 筆用來看最接近目前的歷史劇本；參考 100 筆用來看更穩定的背景分布。"
             "這是歷史條件相似度，不是未來保證。"
@@ -474,6 +545,31 @@ with tab_news:
     if news.empty:
         st.info("目前沒有抓到近期新聞。")
     else:
+        st.subheader("新聞對持倉影響")
+        news_portfolio_config = load_portfolio_config(st.secrets)
+        if news_portfolio_config is not None and not news_portfolio_config.positions.empty:
+            impact_base = news_portfolio_config.positions.rename(columns={"ticker": "ticker"})
+            impact = portfolio_news_impact(news, impact_base, max_items=8)
+            if impact.empty:
+                st.caption("近期新聞尚未直接命中你的持倉代號。")
+            else:
+                st.dataframe(
+                    impact.rename(
+                        columns={
+                            "ticker": "股票代號",
+                            "impact_level": "影響等級",
+                            "impact": "可能影響",
+                            "headline_count": "新聞數",
+                            "key_tags": "主要標籤",
+                            "sample_headline": "代表新聞",
+                        }
+                    ),
+                    hide_index=True,
+                    width="stretch",
+                )
+        else:
+            st.caption("尚未設定持倉 Secrets，因此先顯示一般新聞摘要。")
+
         filtered_symbols = st.multiselect("標的", options=list(NEWS_QUERIES), default=list(NEWS_QUERIES)[:6])
         news_view = news[news["symbol"].isin(filtered_symbols)] if filtered_symbols else news
         for row in news_view.head(80).itertuples():
@@ -617,6 +713,39 @@ VOO,,,500
             if portfolio_view.empty:
                 st.info("目前沒有可顯示的持倉資料。")
             else:
+                st.markdown("#### 今日最需要注意的 3 檔")
+                attention = attention_positions(portfolio_view, limit=3)
+                if attention.empty:
+                    st.success("目前沒有特別需要優先處理的持倉。")
+                else:
+                    attention_display = attention.rename(
+                        columns={
+                            "ticker": "股票代號",
+                            "attention_score": "注意分數",
+                            "attention_reason": "注意原因",
+                            "position_state": "目前狀態",
+                            "suggestion": "操作傾向",
+                            "suggestion_intensity": "強度",
+                            "market_heat_score": "市場熱度",
+                            "risk_score": "風險分數",
+                            "position_weight": "持倉占比",
+                            "unrealized_return": "未實現報酬率",
+                            "action_zone": "操作區間",
+                        }
+                    )
+                    st.dataframe(
+                        attention_display,
+                        hide_index=True,
+                        width="stretch",
+                        column_config={
+                            "注意分數": st.column_config.NumberColumn(format="%.0f"),
+                            "市場熱度": st.column_config.NumberColumn(format="%.0f"),
+                            "風險分數": st.column_config.NumberColumn(format="%.0f"),
+                            "持倉占比": st.column_config.NumberColumn(format="%.2%"),
+                            "未實現報酬率": st.column_config.NumberColumn(format="%.2%"),
+                        },
+                    )
+
                 st.markdown("#### B. 持倉明細表")
                 detail_columns = [
                     "ticker",
@@ -677,6 +806,7 @@ VOO,,,500
                     "suggestion_intensity",
                     "suggestion_reason",
                     "market_link",
+                    "action_zone",
                     "add_price",
                     "trim_price",
                     "stop_loss_price",
@@ -696,6 +826,7 @@ VOO,,,500
                         "suggestion_intensity": "強度",
                         "suggestion_reason": "理由",
                         "market_link": "持倉與市場風險連動",
+                        "action_zone": "操作區間",
                         "add_price": "加倉價",
                         "trim_price": "減碼價",
                         "stop_loss_price": "停損價",
