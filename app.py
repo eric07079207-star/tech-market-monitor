@@ -19,17 +19,59 @@ from src.indicators import (
     add_price_indicators,
     analog_stats,
     breadth_table,
-    categorize_anomalies,
     detect_anomalies,
     historical_analogs,
     latest_snapshot,
     regime_summary,
-    risk_clue_table,
-    today_conclusion,
 )
-from src.news import fetch_international_news, fetch_news_batch, international_news_selection
+try:
+    from src.indicators import categorize_anomalies, risk_clue_table, today_conclusion
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def categorize_anomalies(anomalies: pd.DataFrame) -> dict[str, pd.DataFrame]:
+        return {"價格異常": anomalies, "成交量異常": pd.DataFrame(), "趨勢異常": pd.DataFrame()}
+
+    def risk_clue_table(indicators: pd.DataFrame, macro: pd.DataFrame, snapshot: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame(
+            [
+                {
+                    "indicator": "資料同步中",
+                    "current": "n/a",
+                    "risk_threshold": "等待雲端部署完成",
+                    "status": "未觸發",
+                    "implication": "Streamlit Cloud 正在更新模組，稍後會恢復完整風險線索。",
+                }
+            ]
+        )
+
+    def today_conclusion(regime: dict, snapshot: pd.DataFrame, anomalies: pd.DataFrame) -> dict:
+        return {
+            "label": regime.get("label", "資料同步中"),
+            "sentence": "雲端模組正在同步，先顯示基礎市場狀態。",
+            "confidence": "低",
+        }
+
+from src.news import fetch_news_batch
+try:
+    from src.news import fetch_international_news, international_news_selection
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def fetch_international_news(days: int = 3, limit_per_topic: int = 8) -> pd.DataFrame:
+        return pd.DataFrame(columns=["symbol", "title", "source", "published", "tags", "link", "is_major", "priority"])
+
+    def international_news_selection(news: pd.DataFrame, random_count: int = 3) -> tuple[pd.DataFrame, pd.DataFrame]:
+        return news.copy(), news.copy()
+
 from src.portfolio import build_portfolio_view, fetch_portfolio_prices, load_portfolio_config
-from src.predictions import build_market_prediction, load_prediction_log, prediction_validation_summary
+try:
+    from src.predictions import build_market_prediction, load_prediction_log, prediction_validation_summary
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def build_market_prediction(regime: dict, conclusion: dict, snapshot: pd.DataFrame) -> dict:
+        return {"target": "QQQ", "prediction_direction": "資料同步中"}
+
+    def load_prediction_log() -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def prediction_validation_summary(log: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame()
 
 
 st.set_page_config(page_title="Tech Market Monitor", layout="wide")
@@ -538,14 +580,25 @@ VOO,,,500
                         and regime.get("score", 0) >= 55
                     ),
                 }
-                portfolio_view, portfolio_summary, portfolio_alerts = build_portfolio_view(
-                    portfolio_config.positions,
-                    portfolio_history,
-                    portfolio_news,
-                    cash_usd=portfolio_config.cash_usd,
-                    max_position_weight=portfolio_config.max_position_weight,
-                    market_context=market_context,
-                )
+                try:
+                    portfolio_view, portfolio_summary, portfolio_alerts = build_portfolio_view(
+                        portfolio_config.positions,
+                        portfolio_history,
+                        portfolio_news,
+                        cash_usd=portfolio_config.cash_usd,
+                        max_position_weight=portfolio_config.max_position_weight,
+                        market_context=market_context,
+                    )
+                except TypeError as exc:
+                    if "market_context" not in str(exc):
+                        raise
+                    portfolio_view, portfolio_summary, portfolio_alerts = build_portfolio_view(
+                        portfolio_config.positions,
+                        portfolio_history,
+                        portfolio_news,
+                        cash_usd=portfolio_config.cash_usd,
+                        max_position_weight=portfolio_config.max_position_weight,
+                    )
 
             st.markdown("#### A. 投資組合總覽")
             if not portfolio_alerts.empty:
@@ -565,8 +618,7 @@ VOO,,,500
                 st.info("目前沒有可顯示的持倉資料。")
             else:
                 st.markdown("#### B. 持倉明細表")
-                detail = portfolio_view[
-                [
+                detail_columns = [
                     "ticker",
                     "shares",
                     "avg_cost",
@@ -582,7 +634,7 @@ VOO,,,500
                     "suggestion_intensity",
                     "suggestion",
                 ]
-                ].rename(
+                detail = portfolio_view[[col for col in detail_columns if col in portfolio_view.columns]].rename(
                     columns={
                         "ticker": "股票代號",
                         "shares": "持股數量",
@@ -618,8 +670,7 @@ VOO,,,500
                 )
 
                 st.markdown("#### C. 操作建議")
-                advice = portfolio_view[
-                [
+                advice_columns = [
                     "ticker",
                     "position_state",
                     "suggestion",
@@ -637,7 +688,7 @@ VOO,,,500
                     "news_sentiment",
                     "negative_keywords",
                 ]
-                ].rename(
+                advice = portfolio_view[[col for col in advice_columns if col in portfolio_view.columns]].rename(
                     columns={
                         "ticker": "股票代號",
                         "position_state": "目前狀態",
