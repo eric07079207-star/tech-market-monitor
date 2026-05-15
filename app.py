@@ -19,13 +19,17 @@ from src.indicators import (
     add_price_indicators,
     analog_stats,
     breadth_table,
+    categorize_anomalies,
     detect_anomalies,
     historical_analogs,
     latest_snapshot,
     regime_summary,
+    risk_clue_table,
+    today_conclusion,
 )
-from src.news import fetch_news_batch
+from src.news import fetch_international_news, fetch_news_batch, international_news_selection
 from src.portfolio import build_portfolio_view, fetch_portfolio_prices, load_portfolio_config
+from src.predictions import build_market_prediction, load_prediction_log, prediction_validation_summary
 
 
 st.set_page_config(page_title="Tech Market Monitor", layout="wide")
@@ -68,6 +72,19 @@ def load_news(force_refresh: bool, days: int) -> pd.DataFrame:
     return news
 
 
+@st.cache_data(show_spinner=False, ttl=60 * 60 * 3)
+def load_international_news(force_refresh: bool, days: int) -> pd.DataFrame:
+    news_path = cache_path("international_news.parquet")
+    if not force_refresh and news_path.exists():
+        news = pd.read_parquet(news_path)
+        news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
+        return news
+    news = fetch_international_news(days=min(days, 7), limit_per_topic=8)
+    if not news.empty:
+        news.to_parquet(news_path, index=False)
+    return news
+
+
 @st.cache_data(show_spinner=False, ttl=60 * 5)
 def load_portfolio_prices(tickers: tuple[str, ...]) -> pd.DataFrame:
     return fetch_portfolio_prices(list(tickers), period="1y")
@@ -90,6 +107,39 @@ def num(value: float | int | None, digits: int = 2) -> str:
     return f"{value:.{digits}f}"
 
 
+def _show_anomaly_table(data: pd.DataFrame) -> None:
+    if data.empty:
+        st.info("這一類目前沒有觸發異常。")
+        return
+    anomaly_display = data[
+        ["symbol", "name", "group", "flags", "ret_1d", "ret_z_20d", "volume_ratio_20d", "gap_pct", "dist_ma_200"]
+    ].rename(
+        columns={
+            "symbol": "代號",
+            "name": "名稱",
+            "group": "類別",
+            "flags": "異常",
+            "ret_1d": "1D",
+            "ret_z_20d": "報酬z",
+            "volume_ratio_20d": "量/20日均量",
+            "gap_pct": "跳空",
+            "dist_ma_200": "距200DMA",
+        }
+    )
+    st.dataframe(
+        anomaly_display,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "1D": st.column_config.NumberColumn(format="%.2%"),
+            "報酬z": st.column_config.NumberColumn(format="%.2f"),
+            "量/20日均量": st.column_config.NumberColumn(format="%.2fx"),
+            "跳空": st.column_config.NumberColumn(format="%.2%"),
+            "距200DMA": st.column_config.NumberColumn(format="%.2%"),
+        },
+    )
+
+
 with st.sidebar:
     st.header("設定")
     start_date = st.date_input("歷史起點", value=default_start_date())
@@ -110,6 +160,9 @@ indicators = add_price_indicators(prices)
 snapshot = latest_snapshot(indicators)
 anomalies = detect_anomalies(snapshot)
 regime = regime_summary(indicators, macro)
+conclusion = today_conclusion(regime, snapshot, anomalies)
+market_prediction = build_market_prediction(regime, conclusion, snapshot)
+prediction_log = load_prediction_log()
 metadata = load_metadata()
 
 st.title("科技股量化監控儀表板")
@@ -118,7 +171,7 @@ updated_at = metadata.get("updated_at_utc", "尚未寫入")
 st.markdown(f"<span class='small-muted'>市場資料日期：{last_date}｜快取更新 UTC：{updated_at}</span>", unsafe_allow_html=True)
 
 top = st.columns([1.2, 1, 1, 1])
-top[0].metric("Regime Score", f"{num(regime['score'], 0)}/100")
+top[0].metric("Regime Score", pct(regime["score"] / 100 if pd.notna(regime["score"]) else np.nan))
 top[0].caption(regime["label"])
 
 qqq = snapshot[snapshot["symbol"] == "QQQ"].squeeze()
@@ -130,6 +183,8 @@ top[3].metric("VIX", num(vix.get("close") if isinstance(vix, pd.Series) else np.
 
 if regime["drivers"]:
     st.caption(" / ".join(regime["drivers"]))
+
+st.info(f"今日結論：{conclusion['sentence']}｜信心等級：{conclusion['confidence']}｜模型方向：{market_prediction['prediction_direction']}")
 
 tab_overview, tab_anomaly, tab_analog, tab_news, tab_charts, tab_portfolio = st.tabs(
     ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "走勢圖", "我的持倉"]
@@ -221,71 +276,116 @@ with tab_overview:
         fig.update_layout(margin=dict(l=10, r=10, t=25, b=10), legend_title_text="")
         st.plotly_chart(fig, width="stretch")
 
+        st.subheader("預測追蹤")
+        validation = prediction_validation_summary(prediction_log)
+        if validation.empty:
+            st.caption("預測紀錄已建立；等 5D / 20D / 60D 週期走完後，這裡會開始顯示成功率。")
+        else:
+            st.dataframe(
+                validation.rename(
+                    columns={
+                        "horizon": "驗證週期",
+                        "prediction_direction": "預測方向",
+                        "sample": "樣本數",
+                        "success_rate": "成功率",
+                        "avg_return": "平均實際報酬",
+                        "avg_max_drawdown": "平均最大回撤",
+                    }
+                ),
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "成功率": st.column_config.NumberColumn(format="%.2%"),
+                    "平均實際報酬": st.column_config.NumberColumn(format="%.2%"),
+                    "平均最大回撤": st.column_config.NumberColumn(format="%.2%"),
+                },
+            )
+
+        with st.expander("名詞說明"):
+            st.markdown(
+                """
+                - **50DMA**：50 日移動平均線，常用來看中短期趨勢。
+                - **200DMA**：200 日移動平均線，常用來看長期多空分界。
+                - **VIX**：市場預期波動率，越高通常代表避險情緒越強。
+                - **HYG / 高收益債利差**：信用市場風險溫度計，走弱或利差擴大通常代表風險偏好下降。
+                - **相對強弱**：例如 QQQ 相對 SPY，代表科技股是否比大盤更強。
+                - **最差 10% 均值**：歷史相似樣本中最差那一批結果的平均，用來估計壞情境。
+                """
+            )
+
 with tab_anomaly:
     st.subheader("今日異常訊號")
     if anomalies.empty:
         st.info("目前 watchlist 沒有觸發主要異常規則。")
     else:
-        anomaly_display = anomalies[
-            ["symbol", "name", "group", "flags", "ret_1d", "ret_z_20d", "volume_ratio_20d", "gap_pct", "dist_ma_200"]
-        ].rename(
-            columns={
-                "symbol": "代號",
-                "name": "名稱",
-                "group": "類別",
-                "flags": "異常",
-                "ret_1d": "1D",
-                "ret_z_20d": "報酬z",
-                "volume_ratio_20d": "量/20日均量",
-                "gap_pct": "跳空",
-                "dist_ma_200": "距200DMA",
-            }
-        )
-        st.dataframe(
-            anomaly_display,
-            hide_index=True,
-            width="stretch",
-            column_config={
-                "1D": st.column_config.NumberColumn(format="%.2%"),
-                "報酬z": st.column_config.NumberColumn(format="%.2f"),
-                "量/20日均量": st.column_config.NumberColumn(format="%.2fx"),
-                "跳空": st.column_config.NumberColumn(format="%.2%"),
-                "距200DMA": st.column_config.NumberColumn(format="%.2%"),
-            },
-        )
+        category_tabs = st.tabs(["價格異常", "成交量異常", "趨勢異常", "消息異常"])
+        categorized = categorize_anomalies(anomalies)
+        with category_tabs[0]:
+            _show_anomaly_table(categorized.get("價格異常", pd.DataFrame()))
+        with category_tabs[1]:
+            _show_anomaly_table(categorized.get("成交量異常", pd.DataFrame()))
+        with category_tabs[2]:
+            _show_anomaly_table(categorized.get("趨勢異常", pd.DataFrame()))
+        with category_tabs[3]:
+            with st.spinner("讀取消息異常..."):
+                news_for_anomaly = load_news(force_news, news_days)
+            news_anomaly = news_for_anomaly[
+                news_for_anomaly["tags"].astype(str).str.contains("大盤風險|監管/訴訟|財報/財測|國際", na=False)
+            ].copy()
+            if news_anomaly.empty:
+                st.info("近期沒有明顯消息異常。")
+            else:
+                for row in news_anomaly.head(20).itertuples():
+                    published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
+                    st.markdown(f"**{row.symbol}** · `{row.tags}` · {row.source} · {published}  \n[{row.title}]({row.link})")
 
     st.subheader("下跌前風險線索")
-    risk_notes = [
-        "QQQ 跌破 200DMA 且 200DMA 斜率轉負",
-        "QQQ 相對 SPY 連續 3 個月轉弱",
-        "SMH 相對 QQQ 轉弱，半導體不再領先",
-        "VIX 高於 30 或 20 日實現波動進入近一年高分位",
-        "HYG 走弱或高收益債利差擴大",
-        "少數大型股撐盤，但 watchlist 多數個股低於 50DMA",
-    ]
-    st.write("\n".join(f"- {note}" for note in risk_notes))
+    st.dataframe(
+        risk_clue_table(indicators, macro, snapshot).rename(
+            columns={
+                "indicator": "線索",
+                "current": "目前數值",
+                "risk_threshold": "風險門檻",
+                "status": "狀態",
+                "implication": "解讀",
+            }
+        ),
+        hide_index=True,
+        width="stretch",
+    )
 
 with tab_analog:
     st.subheader("QQQ 歷史相似情境")
-    analogs = historical_analogs(indicators, target="QQQ", top_n=12)
+    sample_choice = st.segmented_control("樣本層級", options=["核心 50 筆", "參考 100 筆"], default="核心 50 筆")
+    analogs_core = historical_analogs(indicators, target="QQQ", top_n=50)
+    analogs_broad = historical_analogs(indicators, target="QQQ", top_n=100)
+    analogs = analogs_core if sample_choice == "核心 50 筆" else analogs_broad
     if analogs.empty:
         st.info("資料量不足，暫時無法計算歷史相似情境。")
     else:
         stats = analog_stats(analogs)
         st.caption(
-            "這裡的上漲比例只代表目前最相似的 12 個歷史樣本中，後續報酬為正的比例；"
-            "樣本很小，不是未來勝率或保證。"
+            "核心 50 筆用來看最接近目前的歷史劇本；參考 100 筆用來看更穩定的背景分布。"
+            "這是歷史條件相似度，不是未來保證。"
         )
         stat_cols = st.columns(len(stats) if len(stats) else 1)
         for i, row in enumerate(stats.itertuples()):
             stat_cols[i].metric(
-                row.horizon,
+                f"後 {row.horizon}",
                 pct(row.avg_return),
-                f"樣本上漲 {pct(row.win_rate)}",
+                f"中位數 {pct(row.median_return)}",
             )
             stat_cols[i].caption(
-                f"N={row.sample}｜保守估計 {pct(row.win_rate_conservative)}｜最差 {pct(row.worst_return)}"
+                f"N={row.sample}｜原始上漲 {pct(row.win_rate)}｜保守勝率 {pct(row.win_rate_conservative)}｜"
+                f"最差10%均值 {pct(row.worst_decile_avg)}｜信心 {row.confidence}"
             )
+
+        st.markdown(
+            """
+            **指標怎麼看：** 平均報酬代表歷史期望值，中位數代表比較典型的結果，保守勝率會修正小樣本過度樂觀，
+            最差 10% 均值用來看壞情境。若樣本數少、分布很分散或平均與中位數互相矛盾，信心等級會下降。
+            """
+        )
 
         analog_display = analogs.copy()
         analog_display["date"] = pd.to_datetime(analog_display["date"]).dt.date
@@ -315,6 +415,7 @@ with tab_analog:
 with tab_news:
     with st.spinner("讀取新聞..."):
         news = load_news(force_news, news_days)
+        international_news = load_international_news(force_news, min(news_days, 7))
     summary = ""
     if use_ai:
         with st.spinner("產生摘要..."):
@@ -336,6 +437,23 @@ with tab_news:
         for row in news_view.head(80).itertuples():
             published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
             st.markdown(f"**{row.symbol}** · `{row.tags}` · {row.source} · {published}  \n[{row.title}]({row.link})")
+
+    st.subheader("今日國際新聞")
+    major_news, random_news = international_news_selection(international_news, random_count=3)
+    if international_news.empty:
+        st.info("目前沒有抓到國際新聞。")
+    else:
+        if not major_news.empty:
+            st.markdown("**重大新聞（戰爭、貿易談判、制裁、出口管制等優先，不計入下方 3 則隨機新聞）**")
+            for row in major_news.head(8).itertuples():
+                published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
+                st.markdown(f"`{row.tags}` · {row.source} · {published}  \n[{row.title}]({row.link})")
+        st.markdown("**隨機 3 則一般國際新聞**")
+        if random_news.empty:
+            st.caption("一般國際新聞不足 3 則。")
+        for row in random_news.itertuples():
+            published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
+            st.markdown(f"`{row.tags}` · {row.source} · {published}  \n[{row.title}]({row.link})")
 
 with tab_charts:
     symbols = st.multiselect("圖表標的", ETF_TICKERS + STOCK_TICKERS + ["SPY", "^VIX", "TLT", "HYG"], default=["QQQ", "SMH", "XLK", "NVDA"])
@@ -412,12 +530,21 @@ VOO,,,500
             with st.spinner("更新持倉價格與新聞..."):
                 portfolio_history = load_portfolio_prices(tickers)
                 portfolio_news = load_portfolio_news(tickers, news_days)
+                market_context = {
+                    "risk_label": conclusion["label"],
+                    "qqq_strong": bool(
+                        isinstance(qqq, pd.Series)
+                        and qqq.get("dist_ma_50", np.nan) > 0
+                        and regime.get("score", 0) >= 55
+                    ),
+                }
                 portfolio_view, portfolio_summary, portfolio_alerts = build_portfolio_view(
                     portfolio_config.positions,
                     portfolio_history,
                     portfolio_news,
                     cash_usd=portfolio_config.cash_usd,
                     max_position_weight=portfolio_config.max_position_weight,
+                    market_context=market_context,
                 )
 
             st.markdown("#### A. 投資組合總覽")
@@ -451,6 +578,8 @@ VOO,,,500
                     "market_heat_score",
                     "market_heat_label",
                     "risk_score",
+                    "position_state",
+                    "suggestion_intensity",
                     "suggestion",
                 ]
                 ].rename(
@@ -466,6 +595,8 @@ VOO,,,500
                         "market_heat_score": "市場熱度分數",
                         "market_heat_label": "熱度解讀",
                         "risk_score": "風險分數",
+                        "position_state": "目前狀態",
+                        "suggestion_intensity": "建議強度",
                         "suggestion": "操作建議",
                     }
                 )
@@ -490,8 +621,11 @@ VOO,,,500
                 advice = portfolio_view[
                 [
                     "ticker",
+                    "position_state",
                     "suggestion",
+                    "suggestion_intensity",
                     "suggestion_reason",
+                    "market_link",
                     "add_price",
                     "trim_price",
                     "stop_loss_price",
@@ -506,8 +640,11 @@ VOO,,,500
                 ].rename(
                     columns={
                         "ticker": "股票代號",
+                        "position_state": "目前狀態",
                         "suggestion": "建議",
+                        "suggestion_intensity": "強度",
                         "suggestion_reason": "理由",
+                        "market_link": "持倉與市場風險連動",
                         "add_price": "加倉價",
                         "trim_price": "減碼價",
                         "stop_loss_price": "停損價",

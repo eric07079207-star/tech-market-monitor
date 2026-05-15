@@ -74,6 +74,14 @@ NEWS_QUERIES = {
     "TSLA": "Tesla TSLA stock",
 }
 
+INTERNATIONAL_NEWS_QUERIES = {
+    "GLOBAL": "global markets economy geopolitics trade",
+    "WAR": "war conflict geopolitical risk global markets",
+    "TRADE": "international trade negotiations tariffs export controls",
+    "CENTRAL_BANKS": "central banks interest rates inflation global markets",
+    "ENERGY": "oil energy supply shock global markets",
+}
+
 
 @dataclass(frozen=True)
 class Horizon:

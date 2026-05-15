@@ -137,6 +137,7 @@ def build_portfolio_view(
     news: pd.DataFrame,
     cash_usd: float = 0.0,
     max_position_weight: float = 0.15,
+    market_context: dict | None = None,
 ) -> tuple[pd.DataFrame, dict, pd.DataFrame]:
     if positions.empty:
         return pd.DataFrame(), _empty_summary(cash_usd), pd.DataFrame()
@@ -218,7 +219,12 @@ def build_portfolio_view(
         ),
         axis=1,
     )
-    suggestions = view.apply(lambda row: recommendation(row.to_dict(), max_position_weight), axis=1, result_type="expand")
+    market_context = market_context or {}
+    suggestions = view.apply(
+        lambda row: recommendation(row.to_dict(), max_position_weight, market_context),
+        axis=1,
+        result_type="expand",
+    )
     view = pd.concat([view, suggestions], axis=1)
     alerts = risk_alerts(view, max_position_weight)
     return view.sort_values("market_value", ascending=False), summary_metrics(view, cash_usd), alerts
@@ -272,7 +278,7 @@ def position_risk_score(
     if pd.notna(unrealized_return) and unrealized_return <= -0.1:
         score += min(abs(unrealized_return) * 150, 25)
     if heat_score >= 85:
-        score += 14
+        score += 10
     if _safe(metrics.get("ret_1d")) <= -0.08:
         score += 18
     if _safe(metrics.get("ret_5d")) <= -0.12:
@@ -284,11 +290,12 @@ def position_risk_score(
     if _safe(metrics.get("volume_ratio_20d"), default=1.0) >= 1.8 and _safe(metrics.get("ret_1d")) < 0:
         score += 10
     if news_metrics.get("negative_event"):
-        score += 20
+        score += 18
     return float(np.clip(score, 0, 100))
 
 
-def recommendation(row: dict, max_position_weight: float) -> dict:
+def recommendation(row: dict, max_position_weight: float, market_context: dict | None = None) -> dict:
+    market_context = market_context or {}
     price = _clean_number(row.get("current_price"))
     avg_cost = _clean_number(row.get("avg_cost"))
     heat = _safe(row.get("market_heat_score"), default=50)
@@ -300,34 +307,73 @@ def recommendation(row: dict, max_position_weight: float) -> dict:
     volume_ratio = _safe(row.get("volume_ratio_20d"), default=1)
     unrealized_return = _clean_number(row.get("unrealized_return"))
     negative_event = bool(row.get("negative_event"))
+    qqq_strong = bool(market_context.get("qqq_strong", False))
+    market_risk = str(market_context.get("risk_label", "觀望"))
 
     stop_loss = price * 0.9 if pd.isna(avg_cost) else min(avg_cost * 0.88, price * 0.93)
     add_price = price * 0.98 if pd.notna(price) else np.nan
     trim_price = price * 1.08 if pd.notna(price) else np.nan
 
-    if (
-        (pd.notna(unrealized_return) and unrealized_return <= -0.1)
+    severe_breakdown = (
+        pd.notna(unrealized_return)
+        and unrealized_return <= -0.12
+        and dist_ma_20 < 0
+        and dist_ma_50 < 0
+        and (volume_ratio >= 1.5 or negative_event)
+    )
+    risk_control = (
+        negative_event
         or (dist_ma_20 < 0 and dist_ma_50 < 0 and volume_ratio >= 1.5 and _safe(row.get("ret_1d")) < 0)
-        or negative_event
-    ):
-        action = "停損" if pd.notna(unrealized_return) and unrealized_return <= -0.1 else "減碼"
-        reason = "跌破成本或均線轉弱，且風險事件/放量下跌訊號偏高。"
-    elif heat > 80 or ret_5d > 0.15 or weight > max_position_weight:
-        action = "減碼"
-        reason = "熱度偏高、短線漲幅或持倉占比已接近風險上限。"
-    elif ret_20d > 0 and dist_ma_20 > 0 and 50 <= heat <= 75 and not negative_event and weight < max_position_weight:
-        action = "加倉"
-        reason = "趨勢向上且尚未過熱，持倉比例仍低於設定上限。"
-    elif pd.notna(avg_cost) and pd.notna(price) and abs(price / avg_cost - 1) <= 0.05 and 40 <= heat <= 70:
-        action = "觀望"
-        reason = "股價接近成本，熱度正常，等待明確突破或跌破。"
+        or (pd.notna(unrealized_return) and unrealized_return <= -0.15)
+    )
+    overheated = heat > 85 or ret_5d > 0.18
+    overweight = weight > max_position_weight
+    uptrend = ret_20d > 0 and dist_ma_20 > 0 and dist_ma_50 > -0.02
+
+    if severe_breakdown:
+        state = "風險升溫"
+        action = "停損觀察"
+        intensity = "高"
+        reason = "虧損較深且同時跌破短中期均線，若放量或負面消息延續，需要優先控管風險。"
+    elif risk_control or (overweight and heat >= 75):
+        state = "偏防守"
+        action = "風險控管"
+        intensity = "高" if negative_event or overweight else "中"
+        reason = "風險事件、放量轉弱或持倉占比偏高，適合先控制倉位，不急著加碼。"
+    elif overheated:
+        state = "偏熱但趨勢強" if uptrend or qqq_strong else "短線過熱"
+        action = "續抱觀察"
+        intensity = "中"
+        reason = "短線熱度偏高，若已有獲利可觀察分批鎖利，但大盤未轉弱前不必視為停損訊號。"
+    elif uptrend and 45 <= heat <= 78 and not negative_event and weight < max_position_weight:
+        state = "偏強"
+        action = "可分批加倉"
+        intensity = "低" if market_risk in {"風險升溫", "防守"} else "中"
+        reason = "趨勢向上且未明顯過熱，持倉比例仍低於上限，適合用分批方式等待合理價格。"
+    elif pd.notna(avg_cost) and pd.notna(price) and abs(price / avg_cost - 1) <= 0.06 and 35 <= heat <= 75:
+        state = "正常"
+        action = "中性觀望"
+        intensity = "低"
+        reason = "股價接近成本、熱度正常，先等突破或跌破訊號確認。"
+    elif pd.notna(unrealized_return) and unrealized_return > 0.25 and qqq_strong:
+        state = "偏強"
+        action = "穩健持有"
+        intensity = "低"
+        reason = "已有明顯獲利且 QQQ 仍偏強，重點是避免追高並持續追蹤熱度。"
     else:
-        action = "持有"
-        reason = "目前訊號未達明確調整條件，維持追蹤。"
+        state = "偏弱" if ret_20d < 0 or dist_ma_50 < 0 else "正常"
+        action = "續抱觀察" if state == "正常" else "等訊號確認"
+        intensity = "中" if state == "偏弱" else "低"
+        reason = "目前訊號未達明確調整條件，維持追蹤，等待趨勢、量能或消息面提供更清楚方向。"
+
+    market_link = _market_link_text(row, market_context)
 
     return {
+        "position_state": state,
         "suggestion": action,
+        "suggestion_intensity": intensity,
         "suggestion_reason": reason,
+        "market_link": market_link,
         "add_price": add_price,
         "trim_price": trim_price,
         "stop_loss_price": stop_loss,
@@ -343,7 +389,11 @@ def summary_metrics(view: pd.DataFrame, cash_usd: float) -> dict:
     total_return = total_pnl / total_cost if pd.notna(total_pnl) and total_cost > 0 else np.nan
     largest = view.sort_values("market_value", ascending=False).iloc[0]
     riskiest = view.sort_values("risk_score", ascending=False).iloc[0]
-    action_count = int(view["suggestion"].isin(["加倉", "減碼", "停損"]).sum()) if "suggestion" in view else 0
+    action_count = (
+        int(view["suggestion_intensity"].isin(["中", "高"]).sum())
+        if "suggestion_intensity" in view
+        else 0
+    )
     return {
         "total_market_value": total_market_value,
         "cash_usd": cash_usd,
@@ -494,3 +544,17 @@ def _empty_summary(cash_usd: float) -> dict:
         "riskiest_position": "n/a",
         "action_count": 0,
     }
+
+
+def _market_link_text(row: dict, market_context: dict) -> str:
+    label = str(market_context.get("risk_label", "觀望"))
+    qqq_strong = bool(market_context.get("qqq_strong", False))
+    heat = _safe(row.get("market_heat_score"), default=50)
+    ticker = row.get("ticker", "")
+    if heat >= 80 and qqq_strong:
+        return f"{ticker} 偏熱，但 QQQ 仍強，偏向續抱觀察而非立即防守。"
+    if heat >= 80 and not qqq_strong:
+        return f"{ticker} 偏熱且大盤不強，追高風險較高。"
+    if label in {"風險升溫", "防守"}:
+        return "大盤風險偏高，個股加倉訊號需更保守解讀。"
+    return "大盤環境未明顯拖累，主要依個股趨勢與持倉比例判斷。"

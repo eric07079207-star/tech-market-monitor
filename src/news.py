@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 import requests
 
-from .config import NEWS_QUERIES
+from .config import INTERNATIONAL_NEWS_QUERIES, NEWS_QUERIES
 
 
 TAG_RULES = {
@@ -21,7 +21,24 @@ TAG_RULES = {
     "分析師": ["analyst", "upgrade", "downgrade", "price target", "rating"],
     "併購/合作": ["acquire", "merger", "partnership", "deal", "investment"],
     "大盤風險": ["selloff", "recession", "risk", "tariff", "geopolitical", "war"],
+    "國際/戰爭": ["war", "conflict", "missile", "ceasefire", "sanction", "geopolitical"],
+    "國際/貿易": ["tariff", "trade talks", "trade negotiation", "export control", "deal", "import"],
 }
+
+MAJOR_INTERNATIONAL_KEYWORDS = [
+    "war",
+    "conflict",
+    "invasion",
+    "missile",
+    "ceasefire",
+    "sanction",
+    "tariff",
+    "trade talks",
+    "trade negotiation",
+    "export control",
+    "oil shock",
+    "emergency",
+]
 
 
 @dataclass(frozen=True)
@@ -86,6 +103,64 @@ def fetch_news_batch(symbols: list[str] | None = None, days: int = 7, limit_per_
     news = pd.DataFrame(rows)
     news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
     return news.sort_values(["published", "symbol"], ascending=[False, True]).reset_index(drop=True)
+
+
+def fetch_international_news(days: int = 3, limit_per_topic: int = 8) -> pd.DataFrame:
+    rows = []
+    seen = set()
+    for topic, query in INTERNATIONAL_NEWS_QUERIES.items():
+        for item in fetch_google_news(topic, query, days=days, limit=limit_per_topic):
+            key = item.title
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(
+                {
+                    "symbol": topic,
+                    "title": item.title,
+                    "source": item.source,
+                    "published": item.published,
+                    "tags": item.tags,
+                    "link": item.link,
+                    "is_major": is_major_international_news(item.title),
+                    "priority": international_news_priority(item.title),
+                }
+            )
+    if not rows:
+        return pd.DataFrame(columns=["symbol", "title", "source", "published", "tags", "link", "is_major", "priority"])
+    news = pd.DataFrame(rows)
+    news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
+    return news.sort_values(["is_major", "priority", "published"], ascending=[False, False, False]).reset_index(drop=True)
+
+
+def international_news_selection(news: pd.DataFrame, random_count: int = 3) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if news.empty:
+        return news.copy(), news.copy()
+    major = news[news["is_major"].fillna(False)].copy()
+    ordinary = news[~news["is_major"].fillna(False)].copy()
+    if ordinary.empty:
+        random_items = ordinary
+    else:
+        random_items = ordinary.sample(n=min(random_count, len(ordinary)), random_state=7).sort_values(
+            ["priority", "published"], ascending=[False, False]
+        )
+    return major, random_items
+
+
+def is_major_international_news(text: str) -> bool:
+    lower = text.lower()
+    return any(word in lower for word in MAJOR_INTERNATIONAL_KEYWORDS)
+
+
+def international_news_priority(text: str) -> int:
+    lower = text.lower()
+    if any(word in lower for word in ["war", "conflict", "missile", "ceasefire", "sanction"]):
+        return 3
+    if any(word in lower for word in ["tariff", "trade talks", "trade negotiation", "export control"]):
+        return 3
+    if any(word in lower for word in ["central bank", "inflation", "rate", "oil"]):
+        return 2
+    return 1
 
 
 def classify_tags(text: str) -> str:

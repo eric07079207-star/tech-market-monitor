@@ -195,6 +195,36 @@ def regime_summary(indicators: pd.DataFrame, macro: pd.DataFrame) -> dict:
     return {"label": label, "score": score, "drivers": drivers[:8]}
 
 
+def today_conclusion(regime: dict, snapshot: pd.DataFrame, anomalies: pd.DataFrame) -> dict:
+    score = float(regime.get("score", np.nan))
+    qqq = snapshot[snapshot["symbol"] == "QQQ"].squeeze() if not snapshot.empty else pd.Series(dtype=float)
+    vix = snapshot[snapshot["symbol"] == "^VIX"].squeeze() if not snapshot.empty else pd.Series(dtype=float)
+    anomaly_count = 0 if anomalies.empty else len(anomalies)
+
+    q_ret = _row_value(qqq, "ret_20d")
+    q_dist_50 = _row_value(qqq, "dist_ma_50")
+    vix_level = _row_value(vix, "close")
+
+    if pd.isna(score):
+        label = "資料不足"
+        sentence = "目前資料不足，先不要把模型結論當成主要依據。"
+    elif score >= 68 and q_dist_50 > 0 and anomaly_count <= 4:
+        label = "偏多"
+        sentence = "科技股主趨勢仍偏多，但仍需留意短線過熱與成交量異常。"
+    elif score >= 50 and (pd.isna(vix_level) or vix_level < 25):
+        label = "觀望偏多"
+        sentence = "大方向尚未轉弱，適合續抱觀察，等待更明確的突破或回檔訊號。"
+    elif score >= 35 or anomaly_count >= 6 or q_ret < -0.05:
+        label = "風險升溫"
+        sentence = "市場仍有支撐，但波動與風險線索增加，短線不適合追高。"
+    else:
+        label = "防守"
+        sentence = "趨勢與風險指標偏弱，優先控管部位與觀察支撐是否守住。"
+
+    confidence = confidence_level(sample=252, dispersion=0.0, conflict_count=anomaly_count)
+    return {"label": label, "sentence": sentence, "confidence": confidence}
+
+
 def detect_anomalies(snapshot: pd.DataFrame) -> pd.DataFrame:
     if snapshot.empty:
         return snapshot
@@ -223,6 +253,104 @@ def detect_anomalies(snapshot: pd.DataFrame) -> pd.DataFrame:
 
     if not rows:
         return pd.DataFrame(columns=list(snapshot.columns) + ["flags"])
+    return pd.DataFrame(rows)
+
+
+def categorize_anomalies(anomalies: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    categories = {
+        "價格異常": ["單日漲跌", "日報酬", "跳空"],
+        "成交量異常": ["成交量"],
+        "趨勢異常": ["均線", "波動"],
+    }
+    result: dict[str, pd.DataFrame] = {}
+    for label, keywords in categories.items():
+        if anomalies.empty or "flags" not in anomalies:
+            result[label] = pd.DataFrame(columns=anomalies.columns if not anomalies.empty else [])
+            continue
+        mask = anomalies["flags"].astype(str).apply(lambda text: any(keyword in text for keyword in keywords))
+        result[label] = anomalies[mask].copy()
+    return result
+
+
+def risk_clue_table(indicators: pd.DataFrame, macro: pd.DataFrame, snapshot: pd.DataFrame) -> pd.DataFrame:
+    wide = _wide_close(indicators)
+    macro_wide = build_macro_wide(macro)
+    qqq = snapshot[snapshot["symbol"] == "QQQ"].squeeze() if not snapshot.empty else pd.Series(dtype=float)
+    vix = snapshot[snapshot["symbol"] == "^VIX"].squeeze() if not snapshot.empty else pd.Series(dtype=float)
+
+    rows = []
+    rows.append(
+        _risk_row(
+            "QQQ 與長期均線",
+            _row_value(qqq, "dist_ma_200"),
+            "低於 200DMA 或 200DMA 斜率轉負",
+            _row_value(qqq, "dist_ma_200") < 0 or _row_value(qqq, "ma200_slope_20d") < 0,
+            "長期趨勢轉弱時，科技股回撤通常會更深、更久。",
+            value_format="pct",
+        )
+    )
+    rows.append(
+        _risk_row(
+            "QQQ 相對 SPY",
+            _relative_return(wide, "QQQ", "SPY", 63),
+            "近 3 個月相對報酬轉負",
+            _relative_return(wide, "QQQ", "SPY", 63) < 0,
+            "科技股失去領先地位，代表資金可能從成長股轉向防守或價值股。",
+            value_format="pct",
+        )
+    )
+    rows.append(
+        _risk_row(
+            "半導體相對 QQQ",
+            _relative_return(wide, "SMH", "QQQ", 63),
+            "近 3 個月相對報酬轉負",
+            _relative_return(wide, "SMH", "QQQ", 63) < 0,
+            "半導體常是科技股風險偏好的核心，轉弱時需要降低追高意願。",
+            value_format="pct",
+        )
+    )
+    rows.append(
+        _risk_row(
+            "VIX 壓力",
+            _row_value(vix, "close"),
+            "高於 25 留意，高於 30 代表壓力升高",
+            _row_value(vix, "close") >= 25,
+            "波動率上升通常代表避險需求增加，容易放大下跌。",
+            value_format="number",
+        )
+    )
+    hy_value = np.nan
+    hy_change = np.nan
+    if not macro_wide.empty and "BAMLH0A0HYM2" in macro_wide:
+        hy = macro_wide["BAMLH0A0HYM2"].dropna()
+        if len(hy) > 65:
+            hy_value = hy.iloc[-1]
+            hy_change = hy.iloc[-1] - hy.iloc[-64]
+    rows.append(
+        _risk_row(
+            "高收益債利差",
+            hy_change,
+            "3 個月擴大超過 0.75",
+            pd.notna(hy_change) and hy_change > 0.75,
+            f"信用市場變緊會壓抑風險資產；最新利差約 {hy_value:.2f}。" if pd.notna(hy_value) else "信用資料不足。",
+            value_format="number",
+        )
+    )
+    if not snapshot.empty and {"group", "dist_ma_50"}.issubset(snapshot.columns):
+        watch = snapshot[snapshot["group"].isin(["ETF", "個股"])]
+        breadth = float((watch["dist_ma_50"] > 0).mean()) if not watch.empty else np.nan
+    else:
+        breadth = np.nan
+    rows.append(
+        _risk_row(
+            "Watchlist 廣度",
+            breadth,
+            "低於 50% 站上 50DMA",
+            pd.notna(breadth) and breadth < 0.5,
+            "少數大型股撐盤而多數個股轉弱，是大跌前常見的隱性分歧。",
+            value_format="pct",
+        )
+    )
     return pd.DataFrame(rows)
 
 
@@ -318,11 +446,37 @@ def analog_stats(analogs: pd.DataFrame) -> pd.DataFrame:
                 "win_rate_conservative": _wilson_lower_bound(wins, sample),
                 "avg_return": float(values.mean()),
                 "median_return": float(values.median()),
+                "worst_decile_avg": float(values.nsmallest(max(1, int(np.ceil(sample * 0.1)))).mean()),
                 "worst_return": float(values.min()),
                 "best_return": float(values.max()),
+                "confidence": confidence_level(
+                    sample=sample,
+                    dispersion=float(values.std()) if sample > 1 else np.nan,
+                    conflict_count=int(((values > 0).mean() > 0.55 and values.median() < 0) or ((values > 0).mean() < 0.45 and values.median() > 0)),
+                ),
             }
         )
     return pd.DataFrame(rows)
+
+
+def confidence_level(sample: int, dispersion: float | None = None, conflict_count: int = 0) -> str:
+    score = 0
+    if sample >= 80:
+        score += 2
+    elif sample >= 30:
+        score += 1
+    if dispersion is not None and pd.notna(dispersion):
+        if dispersion <= 0.08:
+            score += 1
+        elif dispersion >= 0.18:
+            score -= 1
+    if conflict_count >= 5:
+        score -= 1
+    if score >= 3:
+        return "高"
+    if score >= 1:
+        return "中"
+    return "低"
 
 
 def _wilson_lower_bound(wins: int, sample: int, z: float = 1.96) -> float:
@@ -354,3 +508,43 @@ def _compact_regime_text(row: pd.Series) -> str:
     if row.get("volume_z_60d", np.nan) > 2:
         parts.append("volume spike")
     return ", ".join(parts)
+
+
+def _row_value(row: pd.Series, column: str) -> float:
+    if isinstance(row, pd.Series) and column in row:
+        value = row.get(column)
+        try:
+            return float(value) if pd.notna(value) else np.nan
+        except (TypeError, ValueError):
+            return np.nan
+    return np.nan
+
+
+def _relative_return(wide: pd.DataFrame, left: str, right: str, window: int) -> float:
+    if wide.empty or not {left, right}.issubset(wide.columns):
+        return np.nan
+    rel = (wide[left] / wide[right]).pct_change(window).dropna()
+    return float(rel.iloc[-1]) if not rel.empty else np.nan
+
+
+def _risk_row(
+    name: str,
+    value: float,
+    threshold: str,
+    triggered: bool,
+    implication: str,
+    value_format: str,
+) -> dict:
+    if pd.isna(value):
+        display_value = "n/a"
+    elif value_format == "pct":
+        display_value = f"{value:.2%}"
+    else:
+        display_value = f"{value:.2f}"
+    return {
+        "indicator": name,
+        "current": display_value,
+        "risk_threshold": threshold,
+        "status": "觸發" if triggered else "未觸發",
+        "implication": implication,
+    }
