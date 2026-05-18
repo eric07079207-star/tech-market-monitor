@@ -8,7 +8,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.ai_summary import build_gemini_summary, save_ai_summary
+from src.ai_summary import build_openai_summary, save_ai_summary
 from src.data import cache_path
 from src.indicators import add_price_indicators, detect_anomalies, latest_snapshot
 from src.news import portfolio_news_impact
@@ -40,7 +40,7 @@ def main() -> None:
     if portfolio_config is not None and not portfolio_config.positions.empty and not news.empty:
         portfolio_impact = portfolio_news_impact(news, portfolio_config.positions, max_items=8)
 
-    payload = build_gemini_summary(
+    payload = build_openai_summary(
         snapshot=snapshot,
         anomalies=anomalies,
         news=news,

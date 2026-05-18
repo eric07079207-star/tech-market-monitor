@@ -17,7 +17,7 @@ from .news import rule_based_news_summary
 AI_SUMMARY_CACHE = cache_path("ai_summary.json")
 
 
-def build_gemini_summary(
+def build_openai_summary(
     snapshot: pd.DataFrame,
     anomalies: pd.DataFrame,
     news: pd.DataFrame,
@@ -25,8 +25,8 @@ def build_gemini_summary(
     discovery_candidates: pd.DataFrame | None = None,
     portfolio_impact: pd.DataFrame | None = None,
 ) -> dict:
-    api_key = _get_secret("GEMINI_API_KEY")
-    model = _get_secret("GEMINI_MODEL") or "gemini-2.5-flash"
+    api_key = _get_secret("OPENAI_API_KEY")
+    model = _get_secret("OPENAI_MODEL") or "gpt-4.1-mini"
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     fallback_text = _fallback(snapshot, anomalies, news)
     if not api_key:
@@ -36,36 +36,32 @@ def build_gemini_summary(
             model="rule_based",
             generated_at=generated_at,
             used_ai=False,
-            status="尚未設定 GEMINI_API_KEY，已使用規則摘要。",
+            status="尚未設定 OPENAI_API_KEY，已使用規則摘要。",
         )
 
     try:
-        prompt = _build_gemini_prompt(snapshot, anomalies, news, international_news, discovery_candidates, portfolio_impact)
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        prompt = _build_summary_prompt(snapshot, anomalies, news, international_news, discovery_candidates, portfolio_impact)
         response = requests.post(
-            url,
-            params={"key": api_key},
+            "https://api.openai.com/v1/responses",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.25,
-                    "maxOutputTokens": 4096,
-                    "thinkingConfig": {"thinkingBudget": 0},
-                },
+                "model": model,
+                "input": prompt,
+                "temperature": 0.25,
+                "max_output_tokens": 1200,
             },
             timeout=45,
         )
         response.raise_for_status()
-        data = response.json()
-        text = _extract_gemini_text(data)
+        text = _extract_openai_text(response.json())
         if _is_complete_summary(text):
             return _summary_payload(
                 text=text,
-                provider="gemini",
+                provider="openai",
                 model=model,
                 generated_at=generated_at,
                 used_ai=True,
-                status="Gemini AI 摘要已成功產生。",
+                status="OpenAI AI 摘要已成功產生。",
             )
         return _summary_payload(
             text=fallback_text,
@@ -73,7 +69,7 @@ def build_gemini_summary(
             model="rule_based",
             generated_at=generated_at,
             used_ai=False,
-            status="Gemini 回覆過短或章節不完整，已改用規則摘要。",
+            status="OpenAI 回覆過短或章節不完整，已改用規則摘要。",
         )
     except Exception as exc:
         return _summary_payload(
@@ -82,7 +78,7 @@ def build_gemini_summary(
             model="rule_based",
             generated_at=generated_at,
             used_ai=False,
-            status=f"Gemini 摘要失敗，已改用規則摘要：{_safe_error(exc)}",
+            status=f"OpenAI 摘要失敗，已改用規則摘要：{_safe_error(exc)}",
         )
 
 
@@ -174,7 +170,7 @@ def _fallback(snapshot: pd.DataFrame, anomalies: pd.DataFrame, news: pd.DataFram
     return "\n".join(lines)
 
 
-def _build_gemini_prompt(
+def _build_summary_prompt(
     snapshot: pd.DataFrame,
     anomalies: pd.DataFrame,
     news: pd.DataFrame,
@@ -252,13 +248,19 @@ def _safe_error(exc: Exception) -> str:
     message = str(exc).split("\n")[0][:160]
     message = re.sub(r"key=([^&\\s]+)", "key=[REDACTED]", message)
     message = re.sub(r"AIza[0-9A-Za-z_\\-]{20,}", "[REDACTED_API_KEY]", message)
+    message = re.sub(r"sk-[0-9A-Za-z_\\-]{20,}", "[REDACTED_API_KEY]", message)
     return f"{name}: {message}"
 
 
-def _extract_gemini_text(data: dict) -> str:
-    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-    text = "\n".join(str(part.get("text", "")).strip() for part in parts if part.get("text"))
-    return text.strip()
+def _extract_openai_text(data: dict) -> str:
+    if data.get("output_text"):
+        return str(data["output_text"]).strip()
+    chunks = []
+    for item in data.get("output", []):
+        for content in item.get("content", []):
+            if content.get("type") in {"output_text", "text"} and content.get("text"):
+                chunks.append(str(content["text"]))
+    return "\n".join(chunks).strip()
 
 
 def _is_complete_summary(text: str) -> bool:

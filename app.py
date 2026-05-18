@@ -354,7 +354,7 @@ with st.sidebar:
     news_days = st.slider("新聞回看天數", 3, 30, 10)
     show_health = st.button("顯示資料健康檢查", width="stretch")
     st.caption("資料由 GitHub Actions 每 6 小時自動更新；前台只讀快取，避免人為刷新造成偏差。")
-    st.caption("AI 摘要每日 07:00（台灣時間）由 Gemini 自動生成；前台只讀取摘要快取。")
+    st.caption("AI 摘要每日 07:00（台灣時間）由 OpenAI 自動生成；前台只讀取摘要快取。")
 
 with st.spinner("讀取市場資料..."):
     prices, macro = load_market(str(default_start_date()))

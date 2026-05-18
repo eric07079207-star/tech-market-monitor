@@ -1,8 +1,8 @@
 {
-  "text": "今日主要異常：\n- SMH: 20 日波動位於近一年高檔\n- SOXX: 20 日波動位於近一年高檔\n- AMD: 20 日波動位於近一年高檔\n- GOOGL: 20 日波動位於近一年高檔\n- META: 同時低於 50/200 日均線\n- NVDA: 20 日波動位於近一年高檔\n- TLT: 同時低於 50/200 日均線\n- ^VIX: 跳空超過 3%；同時低於 50/200 日均線\n\n近期新聞集中在 AI/晶片、大盤風險、財報/財測、產品/需求，主要覆蓋 QQQ, MSFT, VGT, SMH, GOOGL, XLK, AMZN, IGV。\n- History Says VUG Is Not Worth Your Money. Hold This Instead - 24/7 Wall St.\n- How Microsoft Stock Can Climb To $600 - Forbes\n- Looking for a Single Tech ETF? Do Not Overlook This Option. - Yahoo Finance\n- S&P 500 vs Nasdaq-100: What's the Better Index to Track Right Now? - AOL.com\n- QQQ ETF vs S&P 500: Should You Choose Tech or a Broad-Market Fund? - News and Statistics - IndexBox",
+  "text": "今日主要異常：\n- SMH: 20 日波動位於近一年高檔\n- SOXX: 20 日波動位於近一年高檔\n- XLK: 20 日波動位於近一年高檔\n- AMD: 20 日波動位於近一年高檔\n- GOOGL: 20 日波動位於近一年高檔\n- META: 同時低於 50/200 日均線\n- NVDA: 20 日波動位於近一年高檔\n- TLT: 同時低於 50/200 日均線\n\n近期新聞集中在 AI/晶片、大盤風險、財報/財測、國際/戰爭，主要覆蓋 NVDA, AMZN, TSLA, QQQ, MSFT, VGT, SMH, GOOGL。\n- How Nvidia Stock Can Hit $300 Post Earnings - Barron's\n- The Next Big Rally in Amazon.com Stock Could Start Like This - Trefis\n- Elon Musk Provides New Timeline For Tesla Robotaxi Expansion - Investor's Business Daily\n- History Says VUG Is Not Worth Your Money. Hold This Instead - 24/7 Wall St.\n- How Microsoft Stock Can Climb To $600 - Forbes",
   "provider": "rules",
   "model": "rule_based",
-  "generated_at_utc": "2026-05-18T14:12:37+00:00",
+  "generated_at_utc": "2026-05-18T14:57:28+00:00",
   "used_ai": false,
-  "status": "Gemini 摘要失敗，已改用規則摘要：HTTPError: 503 Server Error: Service Unavailable for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=[REDACTED]"
+  "status": "尚未設定 OPENAI_API_KEY，已使用規則摘要。"
 }
