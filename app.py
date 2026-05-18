@@ -13,11 +13,36 @@ except ImportError:  # pragma: no cover - optional local dependency
     st_autorefresh = None
 
 from src.ai_summary import build_ai_summary
-from src.annual_picks import annual_picks_summary, annual_picks_table
-from src.config import ANNUAL_PICK_TICKERS, ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
+from src.config import ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
+try:
+    from src.config import ANNUAL_PICK_TICKERS
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    ANNUAL_PICK_TICKERS = ["TSLA", "PLTR", "CRWD", "VST", "RKLB", "IONQ", "OKLO", "SOFI", "HOOD", "TMDX"]
+try:
+    from src.annual_picks import annual_picks_summary, annual_picks_table
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def annual_picks_table(prices: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame({"ticker": ANNUAL_PICK_TICKERS})
+
+    def annual_picks_summary(table: pd.DataFrame) -> dict:
+        return {"avg_return": np.nan, "win_rate": np.nan, "best": "n/a", "worst": "n/a", "avg_rel_qqq": np.nan}
 from src.data import cache_path, load_cached_market_data, load_metadata, refresh_market_data
-from src.discovery import build_discovery_candidates, fetch_discovery_news
-from src.health import data_health_report, missing_price_symbols
+try:
+    from src.discovery import build_discovery_candidates, fetch_discovery_news
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def fetch_discovery_news(days: int = 7, topics_per_day: int = 5, limit_per_topic: int = 7) -> pd.DataFrame:
+        return pd.DataFrame(columns=["topic", "symbol", "title", "source", "published", "tags", "link", "tickers"])
+
+    def build_discovery_candidates(news: pd.DataFrame, lookback_days: int = 180, top_n: int = 12) -> tuple[pd.DataFrame, pd.DataFrame]:
+        return pd.DataFrame(), pd.DataFrame()
+try:
+    from src.health import data_health_report, missing_price_symbols
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def data_health_report(*args, **kwargs) -> pd.DataFrame:
+        return pd.DataFrame([{"資料項目": "資料同步中", "筆數": 0, "最新日期": "n/a", "說明": "等待雲端部署完成"}])
+
+    def missing_price_symbols(prices: pd.DataFrame, symbols: list[str]) -> list[str]:
+        return []
 from src.indicators import (
     add_price_indicators,
     analog_stats,
@@ -476,26 +501,26 @@ with tab_overview:
     pick_cols[2].metric("相對 QQQ", pct(annual_summary["avg_rel_qqq"]))
     pick_cols[3].metric("最佳", annual_summary["best"])
     pick_cols[4].metric("最弱", annual_summary["worst"])
+    annual_display = annual_picks.rename(
+        columns={
+            "ticker": "股票",
+            "theme": "主題",
+            "risk_level": "風險",
+            "selected_date": "選入日",
+            "selected_price": "選入價",
+            "current_price": "現價",
+            "return_since_selected": "選入後報酬",
+            "relative_spy": "相對 SPY",
+            "relative_qqq": "相對 QQQ",
+            "max_drawdown": "最大回撤",
+            "status": "狀態",
+            "reason": "選入理由",
+            "risk": "主要風險",
+        }
+    )
+    annual_columns = ["股票", "主題", "風險", "選入價", "現價", "選入後報酬", "相對 QQQ", "最大回撤", "狀態", "選入理由", "主要風險"]
     st.dataframe(
-        annual_picks.rename(
-            columns={
-                "ticker": "股票",
-                "theme": "主題",
-                "risk_level": "風險",
-                "selected_date": "選入日",
-                "selected_price": "選入價",
-                "current_price": "現價",
-                "return_since_selected": "選入後報酬",
-                "relative_spy": "相對 SPY",
-                "relative_qqq": "相對 QQQ",
-                "max_drawdown": "最大回撤",
-                "status": "狀態",
-                "reason": "選入理由",
-                "risk": "主要風險",
-            }
-        )[
-            ["股票", "主題", "風險", "選入價", "現價", "選入後報酬", "相對 QQQ", "最大回撤", "狀態", "選入理由", "主要風險"]
-        ],
+        annual_display[[col for col in annual_columns if col in annual_display.columns]],
         hide_index=True,
         width="stretch",
         column_config={
