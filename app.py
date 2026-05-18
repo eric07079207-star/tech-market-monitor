@@ -10,7 +10,21 @@ try:
 except ImportError:  # pragma: no cover - optional local dependency
     st_autorefresh = None
 
-from src.ai_summary import ai_summary_quality, load_cached_ai_summary
+try:
+    from src.ai_summary import ai_summary_quality, load_cached_ai_summary
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def load_cached_ai_summary(path=None) -> dict:
+        return {}
+
+    def ai_summary_quality(payload: dict) -> dict:
+        return {
+            "quality_score": 0,
+            "quality_label": "資料同步中",
+            "text_length": 0,
+            "section_count": 0,
+            "required_sections": 6,
+            "missing_sections": "等待模組同步",
+        }
 from src.config import ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
 try:
     from src.config import ANNUAL_PICK_TICKERS
