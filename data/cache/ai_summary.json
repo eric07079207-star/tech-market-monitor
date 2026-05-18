@@ -1,8 +1,8 @@
 {
-  "text": "## 今日市場結論\n今日科技股市場呈現普遍回檔，半導體板塊跌幅尤為顯著，VIX指數上升反映市場避險情緒有所增溫。考量到",
-  "provider": "gemini",
-  "model": "gemini-2.5-flash",
-  "generated_at_utc": "2026-05-18T11:02:45+00:00",
-  "used_ai": true,
-  "status": "Gemini AI 摘要已成功產生。"
+  "text": "今日主要異常：\n- SMH: 跳空超過 3%；20 日波動位於近一年高檔\n- SOXX: 跳空超過 3%；20 日波動位於近一年高檔\n- AMD: 單日漲跌超過 5%；跳空超過 3%；20 日波動位於近一年高檔\n- GOOGL: 20 日波動位於近一年高檔\n- META: 同時低於 50/200 日均線\n- NVDA: 20 日波動位於近一年高檔\n- IWM: 日報酬 z-score 異常\n- SPY: 日報酬 z-score 異常\n\n近期新聞集中在 AI/晶片、大盤風險、財報/財測、產品/需求，主要覆蓋 QQQ, SMH, GOOGL, XLK, VGT, AMZN, IGV, AMD。\n- 6 ETFs to Buy in Q2 2026 - AOL.com\n- S&P 500 vs Nasdaq-100: What's the Better Index to Track Right Now? - AOL.com\n- Why Would Anyone Buy SPYM Instead of QQQ? - The Motley Fool\n- QQQ ETF vs S&P 500: Should You Choose Tech or a Broad-Market Fund? - News and Statistics - IndexBox\n- Semiconductors Drive New Tech Advances - VanEck",
+  "provider": "rules",
+  "model": "rule_based",
+  "generated_at_utc": "2026-05-18T11:05:49+00:00",
+  "used_ai": false,
+  "status": "Gemini 摘要失敗，已改用規則摘要：HTTPError: 429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyD7vQnos1dFnRPCUP"
 }
