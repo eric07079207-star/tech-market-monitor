@@ -12,6 +12,7 @@ def data_health_report(
     metadata: dict,
     discovery_news: pd.DataFrame | None = None,
     discovery_candidates: pd.DataFrame | None = None,
+    discovery_history: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     rows = [
         _row("市場價格", len(prices), _max_date(prices, "date"), "價格與量能快取"),
@@ -21,6 +22,7 @@ def data_health_report(
         _row("預測紀錄", len(prediction_log), _max_date(prediction_log, "prediction_date"), "5D/20D/60D 驗證資料"),
         _row("新聞探索", len(discovery_news) if discovery_news is not None else 0, _max_date(discovery_news, "published") if discovery_news is not None else "n/a", "隨機主題新聞"),
         _row("候選觀察股", len(discovery_candidates) if discovery_candidates is not None else 0, "n/a", "新聞探索量化候選"),
+        _row("候選歷史紀錄", len(discovery_history) if discovery_history is not None else 0, _max_date(discovery_history, "date") if discovery_history is not None else "n/a", "每日 Top 15 候選追蹤"),
     ]
     report = pd.DataFrame(rows)
     report["快取更新 UTC"] = metadata.get("updated_at_utc", "尚未寫入")

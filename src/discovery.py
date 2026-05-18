@@ -14,7 +14,7 @@ from .news import fetch_google_news
 FALSE_TICKERS = {
     "AI", "CEO", "CFO", "COO", "USA", "SEC", "GDP", "IPO", "ETF", "FED", "FBI", "DOJ", "FDA",
     "EPS", "EBITDA", "NYSE", "NASDAQ", "US", "EU", "UK", "Q", "A", "I", "AM", "PM", "THE",
-    "YTD", "SPAC", "SLIM", "EV", "ETF", "CEO", "CAN", "MSN",
+    "YTD", "SPAC", "SLIM", "EV", "ETF", "CEO", "CAN", "MSN", "CNN", "AOL",
 }
 
 
@@ -46,7 +46,7 @@ def fetch_discovery_news(days: int = 7, topics_per_day: int = 5, limit_per_topic
     return news.sort_values(["published", "topic"], ascending=[False, True]).reset_index(drop=True)
 
 
-def build_discovery_candidates(news: pd.DataFrame, lookback_days: int = 180, top_n: int = 12) -> tuple[pd.DataFrame, pd.DataFrame]:
+def build_discovery_candidates(news: pd.DataFrame, lookback_days: int = 180, top_n: int = 15) -> tuple[pd.DataFrame, pd.DataFrame]:
     if news.empty or "tickers" not in news:
         return pd.DataFrame(), pd.DataFrame()
 
@@ -81,6 +81,85 @@ def build_discovery_candidates(news: pd.DataFrame, lookback_days: int = 180, top
     if metrics.empty:
         return mention_df, metrics
     return mention_df, metrics.sort_values("candidate_score", ascending=False).head(top_n).reset_index(drop=True)
+
+
+def update_discovery_history(candidates: pd.DataFrame, path=None, run_date: date | str | None = None) -> pd.DataFrame:
+    path = path or cache_path("discovery_history.parquet")
+    history = load_discovery_history(path)
+    if candidates.empty:
+        return history
+
+    current_date = pd.to_datetime(run_date or pd.Timestamp.today(tz="UTC").date()).date().isoformat()
+    today = candidates.copy().head(15)
+    today["date"] = current_date
+    ordered_cols = ["date"] + [col for col in today.columns if col != "date"]
+    today = today[ordered_cols]
+
+    if not history.empty and "date" in history:
+        history = history[pd.to_datetime(history["date"], errors="coerce").dt.date.astype(str) != current_date]
+    history = pd.concat([history, today], ignore_index=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    history.to_parquet(path, index=False)
+    return history
+
+
+def load_discovery_history(path=None) -> pd.DataFrame:
+    path = path or cache_path("discovery_history.parquet")
+    if not path.exists():
+        return pd.DataFrame()
+    history = pd.read_parquet(path)
+    if "date" in history:
+        history["date"] = pd.to_datetime(history["date"], errors="coerce")
+    return history
+
+
+def summarize_discovery_history(history: pd.DataFrame, days: int, top_n: int = 15) -> pd.DataFrame:
+    if history.empty or "date" not in history:
+        return pd.DataFrame()
+    data = history.copy()
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    cutoff = pd.Timestamp.today().normalize() - pd.Timedelta(days=days - 1)
+    data = data[data["date"] >= cutoff]
+    if data.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for ticker, group in data.groupby("ticker", sort=False):
+        risk_hits = group["risk_flags"].fillna("").astype(str).ne("未觸發主要風險").sum() if "risk_flags" in group else 0
+        topics = sorted(set("、".join(group.get("topic", pd.Series(dtype=str)).dropna().astype(str)).split("、")) - {""})
+        avg_score = group["candidate_score"].mean()
+        max_score = group["candidate_score"].max()
+        appearance_days = group["date"].dt.date.nunique()
+        headline_count = group.get("headline_count", pd.Series(0, index=group.index)).sum()
+        avg_rel_qqq = group.get("rel_qqq_20d", pd.Series(dtype=float)).mean()
+        rank_score = (
+            avg_score * 0.38
+            + max_score * 0.18
+            + min(appearance_days, days) * 4.0
+            + min(len(topics), 5) * 3.0
+            + min(headline_count, 20) * 1.2
+            + _num(avg_rel_qqq) * 80
+            - risk_hits * 4.0
+        )
+        latest = group.sort_values("date").iloc[-1]
+        rows.append(
+            {
+                "ticker": ticker,
+                "rank_score": float(np.clip(rank_score, 0, 100)),
+                "appearance_days": int(appearance_days),
+                "avg_candidate_score": float(avg_score),
+                "max_candidate_score": float(max_score),
+                "topic_count": int(len(topics)),
+                "topics": "、".join(topics[:4]),
+                "headline_count": int(headline_count),
+                "avg_rel_qqq": float(avg_rel_qqq) if pd.notna(avg_rel_qqq) else np.nan,
+                "risk_count": int(risk_hits),
+                "latest_reason": latest.get("observation_reason", ""),
+                "latest_risk": latest.get("risk_flags", ""),
+                "sample_headline": latest.get("sample_headline", ""),
+            }
+        )
+    return pd.DataFrame(rows).sort_values("rank_score", ascending=False).head(top_n).reset_index(drop=True)
 
 
 def extract_tickers(text: str) -> list[str]:

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -26,15 +24,15 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 
     def annual_picks_summary(table: pd.DataFrame) -> dict:
         return {"avg_return": np.nan, "win_rate": np.nan, "best": "n/a", "worst": "n/a", "avg_rel_qqq": np.nan}
-from src.data import cache_path, load_cached_market_data, load_metadata, refresh_market_data
+from src.data import MACRO_CACHE, PRICE_CACHE, cache_path, load_metadata
 try:
-    from src.discovery import build_discovery_candidates, fetch_discovery_news
+    from src.discovery import load_discovery_history, summarize_discovery_history
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
-    def fetch_discovery_news(days: int = 7, topics_per_day: int = 5, limit_per_topic: int = 7) -> pd.DataFrame:
-        return pd.DataFrame(columns=["topic", "symbol", "title", "source", "published", "tags", "link", "tickers"])
+    def load_discovery_history(path=None) -> pd.DataFrame:
+        return pd.DataFrame()
 
-    def build_discovery_candidates(news: pd.DataFrame, lookback_days: int = 180, top_n: int = 12) -> tuple[pd.DataFrame, pd.DataFrame]:
-        return pd.DataFrame(), pd.DataFrame()
+    def summarize_discovery_history(history: pd.DataFrame, days: int, top_n: int = 15) -> pd.DataFrame:
+        return pd.DataFrame()
 try:
     from src.health import data_health_report, missing_price_symbols
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
@@ -91,11 +89,8 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 
 from src.news import fetch_news_batch
 try:
-    from src.news import fetch_international_news, international_news_selection, portfolio_news_impact
+    from src.news import international_news_selection, portfolio_news_impact
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
-    def fetch_international_news(days: int = 3, limit_per_topic: int = 8) -> pd.DataFrame:
-        return pd.DataFrame(columns=["symbol", "title", "source", "published", "tags", "link", "is_major", "priority"])
-
     def international_news_selection(news: pd.DataFrame, random_count: int = 3) -> tuple[pd.DataFrame, pd.DataFrame]:
         return news.copy(), news.copy()
 
@@ -155,60 +150,52 @@ st.markdown(
 
 
 @st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
-def load_market(force_refresh: bool, start: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    if force_refresh:
-        return refresh_market_data(start=start)
-    return load_cached_market_data(start=start, force_refresh=False)
+def load_market(start: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if not PRICE_CACHE.exists():
+        return pd.DataFrame(), pd.DataFrame()
+    prices = pd.read_parquet(PRICE_CACHE)
+    prices["date"] = pd.to_datetime(prices["date"])
+    if start:
+        prices = prices[prices["date"] >= pd.to_datetime(start)]
+    macro = pd.read_parquet(MACRO_CACHE) if MACRO_CACHE.exists() else pd.DataFrame(columns=["date", "series", "label", "value"])
+    if not macro.empty and "date" in macro:
+        macro["date"] = pd.to_datetime(macro["date"])
+    return prices, macro
 
 
 @st.cache_data(show_spinner=False, ttl=60 * 60 * 3)
-def load_news(force_refresh: bool, days: int) -> pd.DataFrame:
+def load_news(days: int) -> pd.DataFrame:
     news_path = cache_path("news.parquet")
-    if not force_refresh and news_path.exists():
-        news = pd.read_parquet(news_path)
-        news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
-        return news
-    news = fetch_news_batch(symbols=list(NEWS_QUERIES), days=days, limit_per_symbol=8)
-    if not news.empty:
-        news.to_parquet(news_path, index=False)
+    if not news_path.exists():
+        return pd.DataFrame(columns=["symbol", "title", "source", "published", "tags", "link"])
+    news = pd.read_parquet(news_path)
+    news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
     return news
 
 
 @st.cache_data(show_spinner=False, ttl=60 * 60 * 3)
-def load_international_news(force_refresh: bool, days: int) -> pd.DataFrame:
+def load_international_news(days: int) -> pd.DataFrame:
     news_path = cache_path("international_news.parquet")
-    if not force_refresh and news_path.exists():
-        news = pd.read_parquet(news_path)
-        news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
-        return news
-    news = fetch_international_news(days=min(days, 7), limit_per_topic=8)
-    if not news.empty:
-        news.to_parquet(news_path, index=False)
+    if not news_path.exists():
+        return pd.DataFrame(columns=["symbol", "title", "source", "published", "tags", "link", "is_major", "priority"])
+    news = pd.read_parquet(news_path)
+    news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
     return news
 
 
 @st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
-def load_discovery(force_refresh: bool, days: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_discovery() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     news_path = cache_path("discovery_news.parquet")
     candidates_path = cache_path("discovery_candidates.parquet")
     mentions_path = cache_path("discovery_mentions.parquet")
-    if not force_refresh and news_path.exists() and candidates_path.exists():
-        discovery_news = pd.read_parquet(news_path)
-        candidates = pd.read_parquet(candidates_path)
-        mentions = pd.read_parquet(mentions_path) if mentions_path.exists() else pd.DataFrame()
-        for data, column in [(discovery_news, "published"), (mentions, "published")]:
-            if not data.empty and column in data:
-                data[column] = pd.to_datetime(data[column], utc=True, errors="coerce")
-        return discovery_news, mentions, candidates
-    discovery_news = fetch_discovery_news(days=min(days, 7), topics_per_day=5, limit_per_topic=7)
-    mentions, candidates = build_discovery_candidates(discovery_news, top_n=12)
-    if not discovery_news.empty:
-        discovery_news.to_parquet(news_path, index=False)
-    if not mentions.empty:
-        mentions.to_parquet(mentions_path, index=False)
-    if not candidates.empty:
-        candidates.to_parquet(candidates_path, index=False)
-    return discovery_news, mentions, candidates
+    discovery_news = pd.read_parquet(news_path) if news_path.exists() else pd.DataFrame()
+    candidates = pd.read_parquet(candidates_path) if candidates_path.exists() else pd.DataFrame()
+    mentions = pd.read_parquet(mentions_path) if mentions_path.exists() else pd.DataFrame()
+    history = load_discovery_history()
+    for data, column in [(discovery_news, "published"), (mentions, "published")]:
+        if not data.empty and column in data:
+            data[column] = pd.to_datetime(data[column], utc=True, errors="coerce")
+    return discovery_news, mentions, candidates, history
 
 
 @st.cache_data(show_spinner=False, ttl=60 * 5)
@@ -287,23 +274,67 @@ def _show_anomaly_table(data: pd.DataFrame) -> None:
     )
 
 
+def latest_value(data: pd.DataFrame, column: str) -> str:
+    if data.empty or column not in data:
+        return "n/a"
+    value = pd.to_datetime(data[column], errors="coerce").max()
+    if pd.isna(value):
+        return "n/a"
+    return str(value.date())
+
+
+def render_discovery_rank_table(data: pd.DataFrame, title: str) -> None:
+    st.markdown(f"#### {title}")
+    if data.empty:
+        st.info("目前歷史資料還不足，累積幾天後會自動產生排行。")
+        return
+    display = data.rename(
+        columns={
+            "ticker": "股票",
+            "rank_score": "潛力分數",
+            "appearance_days": "入榜天數",
+            "avg_candidate_score": "平均候選分",
+            "max_candidate_score": "最高候選分",
+            "topic_count": "主題數",
+            "topics": "主要主題",
+            "headline_count": "新聞數",
+            "avg_rel_qqq": "平均相對QQQ",
+            "risk_count": "風險次數",
+            "latest_reason": "最新理由",
+            "latest_risk": "最新風險",
+            "sample_headline": "代表新聞",
+        }
+    )
+    st.dataframe(
+        display,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "潛力分數": st.column_config.NumberColumn(format="%.0f"),
+            "平均候選分": st.column_config.NumberColumn(format="%.0f"),
+            "最高候選分": st.column_config.NumberColumn(format="%.0f"),
+            "平均相對QQQ": st.column_config.NumberColumn(format="%.2%"),
+        },
+    )
+
+
 with st.sidebar:
     st.header("設定")
-    start_date = st.date_input("歷史起點", value=default_start_date())
     news_days = st.slider("新聞回看天數", 3, 30, 10)
-    force_data = st.button("更新市場資料", width="stretch")
-    force_news = st.button("更新新聞", width="stretch")
     use_ai = st.toggle("產生 AI 摘要", value=False)
     show_health = st.button("顯示資料健康檢查", width="stretch")
-    st.caption("每日收盤後可執行 `scripts/update_data.py` 更新快取。")
+    st.caption("資料由 GitHub Actions 每 6 小時自動更新；前台只讀快取，避免人為刷新造成偏差。")
 
 with st.spinner("讀取市場資料..."):
-    prices, macro = load_market(force_data, str(start_date))
+    prices, macro = load_market(str(default_start_date()))
 
 if prices.empty:
-    st.error("目前沒有市場資料。請稍後再按一次更新市場資料。")
+    st.error("目前沒有市場資料。請等待 GitHub Actions 完成下一次資料更新。")
     st.stop()
 
+news = load_news(news_days)
+international_news = load_international_news(min(news_days, 7))
+discovery_news, discovery_mentions, discovery_candidates, discovery_history = load_discovery()
 indicators = add_price_indicators(prices)
 snapshot = latest_snapshot(indicators)
 anomalies = detect_anomalies(snapshot)
@@ -318,6 +349,15 @@ st.title("科技股量化監控儀表板")
 last_date = pd.to_datetime(snapshot["date"]).max().date() if not snapshot.empty else None
 updated_at = metadata.get("updated_at_utc", "尚未寫入")
 st.markdown(f"<span class='small-muted'>市場資料日期：{last_date}｜快取更新 UTC：{updated_at}</span>", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.subheader("最後更新")
+    st.caption(f"市場價格：{last_date}")
+    st.caption(f"標的新聞：{latest_value(news, 'published')}")
+    st.caption(f"國際新聞：{latest_value(international_news, 'published')}")
+    st.caption(f"新聞探索：{latest_value(discovery_news, 'published')}")
+    st.caption(f"探索歷史：{latest_value(discovery_history, 'date')}")
+    st.caption(f"快取寫入 UTC：{updated_at}")
 
 top = st.columns([1.2, 1, 1, 1])
 top[0].metric("Regime Score", pct(regime["score"] / 100 if pd.notna(regime["score"]) else np.nan))
@@ -340,21 +380,18 @@ for card_col, card in zip(card_cols, conclusion_cards(regime, conclusion, market
     render_insight_card(card_col, card["title"], card["value"], card.get("detail", ""))
 
 if show_health:
-    with st.spinner("整理資料健康檢查..."):
-        health_news = load_news(False, news_days)
-        health_international = load_international_news(False, min(news_days, 7))
-        health_discovery_news, _, health_discovery_candidates = load_discovery(False, news_days)
     st.subheader("資料健康檢查")
     st.dataframe(
         data_health_report(
             prices,
             macro,
-            health_news,
-            health_international,
+            news,
+            international_news,
             prediction_log,
             metadata,
-            health_discovery_news,
-            health_discovery_candidates,
+            discovery_news,
+            discovery_candidates,
+            discovery_history,
         ),
         hide_index=True,
         width="stretch",
@@ -546,11 +583,11 @@ with tab_anomaly:
         with category_tabs[2]:
             _show_anomaly_table(categorized.get("趨勢異常", pd.DataFrame()))
         with category_tabs[3]:
-            with st.spinner("讀取消息異常..."):
-                news_for_anomaly = load_news(force_news, news_days)
-            news_anomaly = news_for_anomaly[
-                news_for_anomaly["tags"].astype(str).str.contains("大盤風險|監管/訴訟|財報/財測|國際", na=False)
-            ].copy()
+            news_anomaly = pd.DataFrame()
+            if not news.empty and "tags" in news:
+                news_anomaly = news[
+                    news["tags"].astype(str).str.contains("大盤風險|監管/訴訟|財報/財測|國際", na=False)
+                ].copy()
             if news_anomaly.empty:
                 st.info("近期沒有明顯消息異常。")
             else:
@@ -646,9 +683,6 @@ with tab_analog:
         )
 
 with tab_news:
-    with st.spinner("讀取新聞..."):
-        news = load_news(force_news, news_days)
-        international_news = load_international_news(force_news, min(news_days, 7))
     summary = ""
     if use_ai:
         with st.spinner("產生摘要..."):
@@ -717,12 +751,7 @@ with tab_news:
 
 with tab_discovery:
     st.subheader("新聞探索候選股")
-    st.caption("每天用日期作為隨機種子抽取市場主題，從新聞中找 ticker，再用量價規則評分；這是觀察清單，不是買入建議。")
-    refresh_discovery = st.button("重新整理新聞探索", width="stretch")
-    if refresh_discovery:
-        load_discovery.clear()
-    with st.spinner("讀取新聞探索資料..."):
-        discovery_news, discovery_mentions, discovery_candidates = load_discovery(force_news or refresh_discovery, news_days)
+    st.caption("每天用日期作為隨機種子抽取市場主題，從新聞中找 ticker，再用量價規則評分；系統每日記錄 Top 15，這是觀察清單，不是買入建議。")
 
     topic_summary = (
         discovery_news.groupby("topic").size().reset_index(name="新聞數").sort_values("新聞數", ascending=False)
@@ -737,32 +766,32 @@ with tab_discovery:
             st.dataframe(topic_summary.rename(columns={"topic": "主題"}), hide_index=True, width="stretch")
 
     with right_disc:
-        st.markdown("#### 候選觀察股 Top 12")
+        st.markdown("#### 今日候選觀察股 Top 5")
         if discovery_candidates.empty:
             st.info("目前沒有從探索新聞抽到可驗證的候選股。")
         else:
+            daily_display = discovery_candidates.rename(
+                columns={
+                    "ticker": "股票",
+                    "topic": "相關主題",
+                    "candidate_score": "候選分數",
+                    "candidate_label": "分數解讀",
+                    "current_price": "現價",
+                    "ret_5d": "5日",
+                    "ret_20d": "20日",
+                    "volume_ratio_20d": "量/20日均量",
+                    "dist_ma_50": "距50DMA",
+                    "dist_ma_200": "距200DMA",
+                    "rel_spy_20d": "相對SPY",
+                    "rel_qqq_20d": "相對QQQ",
+                    "risk_flags": "風險標籤",
+                    "observation_reason": "觀察理由",
+                    "sample_headline": "代表新聞",
+                }
+            )
+            daily_columns = ["股票", "相關主題", "候選分數", "分數解讀", "現價", "5日", "20日", "量/20日均量", "距50DMA", "相對QQQ", "風險標籤", "觀察理由", "代表新聞"]
             st.dataframe(
-                discovery_candidates.rename(
-                    columns={
-                        "ticker": "股票",
-                        "topic": "相關主題",
-                        "candidate_score": "候選分數",
-                        "candidate_label": "分數解讀",
-                        "current_price": "現價",
-                        "ret_5d": "5日",
-                        "ret_20d": "20日",
-                        "volume_ratio_20d": "量/20日均量",
-                        "dist_ma_50": "距50DMA",
-                        "dist_ma_200": "距200DMA",
-                        "rel_spy_20d": "相對SPY",
-                        "rel_qqq_20d": "相對QQQ",
-                        "risk_flags": "風險標籤",
-                        "observation_reason": "觀察理由",
-                        "sample_headline": "代表新聞",
-                    }
-                )[
-                    ["股票", "相關主題", "候選分數", "分數解讀", "現價", "5日", "20日", "量/20日均量", "距50DMA", "相對QQQ", "風險標籤", "觀察理由", "代表新聞"]
-                ],
+                daily_display[[col for col in daily_columns if col in daily_display.columns]].head(5),
                 hide_index=True,
                 width="stretch",
                 column_config={
@@ -775,6 +804,33 @@ with tab_discovery:
                     "相對QQQ": st.column_config.NumberColumn(format="%.2%"),
                 },
             )
+            with st.expander("查看今日 Top 15"):
+                st.dataframe(
+                    daily_display[[col for col in daily_columns if col in daily_display.columns]].head(15),
+                    hide_index=True,
+                    width="stretch",
+                    column_config={
+                        "候選分數": st.column_config.NumberColumn(format="%.0f"),
+                        "現價": st.column_config.NumberColumn(format="$%.2f"),
+                        "5日": st.column_config.NumberColumn(format="%.2%"),
+                        "20日": st.column_config.NumberColumn(format="%.2%"),
+                        "量/20日均量": st.column_config.NumberColumn(format="%.2fx"),
+                        "距50DMA": st.column_config.NumberColumn(format="%.2%"),
+                        "相對QQQ": st.column_config.NumberColumn(format="%.2%"),
+                    },
+                )
+
+    weekly_candidates = summarize_discovery_history(discovery_history, days=7, top_n=15)
+    monthly_candidates = summarize_discovery_history(discovery_history, days=30, top_n=15)
+    weekly_tab, monthly_tab = st.tabs(["本週潛力排行", "本月潛力排行"])
+    with weekly_tab:
+        render_discovery_rank_table(weekly_candidates.head(5), "預設 Top 5")
+        with st.expander("展開本週 Top 15"):
+            render_discovery_rank_table(weekly_candidates, "本週 Top 15")
+    with monthly_tab:
+        render_discovery_rank_table(monthly_candidates.head(5), "預設 Top 5")
+        with st.expander("展開本月 Top 15"):
+            render_discovery_rank_table(monthly_candidates, "本月 Top 15")
 
     st.markdown("#### 探索新聞")
     if discovery_news.empty:
@@ -852,10 +908,7 @@ VOO,,,500
                 st.caption("目前環境尚未安裝 streamlit-autorefresh，雲端部署後會依 requirements 自動安裝。")
 
             tickers = tuple(portfolio_config.positions["ticker"].dropna().astype(str).str.upper().drop_duplicates())
-            refresh_portfolio = st.button("立即刷新持倉資料", width="stretch")
-            if refresh_portfolio:
-                load_portfolio_prices.clear()
-                load_portfolio_news.clear()
+            st.caption(f"持倉價格與新聞會在頁面開啟時自動刷新，間隔約 {portfolio_config.refresh_seconds // 60} 分鐘。")
 
             with st.spinner("更新持倉價格與新聞..."):
                 portfolio_history = load_portfolio_prices(tickers)
