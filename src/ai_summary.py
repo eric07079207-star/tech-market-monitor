@@ -23,7 +23,7 @@ def build_gemini_summary(
     portfolio_impact: pd.DataFrame | None = None,
 ) -> dict:
     api_key = _get_secret("GEMINI_API_KEY")
-    model = _get_secret("GEMINI_MODEL") or "gemini-2.5-flash"
+    model = _get_secret("GEMINI_MODEL") or "gemini-2.0-flash"
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     fallback_text = _fallback(snapshot, anomalies, news)
     if not api_key:
@@ -44,14 +44,14 @@ def build_gemini_summary(
             params={"key": api_key},
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.25, "maxOutputTokens": 1100},
+                "generationConfig": {"temperature": 0.25, "maxOutputTokens": 1800},
             },
             timeout=45,
         )
         response.raise_for_status()
         data = response.json()
         text = _extract_gemini_text(data)
-        if text:
+        if _is_complete_summary(text):
             return _summary_payload(
                 text=text,
                 provider="gemini",
@@ -66,7 +66,7 @@ def build_gemini_summary(
             model="rule_based",
             generated_at=generated_at,
             used_ai=False,
-            status="Gemini 回傳空白內容，已改用規則摘要。",
+            status="Gemini 回覆過短或章節不完整，已改用規則摘要。",
         )
     except Exception as exc:
         return _summary_payload(
@@ -216,3 +216,10 @@ def _extract_gemini_text(data: dict) -> str:
     parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
     text = "\n".join(str(part.get("text", "")).strip() for part in parts if part.get("text"))
     return text.strip()
+
+
+def _is_complete_summary(text: str) -> bool:
+    if len(text.strip()) < 350:
+        return False
+    required = ["今日市場結論", "量化訊號", "新聞與國際風險", "明日觀察重點"]
+    return all(section in text for section in required)
