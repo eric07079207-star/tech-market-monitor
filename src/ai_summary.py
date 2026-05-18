@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -23,7 +24,7 @@ def build_gemini_summary(
     portfolio_impact: pd.DataFrame | None = None,
 ) -> dict:
     api_key = _get_secret("GEMINI_API_KEY")
-    model = _get_secret("GEMINI_MODEL") or "gemini-2.0-flash"
+    model = _get_secret("GEMINI_MODEL") or "gemini-2.5-flash"
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     fallback_text = _fallback(snapshot, anomalies, news)
     if not api_key:
@@ -44,7 +45,11 @@ def build_gemini_summary(
             params={"key": api_key},
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.25, "maxOutputTokens": 1800},
+                "generationConfig": {
+                    "temperature": 0.25,
+                    "maxOutputTokens": 4096,
+                    "thinkingConfig": {"thinkingBudget": 0},
+                },
             },
             timeout=45,
         )
@@ -209,6 +214,8 @@ def _build_gemini_prompt(
 def _safe_error(exc: Exception) -> str:
     name = exc.__class__.__name__
     message = str(exc).split("\n")[0][:160]
+    message = re.sub(r"key=([^&\\s]+)", "key=[REDACTED]", message)
+    message = re.sub(r"AIza[0-9A-Za-z_\\-]{20,}", "[REDACTED_API_KEY]", message)
     return f"{name}: {message}"
 
 

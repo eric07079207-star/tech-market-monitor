@@ -4,5 +4,5 @@
   "model": "rule_based",
   "generated_at_utc": "2026-05-18T11:05:49+00:00",
   "used_ai": false,
-  "status": "Gemini 摘要失敗，已改用規則摘要：HTTPError: 429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyD7vQnos1dFnRPCUP"
+  "status": "Gemini 摘要失敗，已改用規則摘要：HTTPError: 429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContentkey=[REDACTED]"
 }
