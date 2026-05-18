@@ -32,7 +32,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/cache/prices.parquet data/cache/macro.parquet data/cache/news.parquet data/cache/international_news.parquet data/cache/prediction_log.csv data/cache/metadata.json
+          git add data/cache/prices.parquet data/cache/macro.parquet data/cache/news.parquet data/cache/international_news.parquet data/cache/discovery_news.parquet data/cache/discovery_mentions.parquet data/cache/discovery_candidates.parquet data/cache/prediction_log.csv data/cache/metadata.json
           git diff --cached --quiet && exit 0
           git commit -m "Update market data cache"
           git push

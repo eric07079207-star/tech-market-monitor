@@ -13,8 +13,11 @@ except ImportError:  # pragma: no cover - optional local dependency
     st_autorefresh = None
 
 from src.ai_summary import build_ai_summary
-from src.config import ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
+from src.annual_picks import annual_picks_summary, annual_picks_table
+from src.config import ANNUAL_PICK_TICKERS, ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
 from src.data import cache_path, load_cached_market_data, load_metadata, refresh_market_data
+from src.discovery import build_discovery_candidates, fetch_discovery_news
+from src.health import data_health_report, missing_price_symbols
 from src.indicators import (
     add_price_indicators,
     analog_stats,
@@ -159,6 +162,30 @@ def load_international_news(force_refresh: bool, days: int) -> pd.DataFrame:
     return news
 
 
+@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+def load_discovery(force_refresh: bool, days: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    news_path = cache_path("discovery_news.parquet")
+    candidates_path = cache_path("discovery_candidates.parquet")
+    mentions_path = cache_path("discovery_mentions.parquet")
+    if not force_refresh and news_path.exists() and candidates_path.exists():
+        discovery_news = pd.read_parquet(news_path)
+        candidates = pd.read_parquet(candidates_path)
+        mentions = pd.read_parquet(mentions_path) if mentions_path.exists() else pd.DataFrame()
+        for data, column in [(discovery_news, "published"), (mentions, "published")]:
+            if not data.empty and column in data:
+                data[column] = pd.to_datetime(data[column], utc=True, errors="coerce")
+        return discovery_news, mentions, candidates
+    discovery_news = fetch_discovery_news(days=min(days, 7), topics_per_day=5, limit_per_topic=7)
+    mentions, candidates = build_discovery_candidates(discovery_news, top_n=12)
+    if not discovery_news.empty:
+        discovery_news.to_parquet(news_path, index=False)
+    if not mentions.empty:
+        mentions.to_parquet(mentions_path, index=False)
+    if not candidates.empty:
+        candidates.to_parquet(candidates_path, index=False)
+    return discovery_news, mentions, candidates
+
+
 @st.cache_data(show_spinner=False, ttl=60 * 5)
 def load_portfolio_prices(tickers: tuple[str, ...]) -> pd.DataFrame:
     return fetch_portfolio_prices(list(tickers), period="1y")
@@ -242,6 +269,7 @@ with st.sidebar:
     force_data = st.button("更新市場資料", width="stretch")
     force_news = st.button("更新新聞", width="stretch")
     use_ai = st.toggle("產生 AI 摘要", value=False)
+    show_health = st.button("顯示資料健康檢查", width="stretch")
     st.caption("每日收盤後可執行 `scripts/update_data.py` 更新快取。")
 
 with st.spinner("讀取市場資料..."):
@@ -259,6 +287,7 @@ conclusion = today_conclusion(regime, snapshot, anomalies)
 market_prediction = build_market_prediction(regime, conclusion, snapshot)
 prediction_log = load_prediction_log()
 metadata = load_metadata()
+annual_picks = annual_picks_table(prices)
 
 st.title("科技股量化監控儀表板")
 last_date = pd.to_datetime(snapshot["date"]).max().date() if not snapshot.empty else None
@@ -285,8 +314,34 @@ card_cols = st.columns(4)
 for card_col, card in zip(card_cols, conclusion_cards(regime, conclusion, market_prediction, anomalies)):
     render_insight_card(card_col, card["title"], card["value"], card.get("detail", ""))
 
-tab_overview, tab_anomaly, tab_analog, tab_news, tab_charts, tab_portfolio = st.tabs(
-    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "走勢圖", "我的持倉"]
+if show_health:
+    with st.spinner("整理資料健康檢查..."):
+        health_news = load_news(False, news_days)
+        health_international = load_international_news(False, min(news_days, 7))
+        health_discovery_news, _, health_discovery_candidates = load_discovery(False, news_days)
+    st.subheader("資料健康檢查")
+    st.dataframe(
+        data_health_report(
+            prices,
+            macro,
+            health_news,
+            health_international,
+            prediction_log,
+            metadata,
+            health_discovery_news,
+            health_discovery_candidates,
+        ),
+        hide_index=True,
+        width="stretch",
+    )
+    missing = missing_price_symbols(prices, ETF_TICKERS + STOCK_TICKERS + ANNUAL_PICK_TICKERS + ["SPY", "QQQ"])
+    if missing:
+        st.warning("缺少價格資料：" + ", ".join(missing[:20]))
+    else:
+        st.success("主要追蹤標的價格資料完整。")
+
+tab_overview, tab_anomaly, tab_analog, tab_news, tab_discovery, tab_charts, tab_portfolio = st.tabs(
+    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "新聞探索", "走勢圖", "我的持倉"]
 )
 
 with tab_overview:
@@ -412,6 +467,46 @@ with tab_overview:
                 """
             )
 
+    st.subheader("Codex 年度十大高成長觀察股")
+    st.caption("獨立研究名單，不影響 QQQ 市場預測或你的持倉建議。選入日以 2026-05-18 作為追蹤基準。")
+    annual_summary = annual_picks_summary(annual_picks)
+    pick_cols = st.columns(5)
+    pick_cols[0].metric("平均報酬", pct(annual_summary["avg_return"]))
+    pick_cols[1].metric("勝率", pct(annual_summary["win_rate"]))
+    pick_cols[2].metric("相對 QQQ", pct(annual_summary["avg_rel_qqq"]))
+    pick_cols[3].metric("最佳", annual_summary["best"])
+    pick_cols[4].metric("最弱", annual_summary["worst"])
+    st.dataframe(
+        annual_picks.rename(
+            columns={
+                "ticker": "股票",
+                "theme": "主題",
+                "risk_level": "風險",
+                "selected_date": "選入日",
+                "selected_price": "選入價",
+                "current_price": "現價",
+                "return_since_selected": "選入後報酬",
+                "relative_spy": "相對 SPY",
+                "relative_qqq": "相對 QQQ",
+                "max_drawdown": "最大回撤",
+                "status": "狀態",
+                "reason": "選入理由",
+                "risk": "主要風險",
+            }
+        )[
+            ["股票", "主題", "風險", "選入價", "現價", "選入後報酬", "相對 QQQ", "最大回撤", "狀態", "選入理由", "主要風險"]
+        ],
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "選入價": st.column_config.NumberColumn(format="$%.2f"),
+            "現價": st.column_config.NumberColumn(format="$%.2f"),
+            "選入後報酬": st.column_config.NumberColumn(format="%.2%"),
+            "相對 QQQ": st.column_config.NumberColumn(format="%.2%"),
+            "最大回撤": st.column_config.NumberColumn(format="%.2%"),
+        },
+    )
+
 with tab_anomaly:
     st.subheader("今日異常訊號")
     if anomalies.empty:
@@ -532,13 +627,15 @@ with tab_news:
     summary = ""
     if use_ai:
         with st.spinner("產生摘要..."):
-            summary, used_ai = build_ai_summary(snapshot, anomalies, news)
+            summary, used_ai, ai_status = build_ai_summary(snapshot, anomalies, news)
         st.subheader("AI 市場摘要" if used_ai else "規則摘要")
+        (st.success if used_ai else st.warning)(ai_status)
         st.markdown(summary)
     else:
         from src.news import rule_based_news_summary
 
         st.subheader("規則摘要")
+        st.caption("AI 摘要目前未開啟；這裡使用規則摘要，不會消耗 AI 額度。")
         st.markdown(rule_based_news_summary(news))
 
     st.subheader("新聞標籤與連結")
@@ -592,6 +689,76 @@ with tab_news:
         for row in random_news.itertuples():
             published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
             st.markdown(f"`{row.tags}` · {row.source} · {published}  \n[{row.title}]({row.link})")
+
+with tab_discovery:
+    st.subheader("新聞探索候選股")
+    st.caption("每天用日期作為隨機種子抽取市場主題，從新聞中找 ticker，再用量價規則評分；這是觀察清單，不是買入建議。")
+    refresh_discovery = st.button("重新整理新聞探索", width="stretch")
+    if refresh_discovery:
+        load_discovery.clear()
+    with st.spinner("讀取新聞探索資料..."):
+        discovery_news, discovery_mentions, discovery_candidates = load_discovery(force_news or refresh_discovery, news_days)
+
+    topic_summary = (
+        discovery_news.groupby("topic").size().reset_index(name="新聞數").sort_values("新聞數", ascending=False)
+        if not discovery_news.empty else pd.DataFrame(columns=["topic", "新聞數"])
+    )
+    left_disc, right_disc = st.columns([1, 1.6])
+    with left_disc:
+        st.markdown("#### 今日隨機探索主題")
+        if topic_summary.empty:
+            st.info("目前沒有探索新聞。")
+        else:
+            st.dataframe(topic_summary.rename(columns={"topic": "主題"}), hide_index=True, width="stretch")
+
+    with right_disc:
+        st.markdown("#### 候選觀察股 Top 12")
+        if discovery_candidates.empty:
+            st.info("目前沒有從探索新聞抽到可驗證的候選股。")
+        else:
+            st.dataframe(
+                discovery_candidates.rename(
+                    columns={
+                        "ticker": "股票",
+                        "topic": "相關主題",
+                        "candidate_score": "候選分數",
+                        "candidate_label": "分數解讀",
+                        "current_price": "現價",
+                        "ret_5d": "5日",
+                        "ret_20d": "20日",
+                        "volume_ratio_20d": "量/20日均量",
+                        "dist_ma_50": "距50DMA",
+                        "dist_ma_200": "距200DMA",
+                        "rel_spy_20d": "相對SPY",
+                        "rel_qqq_20d": "相對QQQ",
+                        "risk_flags": "風險標籤",
+                        "observation_reason": "觀察理由",
+                        "sample_headline": "代表新聞",
+                    }
+                )[
+                    ["股票", "相關主題", "候選分數", "分數解讀", "現價", "5日", "20日", "量/20日均量", "距50DMA", "相對QQQ", "風險標籤", "觀察理由", "代表新聞"]
+                ],
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "候選分數": st.column_config.NumberColumn(format="%.0f"),
+                    "現價": st.column_config.NumberColumn(format="$%.2f"),
+                    "5日": st.column_config.NumberColumn(format="%.2%"),
+                    "20日": st.column_config.NumberColumn(format="%.2%"),
+                    "量/20日均量": st.column_config.NumberColumn(format="%.2fx"),
+                    "距50DMA": st.column_config.NumberColumn(format="%.2%"),
+                    "相對QQQ": st.column_config.NumberColumn(format="%.2%"),
+                },
+            )
+
+    st.markdown("#### 探索新聞")
+    if discovery_news.empty:
+        st.info("目前沒有探索新聞可顯示。")
+    else:
+        for row in discovery_news.head(30).itertuples():
+            published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
+            tickers_text = f"｜tickers: `{row.tickers}`" if getattr(row, "tickers", "") else ""
+            st.markdown(f"**{row.topic}** · `{row.tags}` · {row.source} · {published} {tickers_text}  \n[{row.title}]({row.link})")
 
 with tab_charts:
     symbols = st.multiselect("圖表標的", ETF_TICKERS + STOCK_TICKERS + ["SPY", "^VIX", "TLT", "HYG"], default=["QQQ", "SMH", "XLK", "NVDA"])

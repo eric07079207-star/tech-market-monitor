@@ -7,10 +7,10 @@ import pandas as pd
 from .news import rule_based_news_summary
 
 
-def build_ai_summary(snapshot: pd.DataFrame, anomalies: pd.DataFrame, news: pd.DataFrame) -> tuple[str, bool]:
+def build_ai_summary(snapshot: pd.DataFrame, anomalies: pd.DataFrame, news: pd.DataFrame) -> tuple[str, bool, str]:
     api_key = _get_secret("OPENAI_API_KEY")
     if not api_key:
-        return _fallback(snapshot, anomalies, news), False
+        return _fallback(snapshot, anomalies, news), False, "尚未設定 OpenAI API key，目前使用規則摘要。"
 
     try:
         from openai import OpenAI
@@ -25,11 +25,11 @@ def build_ai_summary(snapshot: pd.DataFrame, anomalies: pd.DataFrame, news: pd.D
         )
         text = getattr(response, "output_text", "") or ""
         if text.strip():
-            return text.strip(), True
+            return text.strip(), True, "AI 摘要已成功產生。"
     except Exception as exc:
-        return f"{_fallback(snapshot, anomalies, news)}\n\nAI 摘要暫時無法產生：{exc}", False
+        return _fallback(snapshot, anomalies, news), False, f"AI 摘要失敗，已改用規則摘要：{_safe_error(exc)}"
 
-    return _fallback(snapshot, anomalies, news), False
+    return _fallback(snapshot, anomalies, news), False, "AI 回傳空白內容，已改用規則摘要。"
 
 
 def _get_secret(name: str) -> str | None:
@@ -82,3 +82,9 @@ def _build_prompt(snapshot: pd.DataFrame, anomalies: pd.DataFrame, news: pd.Data
 新聞：
 {news_rows}
 """.strip()
+
+
+def _safe_error(exc: Exception) -> str:
+    name = exc.__class__.__name__
+    message = str(exc).split("\n")[0][:160]
+    return f"{name}: {message}"
