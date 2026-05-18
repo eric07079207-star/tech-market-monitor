@@ -10,7 +10,7 @@ try:
 except ImportError:  # pragma: no cover - optional local dependency
     st_autorefresh = None
 
-from src.ai_summary import build_ai_summary
+from src.ai_summary import load_cached_ai_summary
 from src.config import ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
 try:
     from src.config import ANNUAL_PICK_TICKERS
@@ -321,9 +321,9 @@ def render_discovery_rank_table(data: pd.DataFrame, title: str) -> None:
 with st.sidebar:
     st.header("設定")
     news_days = st.slider("新聞回看天數", 3, 30, 10)
-    use_ai = st.toggle("產生 AI 摘要", value=False)
     show_health = st.button("顯示資料健康檢查", width="stretch")
     st.caption("資料由 GitHub Actions 每 6 小時自動更新；前台只讀快取，避免人為刷新造成偏差。")
+    st.caption("AI 摘要每日 07:00（台灣時間）由 Gemini 自動生成；前台只讀取摘要快取。")
 
 with st.spinner("讀取市場資料..."):
     prices, macro = load_market(str(default_start_date()))
@@ -335,6 +335,7 @@ if prices.empty:
 news = load_news(news_days)
 international_news = load_international_news(min(news_days, 7))
 discovery_news, discovery_mentions, discovery_candidates, discovery_history = load_discovery()
+ai_summary = load_cached_ai_summary()
 indicators = add_price_indicators(prices)
 snapshot = latest_snapshot(indicators)
 anomalies = detect_anomalies(snapshot)
@@ -357,6 +358,7 @@ with st.sidebar:
     st.caption(f"國際新聞：{latest_value(international_news, 'published')}")
     st.caption(f"新聞探索：{latest_value(discovery_news, 'published')}")
     st.caption(f"探索歷史：{latest_value(discovery_history, 'date')}")
+    st.caption(f"AI 摘要：{ai_summary.get('generated_at_utc', '尚未產生')}")
     st.caption(f"快取寫入 UTC：{updated_at}")
 
 top = st.columns([1.2, 1, 1, 1])
@@ -683,18 +685,20 @@ with tab_analog:
         )
 
 with tab_news:
-    summary = ""
-    if use_ai:
-        with st.spinner("產生摘要..."):
-            summary, used_ai, ai_status = build_ai_summary(snapshot, anomalies, news)
-        st.subheader("AI 市場摘要" if used_ai else "規則摘要")
-        (st.success if used_ai else st.warning)(ai_status)
-        st.markdown(summary)
-    else:
-        from src.news import rule_based_news_summary
+    from src.news import rule_based_news_summary
 
-        st.subheader("規則摘要")
-        st.caption("AI 摘要目前未開啟；這裡使用規則摘要，不會消耗 AI 額度。")
+    st.subheader("每日 AI 市場摘要")
+    if ai_summary:
+        used_ai = bool(ai_summary.get("used_ai"))
+        status = ai_summary.get("status", "")
+        provider = ai_summary.get("provider", "n/a")
+        model = ai_summary.get("model", "n/a")
+        generated = ai_summary.get("generated_at_utc", "n/a")
+        (st.success if used_ai else st.warning)(status)
+        st.caption(f"來源：{provider}｜模型：{model}｜生成 UTC：{generated}｜排程：每日 07:00 台灣時間")
+        st.markdown(ai_summary.get("text", ""))
+    else:
+        st.warning("尚未產生每日 AI 摘要，先顯示規則摘要。GitHub Actions 會在每日 07:00 台灣時間自動生成。")
         st.markdown(rule_based_news_summary(news))
 
     st.subheader("新聞標籤與連結")
