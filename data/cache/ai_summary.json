@@ -1,8 +1,8 @@
 {
-  "text": "今日主要異常：\n- SMH: 20 日波動位於近一年高檔\n- SOXX: 20 日波動位於近一年高檔\n- XLK: 20 日波動位於近一年高檔\n- AMD: 20 日波動位於近一年高檔\n- GOOGL: 20 日波動位於近一年高檔\n- META: 同時低於 50/200 日均線\n- NVDA: 20 日波動位於近一年高檔\n- TLT: 同時低於 50/200 日均線\n\n近期新聞集中在 AI/晶片、大盤風險、財報/財測、國際/戰爭，主要覆蓋 NVDA, AMZN, TSLA, QQQ, MSFT, VGT, SMH, GOOGL。\n- How Nvidia Stock Can Hit $300 Post Earnings - Barron's\n- The Next Big Rally in Amazon.com Stock Could Start Like This - Trefis\n- Elon Musk Provides New Timeline For Tesla Robotaxi Expansion - Investor's Business Daily\n- History Says VUG Is Not Worth Your Money. Hold This Instead - 24/7 Wall St.\n- How Microsoft Stock Can Climb To $600 - Forbes",
-  "provider": "rules",
-  "model": "rule_based",
-  "generated_at_utc": "2026-05-18T14:57:28+00:00",
-  "used_ai": false,
-  "status": "尚未設定 OPENAI_API_KEY，已使用規則摘要。"
+  "text": "## 今日市場結論  \n科技股整體呈現觀望格局，主要指數如QQQ與多數科技ETF短線回調，但20日報酬仍維持正向，顯示中期趨勢尚有支撐。波動性指標VIX維持低位，風險情緒相對穩定，信心等級中等偏保守。\n\n## 量化訊號  \n1. QQQ、SMH、SOXX等主要科技與半導體ETF短線下跌，且SMH、SOXX波動率位於近一年高檔。  \n2. 多數科技股價格仍高於50日與200日均線，顯示中長期趨勢偏多，但成交量普遍低於20日均量。  \n3. VIX指數跳空超過3%，但整體波動率呈現下降趨勢，市場風險情緒未明顯升溫。  \n4. 個股如IONQ、OKLO、TMDX出現單日超過5%跌幅，需留意短期波動風險。  \n5. META、PLTR、SOFI等多檔股價低於50日及200日均線，短期承壓。\n\n## 新聞與國際風險  \n1. 美國與中國領導人峰會帶來戰略穩定預期，但伊朗戰爭風險仍存在，能源供應緊張可能影響全球市場。  \n2. 中東衝突推升油價，國際能源署（IEA）警告供應恢復需時，增加市場不確定性。  \n3. 美國央行政策錯誤風險因戰爭驅動的能源價格上漲而加劇，可能影響利率走向。  \n4. 多家媒體報導科技巨頭財報與產品需求，NVIDIA、Google、Amazon等持續受到市場關注。  \n5. 部分ETF如IGV因軟體類股表現不佳，出現季度大幅回調，反映市場對特定子產業的分歧。\n\n## 對持倉影響  \n目前持倉中需關注半導體相關ETF（SMH、SOXX）波動率提升帶來的短期調整風險，以及軟體類ETF（IGV）近期表現疲弱。個股如NVDA、GOOGL財報與產品動向仍是後續觀察重點。整體建議維持謹慎，留意國際地緣政治與能源市場變化對持倉的潛在影響。\n\n## 候選觀察股  \n1. CXDO：股價站上50日均線，新聞提及，技術面與消息面均有支撐，風險較低。  \n2. ICHR：回歸正向EPS指引，股價站穩50DMA，值得關注基本面改善。  \n3. LRCX：受AI晶片需求題材帶動，但量價訊號尚不明朗，需進一步確認。  \n4. QUBT：新聞提及但量價訊號弱，短期表現不強，風險相對中性。  \n5. TDY：防務訂單題材支撐，但股價低於50DMA，短期承壓風險存在。\n\n## 明日觀察重點  \n1. NVIDIA與Google等科技巨頭即將或剛公布的財報及財測反應。  \n2. 美國與中國峰會後續政策與貿易談判進展。  \n3. 國際油價與能源供應狀況，特別是中東局勢變化對市場的影響。",
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "generated_at_utc": "2026-05-18T15:28:55+00:00",
+  "used_ai": true,
+  "status": "OpenAI AI 摘要已成功產生。"
 }
