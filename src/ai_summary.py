@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -25,6 +26,7 @@ def build_gemini_summary(
 ) -> dict:
     api_key = _get_secret("GEMINI_API_KEY")
     model = _get_secret("GEMINI_MODEL") or "gemini-2.5-flash"
+    model_candidates = list(dict.fromkeys([model, "gemini-2.0-flash", "gemini-1.5-flash"]))
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     fallback_text = _fallback(snapshot, anomalies, news)
     if not api_key:
@@ -39,28 +41,13 @@ def build_gemini_summary(
 
     try:
         prompt = _build_gemini_prompt(snapshot, anomalies, news, international_news, discovery_candidates, portfolio_impact)
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        response = requests.post(
-            url,
-            params={"key": api_key},
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.25,
-                    "maxOutputTokens": 4096,
-                    "thinkingConfig": {"thinkingBudget": 0},
-                },
-            },
-            timeout=45,
-        )
-        response.raise_for_status()
-        data = response.json()
+        selected_model, data = _call_gemini_with_fallback(api_key, model_candidates, prompt)
         text = _extract_gemini_text(data)
         if _is_complete_summary(text):
             return _summary_payload(
                 text=text,
                 provider="gemini",
-                model=model,
+                model=selected_model,
                 generated_at=generated_at,
                 used_ai=True,
                 status="Gemini AI 摘要已成功產生。",
@@ -217,6 +204,35 @@ def _safe_error(exc: Exception) -> str:
     message = re.sub(r"key=([^&\\s]+)", "key=[REDACTED]", message)
     message = re.sub(r"AIza[0-9A-Za-z_\\-]{20,}", "[REDACTED_API_KEY]", message)
     return f"{name}: {message}"
+
+
+def _call_gemini_with_fallback(api_key: str, models: list[str], prompt: str) -> tuple[str, dict]:
+    last_exc: Exception | None = None
+    for model in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.25, "maxOutputTokens": 4096},
+        }
+        if model.startswith("gemini-2.5"):
+            payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
+        for attempt in range(2):
+            try:
+                response = requests.post(url, params={"key": api_key}, json=payload, timeout=45)
+                response.raise_for_status()
+                return model, response.json()
+            except requests.HTTPError as exc:
+                last_exc = exc
+                status = exc.response.status_code if exc.response is not None else None
+                if status not in {429, 500, 502, 503, 504}:
+                    raise
+                time.sleep(2 + attempt * 3)
+            except requests.RequestException as exc:
+                last_exc = exc
+                time.sleep(2 + attempt * 3)
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("Gemini request failed before sending")
 
 
 def _extract_gemini_text(data: dict) -> str:
