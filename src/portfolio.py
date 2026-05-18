@@ -175,6 +175,7 @@ def build_portfolio_view(
         rows.append(
             {
                 "ticker": ticker,
+                "position_bucket": position_bucket(ticker, market_value_hint),
                 "shares": shares,
                 "avg_cost": avg_cost,
                 "current_price": price,
@@ -228,6 +229,43 @@ def build_portfolio_view(
     view = pd.concat([view, suggestions], axis=1)
     alerts = risk_alerts(view, max_position_weight)
     return view.sort_values("market_value", ascending=False), summary_metrics(view, cash_usd), alerts
+
+
+def position_bucket(ticker: str, market_value_hint: float = np.nan) -> str:
+    ticker = str(ticker).upper()
+    if ticker in {"VOO", "SPY", "QQQ", "VTI"} or pd.notna(market_value_hint):
+        return "核心ETF"
+    if ticker in {"AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "META", "TSM"}:
+        return "核心成長"
+    if ticker in {"NVDA", "TSLA", "AMD"}:
+        return "高波動成長"
+    return "實驗/觀察"
+
+
+def bucket_summary(view: pd.DataFrame) -> pd.DataFrame:
+    if view.empty or "position_bucket" not in view:
+        return pd.DataFrame()
+    grouped = view.groupby("position_bucket", dropna=False).agg(
+        market_value=("market_value", "sum"),
+        avg_return=("unrealized_return", "mean"),
+        avg_risk=("risk_score", "mean"),
+        max_weight=("position_weight", "max"),
+        count=("ticker", "count"),
+    ).reset_index()
+    total = grouped["market_value"].sum()
+    grouped["asset_weight"] = grouped["market_value"] / total if total else np.nan
+    return grouped.sort_values("market_value", ascending=False)
+
+
+def bucket_guidelines() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {"position_bucket": "核心ETF", "target_role": "長期基底", "risk_rule": "容忍短期震盪，重點看總資產配置。"},
+            {"position_bucket": "核心成長", "target_role": "中長期成長", "risk_rule": "看財報與趨勢，跌破 50/200DMA 才提高防守。"},
+            {"position_bucket": "高波動成長", "target_role": "高 beta 成長", "risk_rule": "熱度、回撤與持倉占比要更嚴格控管。"},
+            {"position_bucket": "實驗/觀察", "target_role": "小部位探索", "risk_rule": "單檔權重宜小，負面事件或增發要優先處理。"},
+        ]
+    )
 
 
 def market_heat_score(metrics: dict, news_metrics: dict) -> float:

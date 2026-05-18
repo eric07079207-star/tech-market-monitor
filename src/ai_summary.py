@@ -6,6 +6,7 @@ import re
 import time
 from datetime import datetime, timezone
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -26,7 +27,6 @@ def build_gemini_summary(
 ) -> dict:
     api_key = _get_secret("GEMINI_API_KEY")
     model = _get_secret("GEMINI_MODEL") or "gemini-2.5-flash"
-    model_candidates = list(dict.fromkeys([model, "gemini-2.0-flash", "gemini-1.5-flash"]))
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     fallback_text = _fallback(snapshot, anomalies, news)
     if not api_key:
@@ -41,13 +41,28 @@ def build_gemini_summary(
 
     try:
         prompt = _build_gemini_prompt(snapshot, anomalies, news, international_news, discovery_candidates, portfolio_impact)
-        selected_model, data = _call_gemini_with_fallback(api_key, model_candidates, prompt)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        response = requests.post(
+            url,
+            params={"key": api_key},
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.25,
+                    "maxOutputTokens": 4096,
+                    "thinkingConfig": {"thinkingBudget": 0},
+                },
+            },
+            timeout=45,
+        )
+        response.raise_for_status()
+        data = response.json()
         text = _extract_gemini_text(data)
         if _is_complete_summary(text):
             return _summary_payload(
                 text=text,
                 provider="gemini",
-                model=selected_model,
+                model=model,
                 generated_at=generated_at,
                 used_ai=True,
                 status="Gemini AI 摘要已成功產生。",
@@ -85,6 +100,40 @@ def load_cached_ai_summary(path=None) -> dict:
         return json.loads(path.read_text())
     except json.JSONDecodeError:
         return {}
+
+
+def ai_summary_quality(payload: dict) -> dict:
+    text = str(payload.get("text", "") or "")
+    required_sections = ["今日市場結論", "量化訊號", "新聞與國際風險", "對持倉影響", "候選觀察股", "明日觀察重點"]
+    present = [section for section in required_sections if section in text]
+    word_count = len(text)
+    used_ai = bool(payload.get("used_ai"))
+    generated = pd.to_datetime(payload.get("generated_at_utc"), errors="coerce", utc=True)
+    age_hours = np.nan
+    if pd.notna(generated):
+        age_hours = (pd.Timestamp.now(tz="UTC") - generated).total_seconds() / 3600
+    score = 0
+    score += min(word_count / 900, 1) * 30
+    score += len(present) / len(required_sections) * 45
+    score += 15 if used_ai else 6
+    score += 10 if pd.notna(age_hours) and age_hours <= 30 else 0
+    if word_count < 350:
+        label = "不完整"
+    elif len(present) < 4:
+        label = "需檢查"
+    elif not used_ai:
+        label = "規則備援"
+    else:
+        label = "完整"
+    return {
+        "quality_score": float(np.clip(score, 0, 100)),
+        "quality_label": label,
+        "text_length": int(word_count),
+        "section_count": int(len(present)),
+        "required_sections": len(required_sections),
+        "missing_sections": "、".join([section for section in required_sections if section not in present]) or "無",
+        "age_hours": age_hours,
+    }
 
 
 def _get_secret(name: str) -> str | None:
@@ -204,35 +253,6 @@ def _safe_error(exc: Exception) -> str:
     message = re.sub(r"key=([^&\\s]+)", "key=[REDACTED]", message)
     message = re.sub(r"AIza[0-9A-Za-z_\\-]{20,}", "[REDACTED_API_KEY]", message)
     return f"{name}: {message}"
-
-
-def _call_gemini_with_fallback(api_key: str, models: list[str], prompt: str) -> tuple[str, dict]:
-    last_exc: Exception | None = None
-    for model in models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.25, "maxOutputTokens": 4096},
-        }
-        if model.startswith("gemini-2.5"):
-            payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
-        for attempt in range(2):
-            try:
-                response = requests.post(url, params={"key": api_key}, json=payload, timeout=45)
-                response.raise_for_status()
-                return model, response.json()
-            except requests.HTTPError as exc:
-                last_exc = exc
-                status = exc.response.status_code if exc.response is not None else None
-                if status not in {429, 500, 502, 503, 504}:
-                    raise
-                time.sleep(2 + attempt * 3)
-            except requests.RequestException as exc:
-                last_exc = exc
-                time.sleep(2 + attempt * 3)
-    if last_exc:
-        raise last_exc
-    raise RuntimeError("Gemini request failed before sending")
 
 
 def _extract_gemini_text(data: dict) -> str:

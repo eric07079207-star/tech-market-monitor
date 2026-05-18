@@ -10,7 +10,7 @@ try:
 except ImportError:  # pragma: no cover - optional local dependency
     st_autorefresh = None
 
-from src.ai_summary import load_cached_ai_summary
+from src.ai_summary import ai_summary_quality, load_cached_ai_summary
 from src.config import ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
 try:
     from src.config import ANNUAL_PICK_TICKERS
@@ -26,12 +26,18 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         return {"avg_return": np.nan, "win_rate": np.nan, "best": "n/a", "worst": "n/a", "avg_rel_qqq": np.nan}
 from src.data import MACRO_CACHE, PRICE_CACHE, cache_path, load_metadata
 try:
-    from src.discovery import load_discovery_history, summarize_discovery_history
+    from src.discovery import discovery_performance_summary, load_discovery_history, load_discovery_performance, summarize_discovery_history
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def load_discovery_history(path=None) -> pd.DataFrame:
         return pd.DataFrame()
 
     def summarize_discovery_history(history: pd.DataFrame, days: int, top_n: int = 15) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def load_discovery_performance(path=None) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def discovery_performance_summary(performance: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 try:
     from src.health import data_health_report, missing_price_symbols
@@ -97,14 +103,14 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
     def portfolio_news_impact(news: pd.DataFrame, portfolio_view: pd.DataFrame | None = None, max_items: int = 8) -> pd.DataFrame:
         return pd.DataFrame(columns=["ticker", "impact_level", "impact", "headline_count", "key_tags", "sample_headline"])
 
-from src.portfolio import build_portfolio_view, fetch_portfolio_prices, load_portfolio_config
+from src.portfolio import bucket_guidelines, bucket_summary, build_portfolio_view, fetch_portfolio_prices, load_portfolio_config
 try:
     from src.portfolio import attention_positions
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def attention_positions(view: pd.DataFrame, limit: int = 3) -> pd.DataFrame:
         return pd.DataFrame()
 try:
-    from src.predictions import build_market_prediction, load_prediction_log, prediction_validation_summary
+    from src.predictions import build_market_prediction, load_prediction_log, prediction_scorecard, prediction_validation_summary, recent_prediction_table
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def build_market_prediction(regime: dict, conclusion: dict, snapshot: pd.DataFrame) -> dict:
         return {"target": "QQQ", "prediction_direction": "資料同步中"}
@@ -113,6 +119,12 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         return pd.DataFrame()
 
     def prediction_validation_summary(log: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def prediction_scorecard(log: pd.DataFrame) -> dict:
+        return {"validated": 0, "success_rate": np.nan, "avg_return": np.nan, "best_segment": "n/a", "weak_segment": "n/a"}
+
+    def recent_prediction_table(log: pd.DataFrame, limit: int = 30) -> pd.DataFrame:
         return pd.DataFrame()
 
 
@@ -196,6 +208,11 @@ def load_discovery() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataF
         if not data.empty and column in data:
             data[column] = pd.to_datetime(data[column], utc=True, errors="coerce")
     return discovery_news, mentions, candidates, history
+
+
+@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+def load_discovery_perf() -> pd.DataFrame:
+    return load_discovery_performance()
 
 
 @st.cache_data(show_spinner=False, ttl=60 * 5)
@@ -335,7 +352,9 @@ if prices.empty:
 news = load_news(news_days)
 international_news = load_international_news(min(news_days, 7))
 discovery_news, discovery_mentions, discovery_candidates, discovery_history = load_discovery()
+discovery_performance = load_discovery_perf()
 ai_summary = load_cached_ai_summary()
+ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
 indicators = add_price_indicators(prices)
 snapshot = latest_snapshot(indicators)
 anomalies = detect_anomalies(snapshot)
@@ -404,8 +423,8 @@ if show_health:
     else:
         st.success("主要追蹤標的價格資料完整。")
 
-tab_overview, tab_anomaly, tab_analog, tab_news, tab_discovery, tab_charts, tab_portfolio = st.tabs(
-    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "新聞探索", "走勢圖", "我的持倉"]
+tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_charts, tab_portfolio = st.tabs(
+    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "走勢圖", "我的持倉"]
 )
 
 with tab_overview:
@@ -696,6 +715,13 @@ with tab_news:
         generated = ai_summary.get("generated_at_utc", "n/a")
         (st.success if used_ai else st.warning)(status)
         st.caption(f"來源：{provider}｜模型：{model}｜生成 UTC：{generated}｜排程：每日 07:00 台灣時間")
+        qcols = st.columns(4)
+        qcols[0].metric("摘要品質", ai_quality.get("quality_label", "n/a"))
+        qcols[1].metric("完整度", f"{ai_quality.get('section_count', 0)}/{ai_quality.get('required_sections', 6)}")
+        qcols[2].metric("字數", f"{ai_quality.get('text_length', 0)}")
+        qcols[3].metric("品質分", num(ai_quality.get("quality_score"), 0))
+        if ai_quality.get("missing_sections") not in {None, "", "無"}:
+            st.caption("缺少章節：" + str(ai_quality.get("missing_sections")))
         st.markdown(ai_summary.get("text", ""))
     else:
         st.warning("尚未產生每日 AI 摘要，先顯示規則摘要。GitHub Actions 會在每日 07:00 台灣時間自動生成。")
@@ -752,6 +778,69 @@ with tab_news:
         for row in random_news.itertuples():
             published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
             st.markdown(f"`{row.tags}` · {row.source} · {published}  \n[{row.title}]({row.link})")
+
+with tab_prediction:
+    st.subheader("市場預測驗證")
+    scorecard = prediction_scorecard(prediction_log)
+    score_cols = st.columns(5)
+    score_cols[0].metric("已驗證樣本", f"{scorecard['validated']}")
+    score_cols[1].metric("整體成功率", pct(scorecard["success_rate"]))
+    score_cols[2].metric("平均後續報酬", pct(scorecard["avg_return"]))
+    score_cols[3].metric("最佳方向", scorecard["best_segment"])
+    score_cols[4].metric("待改善方向", scorecard["weak_segment"])
+
+    validation = prediction_validation_summary(prediction_log)
+    if validation.empty:
+        st.info("目前預測紀錄仍在累積，等 5D / 20D / 60D 週期走完後會自動出現成功率。")
+    else:
+        st.dataframe(
+            validation.rename(
+                columns={
+                    "horizon": "驗證週期",
+                    "prediction_direction": "預測方向",
+                    "sample": "樣本數",
+                    "success_rate": "成功率",
+                    "avg_return": "平均實際報酬",
+                    "avg_max_drawdown": "平均最大回撤",
+                }
+            ),
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "成功率": st.column_config.NumberColumn(format="%.2%"),
+                "平均實際報酬": st.column_config.NumberColumn(format="%.2%"),
+                "平均最大回撤": st.column_config.NumberColumn(format="%.2%"),
+            },
+        )
+
+    st.markdown("#### 最近預測紀錄")
+    recent_predictions = recent_prediction_table(prediction_log, limit=45)
+    if recent_predictions.empty:
+        st.caption("尚無預測紀錄。")
+    else:
+        st.dataframe(
+            recent_predictions.rename(
+                columns={
+                    "prediction_date": "預測日",
+                    "horizon": "週期",
+                    "prediction_direction": "方向",
+                    "confidence": "信心",
+                    "regime_score": "Regime",
+                    "reason": "理由",
+                    "actual_return": "實際報酬",
+                    "max_drawdown": "最大回撤",
+                    "success": "成功",
+                    "validated_at": "驗證日",
+                }
+            )[["預測日", "週期", "方向", "信心", "Regime", "理由", "實際報酬", "最大回撤", "成功", "驗證日"]],
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "Regime": st.column_config.NumberColumn(format="%.0f"),
+                "實際報酬": st.column_config.NumberColumn(format="%.2%"),
+                "最大回撤": st.column_config.NumberColumn(format="%.2%"),
+            },
+        )
 
 with tab_discovery:
     st.subheader("新聞探索候選股")
@@ -826,6 +915,7 @@ with tab_discovery:
 
     weekly_candidates = summarize_discovery_history(discovery_history, days=7, top_n=15)
     monthly_candidates = summarize_discovery_history(discovery_history, days=30, top_n=15)
+    perf_summary = discovery_performance_summary(discovery_performance)
     weekly_tab, monthly_tab = st.tabs(["本週潛力排行", "本月潛力排行"])
     with weekly_tab:
         render_discovery_rank_table(weekly_candidates.head(5), "預設 Top 5")
@@ -835,6 +925,58 @@ with tab_discovery:
         render_discovery_rank_table(monthly_candidates.head(5), "預設 Top 5")
         with st.expander("展開本月 Top 15"):
             render_discovery_rank_table(monthly_candidates, "本月 Top 15")
+
+    st.markdown("#### 候選股入榜後績效追蹤")
+    if perf_summary.empty:
+        st.info("候選股績效資料仍在累積；入榜後滿 5D / 20D / 60D 會自動驗證。")
+    else:
+        st.dataframe(
+            perf_summary.rename(
+                columns={
+                    "horizon": "驗證週期",
+                    "sample": "樣本數",
+                    "success_rate": "上漲率",
+                    "avg_return": "平均報酬",
+                    "avg_relative_qqq": "平均相對QQQ",
+                }
+            ),
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "上漲率": st.column_config.NumberColumn(format="%.2%"),
+                "平均報酬": st.column_config.NumberColumn(format="%.2%"),
+                "平均相對QQQ": st.column_config.NumberColumn(format="%.2%"),
+            },
+        )
+    if not discovery_performance.empty:
+        with st.expander("查看候選股驗證明細"):
+            perf_view = discovery_performance.sort_values(["date", "horizon_days"], ascending=[False, True]).head(80)
+            st.dataframe(
+                perf_view.rename(
+                    columns={
+                        "date": "入榜日",
+                        "ticker": "股票",
+                        "horizon": "週期",
+                        "candidate_score": "入榜分數",
+                        "entry_price": "入榜價",
+                        "actual_return": "後續報酬",
+                        "qqq_return": "QQQ同期",
+                        "relative_qqq_return": "相對QQQ",
+                        "success": "上漲",
+                        "validated_at": "驗證日",
+                        "observation_reason": "入榜理由",
+                    }
+                )[["入榜日", "股票", "週期", "入榜分數", "入榜價", "後續報酬", "QQQ同期", "相對QQQ", "上漲", "驗證日", "入榜理由"]],
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "入榜分數": st.column_config.NumberColumn(format="%.0f"),
+                    "入榜價": st.column_config.NumberColumn(format="$%.2f"),
+                    "後續報酬": st.column_config.NumberColumn(format="%.2%"),
+                    "QQQ同期": st.column_config.NumberColumn(format="%.2%"),
+                    "相對QQQ": st.column_config.NumberColumn(format="%.2%"),
+                },
+            )
 
     st.markdown("#### 探索新聞")
     if discovery_news.empty:
@@ -998,6 +1140,7 @@ VOO,,,500
                 st.markdown("#### B. 持倉明細表")
                 detail_columns = [
                     "ticker",
+                    "position_bucket",
                     "shares",
                     "avg_cost",
                     "current_price",
@@ -1015,6 +1158,7 @@ VOO,,,500
                 detail = portfolio_view[[col for col in detail_columns if col in portfolio_view.columns]].rename(
                     columns={
                         "ticker": "股票代號",
+                        "position_bucket": "持倉分層",
                         "shares": "持股數量",
                         "avg_cost": "平均成本",
                         "current_price": "現價",
@@ -1048,6 +1192,38 @@ VOO,,,500
                 )
 
                 st.markdown("#### C. 操作建議")
+                st.markdown("##### 持倉風險分層")
+                bucket = bucket_summary(portfolio_view)
+                if not bucket.empty:
+                    st.dataframe(
+                        bucket.rename(
+                            columns={
+                                "position_bucket": "分層",
+                                "market_value": "市值",
+                                "asset_weight": "資產占比",
+                                "avg_return": "平均報酬",
+                                "avg_risk": "平均風險分",
+                                "max_weight": "最大單檔占比",
+                                "count": "檔數",
+                            }
+                        ),
+                        hide_index=True,
+                        width="stretch",
+                        column_config={
+                            "市值": st.column_config.NumberColumn(format="$%.0f"),
+                            "資產占比": st.column_config.NumberColumn(format="%.2%"),
+                            "平均報酬": st.column_config.NumberColumn(format="%.2%"),
+                            "平均風險分": st.column_config.NumberColumn(format="%.0f"),
+                            "最大單檔占比": st.column_config.NumberColumn(format="%.2%"),
+                        },
+                    )
+                with st.expander("分層規則"):
+                    st.dataframe(
+                        bucket_guidelines().rename(columns={"position_bucket": "分層", "target_role": "角色", "risk_rule": "風險規則"}),
+                        hide_index=True,
+                        width="stretch",
+                    )
+
                 advice_columns = [
                     "ticker",
                     "position_state",

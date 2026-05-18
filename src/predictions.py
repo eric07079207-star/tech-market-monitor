@@ -176,6 +176,33 @@ def prediction_validation_summary(log: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def prediction_scorecard(log: pd.DataFrame) -> dict:
+    if log.empty or "success" not in log:
+        return {"validated": 0, "success_rate": np.nan, "avg_return": np.nan, "best_segment": "n/a", "weak_segment": "n/a"}
+    done = log.dropna(subset=["success"]).copy()
+    if done.empty:
+        return {"validated": 0, "success_rate": np.nan, "avg_return": np.nan, "best_segment": "n/a", "weak_segment": "n/a"}
+    done["success"] = done["success"].astype(bool)
+    grouped = done.groupby("prediction_direction").agg(success_rate=("success", "mean"), sample=("success", "size"))
+    best = grouped.sort_values(["success_rate", "sample"], ascending=[False, False]).head(1)
+    weak = grouped.sort_values(["success_rate", "sample"], ascending=[True, False]).head(1)
+    return {
+        "validated": int(len(done)),
+        "success_rate": float(done["success"].mean()),
+        "avg_return": float(done["actual_return"].mean()),
+        "best_segment": str(best.index[0]) if not best.empty else "n/a",
+        "weak_segment": str(weak.index[0]) if not weak.empty else "n/a",
+    }
+
+
+def recent_prediction_table(log: pd.DataFrame, limit: int = 30) -> pd.DataFrame:
+    if log.empty:
+        return pd.DataFrame()
+    data = log.copy()
+    data["prediction_date"] = pd.to_datetime(data["prediction_date"], errors="coerce")
+    return data.sort_values(["prediction_date", "horizon_days"], ascending=[False, True]).head(limit)
+
+
 def _prediction_success(direction: str, actual_return: float, max_drawdown: float) -> bool:
     if direction == "偏多":
         return bool(actual_return > 0)

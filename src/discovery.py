@@ -14,7 +14,7 @@ from .news import fetch_google_news
 FALSE_TICKERS = {
     "AI", "CEO", "CFO", "COO", "USA", "SEC", "GDP", "IPO", "ETF", "FED", "FBI", "DOJ", "FDA",
     "EPS", "EBITDA", "NYSE", "NASDAQ", "US", "EU", "UK", "Q", "A", "I", "AM", "PM", "THE",
-    "YTD", "SPAC", "SLIM", "EV", "ETF", "CEO", "CAN", "MSN", "CNN", "AOL",
+    "YTD", "SPAC", "SLIM", "EV", "ETF", "CEO", "CAN", "MSN", "CNN", "AOL", "INC",
 }
 
 
@@ -160,6 +160,103 @@ def summarize_discovery_history(history: pd.DataFrame, days: int, top_n: int = 1
             }
         )
     return pd.DataFrame(rows).sort_values("rank_score", ascending=False).head(top_n).reset_index(drop=True)
+
+
+def update_discovery_performance(history: pd.DataFrame, path=None) -> pd.DataFrame:
+    path = path or cache_path("discovery_performance.parquet")
+    if history.empty or "ticker" not in history or "date" not in history:
+        return pd.DataFrame()
+    entries = history.copy()
+    entries["date"] = pd.to_datetime(entries["date"], errors="coerce").dt.normalize()
+    tickers = entries["ticker"].dropna().astype(str).str.upper().drop_duplicates().tolist()
+    start = entries["date"].min()
+    if pd.isna(start) or not tickers:
+        return pd.DataFrame()
+    prices = fetch_price_history(tickers=tickers + ["QQQ"], start=start.date())
+    performance = discovery_performance_table(entries, prices)
+    if not performance.empty:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        performance.to_parquet(path, index=False)
+    return performance
+
+
+def load_discovery_performance(path=None) -> pd.DataFrame:
+    path = path or cache_path("discovery_performance.parquet")
+    if not path.exists():
+        return pd.DataFrame()
+    data = pd.read_parquet(path)
+    for col in ["date", "validated_at"]:
+        if col in data:
+            data[col] = pd.to_datetime(data[col], errors="coerce")
+    return data
+
+
+def discovery_performance_table(history: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
+    if history.empty or prices.empty:
+        return pd.DataFrame()
+    wide = prices.pivot_table(index="date", columns="symbol", values="close", aggfunc="last").sort_index().ffill()
+    rows = []
+    for entry in history.to_dict("records"):
+        ticker = str(entry.get("ticker", "")).upper()
+        entry_date = pd.to_datetime(entry.get("date"), errors="coerce")
+        if not ticker or ticker not in wide or pd.isna(entry_date):
+            continue
+        series = wide[ticker].dropna()
+        qqq = wide["QQQ"].dropna() if "QQQ" in wide else pd.Series(dtype=float)
+        start_pos = series.index.searchsorted(entry_date)
+        if start_pos >= len(series):
+            continue
+        start_date = series.index[start_pos]
+        start_price = float(series.iloc[start_pos])
+        qqq_start = qqq.iloc[qqq.index.searchsorted(start_date)] if not qqq.empty and qqq.index.searchsorted(start_date) < len(qqq) else np.nan
+        base = {key: entry.get(key) for key in ["date", "ticker", "candidate_score", "candidate_label", "topic", "risk_flags", "observation_reason", "sample_headline"]}
+        base["entry_price"] = start_price
+        for label, days in [("5D", 5), ("20D", 20), ("60D", 60)]:
+            end_pos = start_pos + days
+            row = base.copy()
+            row["horizon"] = label
+            row["horizon_days"] = days
+            if end_pos < len(series):
+                end_date = series.index[end_pos]
+                end_price = float(series.iloc[end_pos])
+                actual_return = end_price / start_price - 1
+                qqq_return = np.nan
+                if not qqq.empty and pd.notna(qqq_start):
+                    qqq_end_pos = qqq.index.searchsorted(end_date)
+                    if qqq_end_pos < len(qqq):
+                        qqq_return = float(qqq.iloc[qqq_end_pos] / qqq_start - 1)
+                row.update(
+                    {
+                        "validated_at": end_date,
+                        "actual_return": actual_return,
+                        "qqq_return": qqq_return,
+                        "relative_qqq_return": actual_return - qqq_return if pd.notna(qqq_return) else np.nan,
+                        "success": actual_return > 0,
+                    }
+                )
+            else:
+                row.update({"validated_at": pd.NaT, "actual_return": np.nan, "qqq_return": np.nan, "relative_qqq_return": np.nan, "success": np.nan})
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def discovery_performance_summary(performance: pd.DataFrame) -> pd.DataFrame:
+    if performance.empty or "success" not in performance:
+        return pd.DataFrame()
+    done = performance.dropna(subset=["success"]).copy()
+    if done.empty:
+        return pd.DataFrame()
+    done["success"] = done["success"].astype(bool)
+    return (
+        done.groupby("horizon")
+        .agg(
+            sample=("success", "size"),
+            success_rate=("success", "mean"),
+            avg_return=("actual_return", "mean"),
+            avg_relative_qqq=("relative_qqq_return", "mean"),
+        )
+        .reset_index()
+    )
 
 
 def extract_tickers(text: str) -> list[str]:
