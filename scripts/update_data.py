@@ -45,14 +45,13 @@ def main() -> None:
     if not discovery_candidates.empty:
         discovery_candidates.to_parquet(cache_path("discovery_candidates.parquet"), index=False)
 
-    kg = build_knowledge_graph(news, international_news, prices, macro, run_date=fetched_at_utc[:10])
-    save_knowledge_graph(kg)
-
     indicators = add_price_indicators(prices)
     snapshot = latest_snapshot(indicators)
     anomalies = detect_anomalies(snapshot)
     regime = regime_summary(indicators, macro)
     conclusion = today_conclusion(regime, snapshot, anomalies)
+    kg = build_knowledge_graph(news, international_news, prices, macro, regime_context=regime, run_date=fetched_at_utc[:10])
+    save_knowledge_graph(kg)
     prediction = build_market_prediction(regime, conclusion, snapshot)
     prediction_log = update_prediction_log(indicators, prediction)
     print(

@@ -1033,6 +1033,12 @@ with tab_kg:
     if kg_payload.facts.empty:
         st.info("目前尚未建立知識圖譜事件。等待下一次資料更新後會自動填入。")
     else:
+        kg_metrics = st.columns(4)
+        kg_metrics[0].metric("事實事件", f"{len(kg_payload.facts)}")
+        kg_metrics[1].metric("去重後事件", f"{kg_payload.facts['canonical_event_id'].nunique() if 'canonical_event_id' in kg_payload.facts else len(kg_payload.facts)}")
+        kg_metrics[2].metric("平均來源可靠度", num(kg_payload.facts.get("source_reliability_score", pd.Series(dtype=float)).mean(), 2))
+        kg_metrics[3].metric("平均事件強度", num(kg_payload.facts.get("event_strength", pd.Series(dtype=float)).mean(), 2))
+
         left_kg, right_kg = st.columns([1, 1.2])
         with left_kg:
             st.markdown("#### 事件類型分布")
@@ -1040,22 +1046,41 @@ with tab_kg:
             st.dataframe(fact_summary.rename(columns={"event_type_primary": "事件類型", "事件數": "事件數"}), hide_index=True, width="stretch")
         with right_kg:
             st.markdown("#### 最近事件")
-            recent_facts = kg_payload.facts.head(15)[["timestamp_utc", "entity", "event_type_primary", "event_title", "impact_direction", "confidence", "source"]]
+            recent_facts = kg_payload.facts.head(15)[[
+                "timestamp_utc",
+                "entity",
+                "event_type_primary",
+                "canonical_event",
+                "event_title",
+                "source_reliability_score",
+                "dedup_group_size",
+                "event_strength",
+                "impact_direction",
+                "confidence",
+            ]]
             st.dataframe(
                 recent_facts.rename(
                     columns={
                         "timestamp_utc": "時間",
                         "entity": "主體",
                         "event_type_primary": "事件類型",
+                        "canonical_event": "標準事件",
                         "event_title": "事件",
+                        "source_reliability_score": "來源可靠度",
+                        "dedup_group_size": "去重群組",
+                        "event_strength": "事件強度",
                         "impact_direction": "方向",
                         "confidence": "信心",
-                        "source": "來源",
                     }
                 ),
                 hide_index=True,
                 width="stretch",
-                column_config={"信心": st.column_config.NumberColumn(format="%.2f")},
+                column_config={
+                    "信心": st.column_config.NumberColumn(format="%.2f"),
+                    "來源可靠度": st.column_config.NumberColumn(format="%.2f"),
+                    "去重群組": st.column_config.NumberColumn(format="%.0f"),
+                    "事件強度": st.column_config.NumberColumn(format="%.2f"),
+                },
             )
         st.markdown("#### 市場反應摘要")
         if kg_payload.reactions.empty:
@@ -1070,11 +1095,13 @@ with tab_kg:
                 reaction_view.head(20).rename(
                     columns={
                         "event_id": "事件ID",
+                        "canonical_event_id": "標準事件ID",
                         "affected_ticker": "影響標的",
                         "time_horizon": "時間窗",
                         "return": "事件後報酬",
                         "relative_return": "相對QQQ",
                         "volume_ratio": "量能比",
+                        "market_impact_rank": "影響排名",
                         "reaction_available": "已驗證",
                     }
                 ),
@@ -1084,6 +1111,7 @@ with tab_kg:
                     "事件後報酬": st.column_config.NumberColumn(format="%.2%"),
                     "相對QQQ": st.column_config.NumberColumn(format="%.2%"),
                     "量能比": st.column_config.NumberColumn(format="%.2fx"),
+                    "影響排名": st.column_config.NumberColumn(format="%.2f"),
                 },
             )
 
