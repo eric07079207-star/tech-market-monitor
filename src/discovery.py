@@ -96,8 +96,11 @@ def update_discovery_history(candidates: pd.DataFrame, path=None, run_date: date
     today = today[ordered_cols]
 
     if not history.empty and "date" in history:
-        history = history[pd.to_datetime(history["date"], errors="coerce").dt.date.astype(str) != current_date]
+        history["date"] = pd.to_datetime(history["date"], errors="coerce").dt.date.astype(str)
+        history = history[history["date"] != current_date]
     history = pd.concat([history, today], ignore_index=True)
+    if "date" in history:
+        history["date"] = pd.to_datetime(history["date"], errors="coerce").dt.date.astype(str)
     path.parent.mkdir(parents=True, exist_ok=True)
     history.to_parquet(path, index=False)
     return history

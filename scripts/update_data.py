@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,16 +15,26 @@ from src.news import fetch_international_news, fetch_news_batch
 from src.predictions import build_market_prediction, update_prediction_log
 
 
+def _stamp_fetch_time(data, fetched_at_utc: str):
+    if data is not None and not data.empty:
+        data = data.copy()
+        data["fetched_at_utc"] = fetched_at_utc
+    return data
+
+
 def main() -> None:
+    fetched_at_utc = datetime.now(timezone.utc).isoformat(timespec="seconds")
     prices, macro = refresh_market_data(start=default_start_date())
-    news = fetch_news_batch(symbols=list(NEWS_QUERIES), days=10, limit_per_symbol=8)
+    news = _stamp_fetch_time(fetch_news_batch(symbols=list(NEWS_QUERIES), days=10, limit_per_symbol=8), fetched_at_utc)
     if not news.empty:
         news.to_parquet(cache_path("news.parquet"), index=False)
-    international_news = fetch_international_news(days=7, limit_per_topic=8)
+    international_news = _stamp_fetch_time(fetch_international_news(days=7, limit_per_topic=8), fetched_at_utc)
     if not international_news.empty:
         international_news.to_parquet(cache_path("international_news.parquet"), index=False)
-    discovery_news = fetch_discovery_news(days=7, topics_per_day=5, limit_per_topic=7)
+    discovery_news = _stamp_fetch_time(fetch_discovery_news(days=7, topics_per_day=5, limit_per_topic=7), fetched_at_utc)
     discovery_mentions, discovery_candidates = build_discovery_candidates(discovery_news, top_n=15)
+    discovery_mentions = _stamp_fetch_time(discovery_mentions, fetched_at_utc)
+    discovery_candidates = _stamp_fetch_time(discovery_candidates, fetched_at_utc)
     discovery_history = update_discovery_history(discovery_candidates)
     discovery_performance = update_discovery_performance(discovery_history)
     if not discovery_news.empty:
