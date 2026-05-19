@@ -1,8 +1,8 @@
 {
-  "updated_at_utc": "2026-05-19T11:43:54+00:00",
-  "fact_rows": 156,
-  "narrative_rows": 156,
-  "reaction_rows": 500,
-  "link_rows": 274,
+  "updated_at_utc": "2026-05-19T18:28:31+00:00",
+  "fact_rows": 155,
+  "narrative_rows": 155,
+  "reaction_rows": 488,
+  "link_rows": 262,
   "max_dedup_group_size": 3
 }
