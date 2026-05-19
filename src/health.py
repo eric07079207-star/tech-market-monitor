@@ -18,6 +18,9 @@ def data_health_report(
     discovery_news: pd.DataFrame | None = None,
     discovery_candidates: pd.DataFrame | None = None,
     discovery_history: pd.DataFrame | None = None,
+    kg_fact_events: pd.DataFrame | None = None,
+    kg_narratives: pd.DataFrame | None = None,
+    kg_reactions: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     cache_updated = metadata.get("updated_at_utc", "尚未寫入")
     rows = [
@@ -29,6 +32,9 @@ def data_health_report(
         _row("新聞探索", "discovery_news.parquet", discovery_news, "published", "隨機主題新聞", cache_updated, 12),
         _row("候選觀察股", "discovery_candidates.parquet", discovery_candidates, "", "新聞探索量化候選", cache_updated, 12),
         _row("候選歷史紀錄", "discovery_history.parquet", discovery_history, "date", "每日 Top 15 候選追蹤", cache_updated, 36),
+        _row("知識圖譜事實層", "kg/fact_events.parquet", kg_fact_events, "timestamp_utc", "客觀事件與來源", cache_updated, 72),
+        _row("知識圖譜敘事層", "kg/narrative_features.parquet", kg_narratives, "timestamp_utc", "量化敘事與情緒", cache_updated, 72),
+        _row("知識圖譜反應層", "kg/market_reactions.parquet", kg_reactions, "validated_at_utc", "事件後市場反應", cache_updated, 72),
     ]
     return pd.DataFrame(rows)
 

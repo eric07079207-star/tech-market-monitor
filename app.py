@@ -54,6 +54,25 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
     def discovery_performance_summary(performance: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 try:
+    from src.kg import kg_summary, load_knowledge_graph
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def load_knowledge_graph():
+        from collections import namedtuple
+
+        KGOutput = namedtuple("KGOutput", "facts narratives reactions links")
+        empty = pd.DataFrame()
+        return KGOutput(empty, empty, empty, empty)
+
+    def kg_summary(payload) -> pd.DataFrame:
+        return pd.DataFrame(
+            [
+                {"層級": "事實層", "筆數": 0, "最新時間": "n/a", "說明": "等待模組同步"},
+                {"層級": "敘事層", "筆數": 0, "最新時間": "n/a", "說明": "等待模組同步"},
+                {"層級": "反應層", "筆數": 0, "最新時間": "n/a", "說明": "等待模組同步"},
+                {"層級": "連結層", "筆數": 0, "最新時間": "n/a", "說明": "等待模組同步"},
+            ]
+        )
+try:
     from src.health import data_health_report, missing_price_symbols
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def data_health_report(*args, **kwargs) -> pd.DataFrame:
@@ -367,6 +386,8 @@ news = load_news(news_days)
 international_news = load_international_news(min(news_days, 7))
 discovery_news, discovery_mentions, discovery_candidates, discovery_history = load_discovery()
 discovery_performance = load_discovery_perf()
+kg_payload = load_knowledge_graph()
+kg_health = kg_summary(kg_payload)
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
 indicators = add_price_indicators(prices)
@@ -427,6 +448,9 @@ if show_health:
             discovery_news,
             discovery_candidates,
             discovery_history,
+            kg_payload.facts,
+            kg_payload.narratives,
+            kg_payload.reactions,
         ),
         hide_index=True,
         width="stretch",
@@ -437,8 +461,8 @@ if show_health:
     else:
         st.success("主要追蹤標的價格資料完整。")
 
-tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_charts, tab_portfolio = st.tabs(
-    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "走勢圖", "我的持倉"]
+tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_kg, tab_charts, tab_portfolio = st.tabs(
+    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "金融知識圖譜", "走勢圖", "我的持倉"]
 )
 
 with tab_overview:
@@ -1000,6 +1024,68 @@ with tab_discovery:
             published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
             tickers_text = f"｜tickers: `{row.tickers}`" if getattr(row, "tickers", "") else ""
             st.markdown(f"**{row.topic}** · `{row.tags}` · {row.source} · {published} {tickers_text}  \n[{row.title}]({row.link})")
+
+with tab_kg:
+    st.subheader("金融知識圖譜")
+    st.caption("第一階段先把新聞與國際新聞拆成可回測事件，再補上敘事特徵與市場反應。")
+    st.dataframe(kg_health.rename(columns={"層級": "層級", "筆數": "筆數", "最新時間": "最新時間", "說明": "說明"}), hide_index=True, width="stretch")
+
+    if kg_payload.facts.empty:
+        st.info("目前尚未建立知識圖譜事件。等待下一次資料更新後會自動填入。")
+    else:
+        left_kg, right_kg = st.columns([1, 1.2])
+        with left_kg:
+            st.markdown("#### 事件類型分布")
+            fact_summary = kg_payload.facts.groupby("event_type_primary").size().reset_index(name="事件數").sort_values("事件數", ascending=False)
+            st.dataframe(fact_summary.rename(columns={"event_type_primary": "事件類型", "事件數": "事件數"}), hide_index=True, width="stretch")
+        with right_kg:
+            st.markdown("#### 最近事件")
+            recent_facts = kg_payload.facts.head(15)[["timestamp_utc", "entity", "event_type_primary", "event_title", "impact_direction", "confidence", "source"]]
+            st.dataframe(
+                recent_facts.rename(
+                    columns={
+                        "timestamp_utc": "時間",
+                        "entity": "主體",
+                        "event_type_primary": "事件類型",
+                        "event_title": "事件",
+                        "impact_direction": "方向",
+                        "confidence": "信心",
+                        "source": "來源",
+                    }
+                ),
+                hide_index=True,
+                width="stretch",
+                column_config={"信心": st.column_config.NumberColumn(format="%.2f")},
+            )
+        st.markdown("#### 市場反應摘要")
+        if kg_payload.reactions.empty:
+            st.info("反應層資料還在累積。")
+        else:
+            reaction_view = kg_payload.reactions.copy()
+            if "return" in reaction_view:
+                reaction_view["return"] = pd.to_numeric(reaction_view["return"], errors="coerce")
+            if "relative_return" in reaction_view:
+                reaction_view["relative_return"] = pd.to_numeric(reaction_view["relative_return"], errors="coerce")
+            st.dataframe(
+                reaction_view.head(20).rename(
+                    columns={
+                        "event_id": "事件ID",
+                        "affected_ticker": "影響標的",
+                        "time_horizon": "時間窗",
+                        "return": "事件後報酬",
+                        "relative_return": "相對QQQ",
+                        "volume_ratio": "量能比",
+                        "reaction_available": "已驗證",
+                    }
+                ),
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "事件後報酬": st.column_config.NumberColumn(format="%.2%"),
+                    "相對QQQ": st.column_config.NumberColumn(format="%.2%"),
+                    "量能比": st.column_config.NumberColumn(format="%.2fx"),
+                },
+            )
 
 with tab_charts:
     symbols = st.multiselect("圖表標的", ETF_TICKERS + STOCK_TICKERS + ["SPY", "^VIX", "TLT", "HYG"], default=["QQQ", "SMH", "XLK", "NVDA"])

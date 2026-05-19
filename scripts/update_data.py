@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 from src.config import NEWS_QUERIES, default_start_date
 from src.data import cache_path, refresh_market_data
 from src.discovery import build_discovery_candidates, fetch_discovery_news, update_discovery_history, update_discovery_performance
+from src.kg import build_knowledge_graph, save_knowledge_graph
 from src.indicators import add_price_indicators, detect_anomalies, latest_snapshot, regime_summary, today_conclusion
 from src.news import fetch_international_news, fetch_news_batch
 from src.predictions import build_market_prediction, update_prediction_log
@@ -44,6 +45,9 @@ def main() -> None:
     if not discovery_candidates.empty:
         discovery_candidates.to_parquet(cache_path("discovery_candidates.parquet"), index=False)
 
+    kg = build_knowledge_graph(news, international_news, prices, macro, run_date=fetched_at_utc[:10])
+    save_knowledge_graph(kg)
+
     indicators = add_price_indicators(prices)
     snapshot = latest_snapshot(indicators)
     anomalies = detect_anomalies(snapshot)
@@ -55,6 +59,7 @@ def main() -> None:
         f"updated prices={len(prices)} macro={len(macro)} news={len(news)} "
         f"international_news={len(international_news)} discovery_candidates={len(discovery_candidates)} "
         f"discovery_history={len(discovery_history)} discovery_performance={len(discovery_performance)} "
+        f"kg_facts={len(kg.facts)} kg_narratives={len(kg.narratives)} kg_reactions={len(kg.reactions)} "
         f"predictions={len(prediction_log)}"
     )
 

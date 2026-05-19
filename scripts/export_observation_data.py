@@ -37,6 +37,11 @@ EXPORTS = [
     ExportItem("prediction_log.csv", "07_預測驗證", "市場預測紀錄", "市場判斷與後續 5D/20D/60D 驗證紀錄。"),
     ExportItem("ai_summary.json", "08_AI摘要", "AI市場摘要", "每日 AI 或規則摘要結果。"),
     ExportItem("ai_summary_history.parquet", "08_AI摘要", "AI摘要歷史", "每日 AI 或規則摘要歷史，用於回看與後續準確率驗證。"),
+    ExportItem("kg/fact_events.parquet", "09_金融知識圖譜", "事實層", "客觀事件與來源資料。"),
+    ExportItem("kg/narrative_features.parquet", "09_金融知識圖譜", "敘事層", "量化敘事與情緒特徵。"),
+    ExportItem("kg/market_reactions.parquet", "09_金融知識圖譜", "反應層", "事件後市場反應與驗證結果。"),
+    ExportItem("kg/event_links.parquet", "09_金融知識圖譜", "事件連結", "事件與標的關聯關係。"),
+    ExportItem("kg/kg_metadata.json", "09_金融知識圖譜", "知識圖譜資訊", "金融知識圖譜更新時間與筆數。"),
     ExportItem("metadata.json", "00_資料說明", "快取更新資訊", "目前快取更新時間、資料起始日與資料筆數。"),
 ]
 
@@ -65,7 +70,9 @@ def main() -> None:
                 latest_date = _latest_date(df)
                 fetched_at_utc = _latest_datetime(df, "fetched_at_utc")
                 parquet_target = target_dir / item.source
+                parquet_target.parent.mkdir(parents=True, exist_ok=True)
                 csv_target = target_dir / f"{source_path.stem}.csv"
+                csv_target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_path, parquet_target)
                 df.to_csv(csv_target, index=False)
                 exported_files = [str(parquet_target.relative_to(ROOT)), str(csv_target.relative_to(ROOT))]
@@ -75,10 +82,12 @@ def main() -> None:
                 latest_date = _latest_date(df)
                 fetched_at_utc = _latest_datetime(df, "fetched_at_utc")
                 csv_target = target_dir / item.source
+                csv_target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_path, csv_target)
                 exported_files = [str(csv_target.relative_to(ROOT))]
             elif source_path.suffix == ".json":
                 json_target = target_dir / item.source
+                json_target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_path, json_target)
                 exported_files = [str(json_target.relative_to(ROOT))]
                 try:
