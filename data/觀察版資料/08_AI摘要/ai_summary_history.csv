@@ -1,0 +1,17 @@
+summary_date,generated_at_utc,provider,model,used_ai,status,quality_score,quality_label,text_length,section_count,missing_sections,prompt_version,text
+2026-05-19,2026-05-19T03:50:21+00:00,rules,rule_based,False,尚未設定 OPENAI_API_KEY，已使用規則摘要。,37.46666666666667,需檢查,644,0,今日市場結論、量化訊號、新聞與國際風險、對持倉影響、候選觀察股、明日觀察重點,2026-05-19-v1,"今日主要異常：
+- IYW: 成交量超過 20 日均量 2 倍
+- SMH: 20 日波動位於近一年高檔
+- SOXX: 20 日波動位於近一年高檔
+- AMD: 20 日波動位於近一年高檔
+- GOOGL: 20 日波動位於近一年高檔
+- META: 同時低於 50/200 日均線
+- NVDA: 20 日波動位於近一年高檔
+- TLT: 同時低於 50/200 日均線
+
+近期新聞集中在 AI/晶片、大盤風險、產品/需求、財報/財測，主要覆蓋 META, SOXX, NVDA, IGV, TSLA, SMH, IYW, AMZN。
+- Meta Cuts 8,000 Jobs As Fool Eyes $1,000 Stock - Gotrade
+- Semiconductor Sector Review: Top 5 ETFs -- Lining Them Up Before The Next Move (SMH) - Seeking Alpha
+- How Nvidia Stock Can Hit $300 After Earnings - Barron's
+- Software's ""Baby with the Bathwater"" Moment - TradingView
+- Lawsuit Over Full Self-Driving Promises Succeeds, Tesla Stock (NASDAQ:TSLA) Sinks - TipRanks"

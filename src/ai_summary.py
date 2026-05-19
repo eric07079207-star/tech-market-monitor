@@ -15,6 +15,8 @@ from .news import rule_based_news_summary
 
 
 AI_SUMMARY_CACHE = cache_path("ai_summary.json")
+AI_SUMMARY_HISTORY_CACHE = cache_path("ai_summary_history.parquet")
+AI_SUMMARY_PROMPT_VERSION = "2026-05-19-v1"
 
 
 def build_openai_summary(
@@ -86,6 +88,31 @@ def save_ai_summary(payload: dict, path=None) -> None:
     path = path or AI_SUMMARY_CACHE
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+    if path == AI_SUMMARY_CACHE:
+        append_ai_summary_history(payload)
+
+
+def append_ai_summary_history(payload: dict, path=None) -> pd.DataFrame:
+    path = path or AI_SUMMARY_HISTORY_CACHE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    history = pd.read_parquet(path) if path.exists() else pd.DataFrame()
+    row = _summary_history_row(payload)
+    if not history.empty and "summary_date" in history:
+        history = history[history["summary_date"].astype(str) != row["summary_date"]]
+    history = pd.concat([history, pd.DataFrame([row])], ignore_index=True)
+    history = history.sort_values("generated_at_utc").reset_index(drop=True)
+    history.to_parquet(path, index=False)
+    return history
+
+
+def load_ai_summary_history(path=None) -> pd.DataFrame:
+    path = path or AI_SUMMARY_HISTORY_CACHE
+    if not path.exists():
+        return pd.DataFrame()
+    history = pd.read_parquet(path)
+    if "generated_at_utc" in history:
+        history["generated_at_utc"] = pd.to_datetime(history["generated_at_utc"], errors="coerce", utc=True)
+    return history
 
 
 def load_cached_ai_summary(path=None) -> dict:
@@ -154,6 +181,30 @@ def _summary_payload(text: str, provider: str, model: str, generated_at: str, us
         "generated_at_utc": generated_at,
         "used_ai": used_ai,
         "status": status,
+        "prompt_version": AI_SUMMARY_PROMPT_VERSION,
+    }
+
+
+def _summary_history_row(payload: dict) -> dict:
+    generated = pd.to_datetime(payload.get("generated_at_utc"), errors="coerce", utc=True)
+    if pd.isna(generated):
+        generated = pd.Timestamp.now(tz="UTC")
+    quality = ai_summary_quality(payload)
+    text = str(payload.get("text", "") or "")
+    return {
+        "summary_date": generated.date().isoformat(),
+        "generated_at_utc": generated.isoformat(),
+        "provider": str(payload.get("provider", "")),
+        "model": str(payload.get("model", "")),
+        "used_ai": bool(payload.get("used_ai")),
+        "status": str(payload.get("status", "")),
+        "quality_score": quality.get("quality_score"),
+        "quality_label": quality.get("quality_label"),
+        "text_length": quality.get("text_length"),
+        "section_count": quality.get("section_count"),
+        "missing_sections": quality.get("missing_sections"),
+        "prompt_version": str(payload.get("prompt_version", AI_SUMMARY_PROMPT_VERSION)),
+        "text": text,
     }
 
 

@@ -36,6 +36,7 @@ EXPORTS = [
     ExportItem("discovery_performance.parquet", "06_候選股追蹤", "候選股表現驗證", "候選股入榜後的後續表現驗證資料。"),
     ExportItem("prediction_log.csv", "07_預測驗證", "市場預測紀錄", "市場判斷與後續 5D/20D/60D 驗證紀錄。"),
     ExportItem("ai_summary.json", "08_AI摘要", "AI市場摘要", "每日 AI 或規則摘要結果。"),
+    ExportItem("ai_summary_history.parquet", "08_AI摘要", "AI摘要歷史", "每日 AI 或規則摘要歷史，用於回看與後續準確率驗證。"),
     ExportItem("metadata.json", "00_資料說明", "快取更新資訊", "目前快取更新時間、資料起始日與資料筆數。"),
 ]
 

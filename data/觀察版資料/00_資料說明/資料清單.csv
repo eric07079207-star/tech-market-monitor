@@ -9,5 +9,6 @@
 06_候選股追蹤,候選股歷史,data/cache/discovery_history.parquet,每日 Top 15 候選觀察股歷史紀錄。,是,是,是,12,2026-05-19T00:00:00+00:00,2026-05-19T03:29:32+00:00,19.7 KB,data/觀察版資料/06_候選股追蹤/discovery_history.parquet；data/觀察版資料/06_候選股追蹤/discovery_history.csv
 06_候選股追蹤,候選股表現驗證,data/cache/discovery_performance.parquet,候選股入榜後的後續表現驗證資料。,是,是,是,24,2026-05-18T00:00:00+00:00,2026-05-19T03:29:37+00:00,10.9 KB,data/觀察版資料/06_候選股追蹤/discovery_performance.parquet；data/觀察版資料/06_候選股追蹤/discovery_performance.csv
 07_預測驗證,市場預測紀錄,data/cache/prediction_log.csv,市場判斷與後續 5D/20D/60D 驗證紀錄。,是,是,是,18,2026-05-15T00:00:00+00:00,2026-05-19T03:29:37+00:00,3.7 KB,data/觀察版資料/07_預測驗證/prediction_log.csv
-08_AI摘要,AI市場摘要,data/cache/ai_summary.json,每日 AI 或規則摘要結果。,是,是,是,1,2026-05-18T15:28:55+00:00,2026-05-18T15:28:55+00:00,2.7 KB,data/觀察版資料/08_AI摘要/ai_summary.json
+08_AI摘要,AI市場摘要,data/cache/ai_summary.json,每日 AI 或規則摘要結果。,是,是,是,1,2026-05-19T03:50:21+00:00,2026-05-19T03:50:21+00:00,1.1 KB,data/觀察版資料/08_AI摘要/ai_summary.json
+08_AI摘要,AI摘要歷史,data/cache/ai_summary_history.parquet,每日 AI 或規則摘要歷史，用於回看與後續準確率驗證。,是,是,是,1,2026-05-19T03:50:21+00:00,2026-05-19T03:29:37+00:00,12.5 KB,data/觀察版資料/08_AI摘要/ai_summary_history.parquet；data/觀察版資料/08_AI摘要/ai_summary_history.csv
 00_資料說明,快取更新資訊,data/cache/metadata.json,目前快取更新時間、資料起始日與資料筆數。,是,是,是,1,2026-05-19T03:29:37+00:00,2026-05-19T03:29:37+00:00,123 B,data/觀察版資料/00_資料說明/metadata.json
