@@ -14,8 +14,27 @@ from .news import fetch_google_news
 FALSE_TICKERS = {
     "AI", "CEO", "CFO", "COO", "USA", "SEC", "GDP", "IPO", "ETF", "FED", "FBI", "DOJ", "FDA",
     "EPS", "EBITDA", "NYSE", "NASDAQ", "US", "EU", "UK", "Q", "A", "I", "AM", "PM", "THE",
-    "YTD", "SPAC", "SLIM", "EV", "ETF", "CEO", "CAN", "MSN", "CNN", "AOL", "INC",
+    "YTD", "SPAC", "SLIM", "EV", "ETF", "CEO", "CAN", "MSN", "CNN", "CNBC", "AOL", "INC",
+    "LLC", "LTD", "PLC", "CORP", "CO", "ADR", "ADS", "ETF", "ETN", "IPO", "SPAC",
+    "TSE", "TSX", "LSE", "HKEX", "OTC", "CBOE", "AMEX", "NIKKEI", "DAX", "CAC",
+    "API", "SAAS", "USD", "EUR", "CPI", "PPI", "FOMC", "ISM", "PMI", "OPEC",
+    "WHO", "UN", "NATO", "GOP", "IRS", "FTC", "EURO", "AP", "PR", "DJIA", "ISG",
 }
+
+TICKER_CONTEXT_WORDS = {
+    "stock", "stocks", "share", "shares", "equity", "equities", "ticker", "ipo", "earnings",
+    "revenue", "profit", "sales", "guidance", "outlook", "upgrade", "downgrade", "price target",
+    "analyst", "market cap", "trading", "surge", "rally", "plunge", "slump", "breakout",
+    "nasdaq", "nyse", "amex", "quarter", "q1", "q2", "q3", "q4",
+}
+
+EXPLICIT_TICKER_PATTERNS = [
+    re.compile(r"(?<![A-Za-z0-9])\$([A-Z][A-Z0-9.]{1,5})(?![A-Za-z0-9])"),
+    re.compile(r"\b(?:NASDAQ|NYSE|AMEX|CBOE)\s*:\s*([A-Z][A-Z0-9.]{1,5})\b"),
+    re.compile(r"\(([A-Z][A-Z0-9.]{1,5})\)"),
+]
+
+BARE_TICKER_PATTERN = re.compile(r"(?<![A-Za-z])([A-Z]{2,5})(?![A-Za-z])")
 
 
 def fetch_discovery_news(days: int = 7, topics_per_day: int = 5, limit_per_topic: int = 7) -> pd.DataFrame:
@@ -263,16 +282,34 @@ def discovery_performance_summary(performance: pd.DataFrame) -> pd.DataFrame:
 
 
 def extract_tickers(text: str) -> list[str]:
-    candidates = re.findall(r"(?<![A-Za-z])\$?([A-Z]{1,5})(?![A-Za-z])", text or "")
     result = []
-    for ticker in candidates:
-        if len(ticker) == 1:
-            continue
-        if ticker in FALSE_TICKERS:
-            continue
-        if ticker not in result:
-            result.append(ticker)
+    text = text or ""
+
+    for pattern in EXPLICIT_TICKER_PATTERNS:
+        for match in pattern.finditer(text):
+            _append_ticker(result, match.group(1))
+
+    for match in BARE_TICKER_PATTERN.finditer(text):
+        if _has_ticker_context(text, match.start(), match.end()):
+            _append_ticker(result, match.group(1))
     return result[:8]
+
+
+def _append_ticker(result: list[str], ticker: str) -> None:
+    ticker = ticker.strip().upper().replace(".", "-")
+    if len(ticker) == 1:
+        return
+    if ticker in FALSE_TICKERS:
+        return
+    if not re.fullmatch(r"[A-Z][A-Z0-9-]{1,5}", ticker):
+        return
+    if ticker not in result:
+        result.append(ticker)
+
+
+def _has_ticker_context(text: str, start: int, end: int) -> bool:
+    window = text[max(0, start - 70) : min(len(text), end + 70)].lower()
+    return any(word in window for word in TICKER_CONTEXT_WORDS)
 
 
 def _daily_topics(count: int) -> dict[str, str]:
