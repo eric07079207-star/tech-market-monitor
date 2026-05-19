@@ -1,9 +1,9 @@
 {
-  "text": "今日主要異常：\n- IYW: 成交量超過 20 日均量 2 倍\n- SMH: 20 日波動位於近一年高檔\n- SOXX: 20 日波動位於近一年高檔\n- AMD: 20 日波動位於近一年高檔\n- GOOGL: 20 日波動位於近一年高檔\n- META: 同時低於 50/200 日均線\n- NVDA: 20 日波動位於近一年高檔\n- TLT: 同時低於 50/200 日均線\n\n近期新聞集中在 AI/晶片、大盤風險、產品/需求、財報/財測，主要覆蓋 META, SOXX, NVDA, IGV, TSLA, SMH, IYW, AMZN。\n- Meta Cuts 8,000 Jobs As Fool Eyes $1,000 Stock - Gotrade\n- Semiconductor Sector Review: Top 5 ETFs -- Lining Them Up Before The Next Move (SMH) - Seeking Alpha\n- How Nvidia Stock Can Hit $300 After Earnings - Barron's\n- Software's \"Baby with the Bathwater\" Moment - TradingView\n- Lawsuit Over Full Self-Driving Promises Succeeds, Tesla Stock (NASDAQ:TSLA) Sinks - TipRanks",
-  "provider": "rules",
-  "model": "rule_based",
-  "generated_at_utc": "2026-05-19T03:50:21+00:00",
-  "used_ai": false,
-  "status": "尚未設定 OPENAI_API_KEY，已使用規則摘要。",
+  "text": "## 今日市場結論  \n科技股整體呈現觀望態勢，主要指數如QQQ、SMH及SOXX雖維持短期均線上方，但成交量與波動性顯示市場情緒仍有不確定性。VIX指數下跌反映風險偏好略有回升，但部分個股如META及IONQ出現較大跌幅，信心屬中等偏低。\n\n## 量化訊號  \n1. IYW成交量超過20日均量2倍，但股價仍下跌約1%，顯示短線賣壓存在。  \n2. SMH與SOXX的20日波動率位於近一年高檔，成交量略高於均量，反映晶片族群波動加劇。  \n3. VIX跳空下跌超過3%，且低於50/200日均線，短期市場風險指標有所緩解。  \n4. 多檔個股（如AMD、GOOGL、NVDA）波動率處於高位，需留意後續走勢。  \n5. 多檔成長股（如IONQ、OKLO、RKLB、TMDX）出現單日超過5%漲跌，短線波動風險較大。\n\n## 新聞與國際風險  \n1. 美國與中國領導人峰會帶來戰略穩定期待，但伊朗戰爭風險仍存，地緣政治不確定性持續。  \n2. 貿易談判取得有限正面進展，但整體全球經濟碎片化趨勢未明顯改善。  \n3. 半導體ETF如SMH、SOXX獲得市場關注，相關報告指出晶片需求與AI應用仍具成長潛力。  \n4. NVIDIA財報前景被看好，但短期股價波動仍需留意。  \n5. Meta宣布裁員8000人，反映大型科技公司調整策略，可能影響市場情緒。\n\n## 對持倉影響  \n目前持倉中未有明顯新聞直接影響，但需關注晶片相關ETF（如SMH、SOXX）及大型科技股（如META、NVDA）波動加劇的風險。建議留意成交量異動與均線支撐情況，避免短線追高。\n\n## 候選觀察股  \n1. CXDO：價格站上50日均線，且近期有新聞提及，具備一定觀察價值，風險尚未明顯。  \n2. RKLB：單日漲幅超過5%，波動率高，短線波動風險較大。  \n3. TMDX：同樣單日大幅波動且低於均線，需注意技術面壓力。  \n4. IONQ：單日跌幅超過5%，短期波動風險顯著。  \n5. META：持續低於50/200日均線，且裁員消息可能影響中長期表現。\n\n## 明日觀察重點  \n1. NVIDIA及Google等大型科技公司財報動向及市場反應。  \n2. 美國與中國貿易及地緣政治消息更新，特別是伊朗局勢發展。  \n3. 半導體相關ETF成交量與波動率變化，判斷市場風險偏好。",
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "generated_at_utc": "2026-05-19T06:12:29+00:00",
+  "used_ai": true,
+  "status": "OpenAI AI 摘要已成功產生。",
   "prompt_version": "2026-05-19-v1"
 }
