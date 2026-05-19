@@ -125,6 +125,25 @@ def load_cached_ai_summary(path=None) -> dict:
         return {}
 
 
+def openai_configuration_status() -> dict:
+    api_key = _get_secret("OPENAI_API_KEY")
+    model = _get_secret("OPENAI_MODEL") or "gpt-4.1-mini"
+    if api_key:
+        masked = f"{api_key[:3]}...{api_key[-4:]}" if len(api_key) > 8 else "***"
+        return {
+            "configured": True,
+            "status": "ready",
+            "model": model,
+            "api_key_preview": masked,
+        }
+    return {
+        "configured": False,
+        "status": "missing_key",
+        "model": model,
+        "api_key_preview": "n/a",
+    }
+
+
 def ai_summary_quality(payload: dict) -> dict:
     text = str(payload.get("text", "") or "")
     required_sections = ["今日市場結論", "量化訊號", "新聞與國際風險", "對持倉影響", "候選觀察股", "明日觀察重點"]

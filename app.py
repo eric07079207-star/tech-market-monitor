@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover - optional local dependency
     st_autorefresh = None
 
 try:
-    from src.ai_summary import ai_summary_quality, load_cached_ai_summary
+    from src.ai_summary import ai_summary_quality, load_cached_ai_summary, openai_configuration_status
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def load_cached_ai_summary(path=None) -> dict:
         return {}
@@ -25,6 +25,8 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
             "required_sections": 6,
             "missing_sections": "等待模組同步",
         }
+    def openai_configuration_status() -> dict:
+        return {"configured": False, "status": "missing_key", "model": "n/a", "api_key_preview": "n/a"}
 from src.config import ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
 try:
     from src.config import ANNUAL_PICK_TICKERS
@@ -390,6 +392,7 @@ kg_payload = load_knowledge_graph()
 kg_health = kg_summary(kg_payload)
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
+openai_status = openai_configuration_status()
 indicators = add_price_indicators(prices)
 snapshot = latest_snapshot(indicators)
 anomalies = detect_anomalies(snapshot)
@@ -414,6 +417,10 @@ with st.sidebar:
     st.caption(f"探索歷史：{latest_value(discovery_history, 'date')}")
     st.caption(f"AI 摘要：{ai_summary.get('generated_at_utc', '尚未產生')}")
     st.caption(f"快取寫入 UTC：{updated_at}")
+    if openai_status.get("configured"):
+        st.success(f"OpenAI 已就緒｜模型：{openai_status.get('model', 'n/a')}")
+    else:
+        st.warning("OpenAI API key 尚未設定，摘要目前使用規則備援。")
 
 top = st.columns([1.2, 1, 1, 1])
 top[0].metric("Regime Score", pct(regime["score"] / 100 if pd.notna(regime["score"]) else np.nan))
@@ -753,6 +760,11 @@ with tab_news:
         generated = ai_summary.get("generated_at_utc", "n/a")
         (st.success if used_ai else st.warning)(status)
         st.caption(f"來源：{provider}｜模型：{model}｜生成 UTC：{generated}｜排程：每日 07:00 台灣時間")
+        st.caption(
+            f"OpenAI 狀態：{openai_status.get('status', 'n/a')}｜"
+            f"模型：{openai_status.get('model', 'n/a')}｜"
+            f"Key：{openai_status.get('api_key_preview', 'n/a')}"
+        )
         qcols = st.columns(4)
         qcols[0].metric("摘要品質", ai_quality.get("quality_label", "n/a"))
         qcols[1].metric("完整度", f"{ai_quality.get('section_count', 0)}/{ai_quality.get('required_sections', 6)}")
