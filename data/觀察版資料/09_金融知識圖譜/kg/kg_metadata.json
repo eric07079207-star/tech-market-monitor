@@ -1,8 +1,8 @@
 {
-  "updated_at_utc": "2026-05-20T10:37:07+00:00",
+  "updated_at_utc": "2026-05-20T10:39:19+00:00",
   "fact_rows": 152,
   "narrative_rows": 152,
-  "reaction_rows": 488,
-  "link_rows": 251,
+  "reaction_rows": 492,
+  "link_rows": 255,
   "max_dedup_group_size": 3
 }
