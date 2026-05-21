@@ -10,6 +10,30 @@ import pandas as pd
 import requests
 
 from .config import INTERNATIONAL_NEWS_QUERIES, NEWS_QUERIES
+from .edge import quality_score, source_domain
+
+DEFAULT_TSLA_KEYWORDS = [
+    "TSLA",
+    "Tesla",
+    "Elon Musk",
+    "Robotaxi",
+    "FSD",
+    "Autopilot",
+    "Cybertruck",
+    "Model 3",
+    "Model Y",
+    "Dojo",
+    "Optimus",
+    "Gigafactory",
+    "Megapack",
+    "energy storage",
+    "deliveries",
+    "price cut",
+    "margin pressure",
+    "recall",
+    "investigation",
+    "lawsuit",
+]
 
 
 TAG_RULES = {
@@ -93,16 +117,38 @@ def fetch_news_batch(symbols: list[str] | None = None, days: int = 7, limit_per_
                     "symbol": item.symbol,
                     "title": item.title,
                     "source": item.source,
+                    "source_domain": source_domain(item.link or item.source),
+                    "source_reliability_score": quality_score(item.title, item.source, item.tags, item.published).source_reliability_score,
                     "published": item.published,
                     "tags": item.tags,
                     "link": item.link,
+                    "quality_score": quality_score(item.title, item.source, item.tags, item.published).quality_score,
                 }
             )
     if not rows:
-        return pd.DataFrame(columns=["symbol", "title", "source", "published", "tags", "link"])
+        return pd.DataFrame(columns=["symbol", "title", "source", "source_domain", "source_reliability_score", "published", "tags", "link", "quality_score"])
     news = pd.DataFrame(rows)
     news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
     return news.sort_values(["published", "symbol"], ascending=[False, True]).reset_index(drop=True)
+
+
+def filter_news_by_keywords(news: pd.DataFrame, keywords: list[str] | str | None) -> pd.DataFrame:
+    if news.empty or not keywords:
+        return news.copy()
+    if isinstance(keywords, str):
+        keywords = [keywords]
+    terms = [term.strip().lower() for term in keywords if term and str(term).strip()]
+    if not terms:
+        return news.copy()
+    haystack_cols = [col for col in ["title", "symbol", "tags", "source"] if col in news.columns]
+    if not haystack_cols:
+        return news.copy()
+    mask = pd.Series(False, index=news.index)
+    for col in haystack_cols:
+        text = news[col].fillna("").astype(str).str.lower()
+        for term in terms:
+            mask |= text.str.contains(term, regex=False)
+    return news[mask].copy().reset_index(drop=True)
 
 
 def fetch_international_news(days: int = 3, limit_per_topic: int = 8) -> pd.DataFrame:
@@ -119,15 +165,18 @@ def fetch_international_news(days: int = 3, limit_per_topic: int = 8) -> pd.Data
                     "symbol": topic,
                     "title": item.title,
                     "source": item.source,
+                    "source_domain": source_domain(item.link or item.source),
+                    "source_reliability_score": quality_score(item.title, item.source, item.tags, item.published).source_reliability_score,
                     "published": item.published,
                     "tags": item.tags,
                     "link": item.link,
                     "is_major": is_major_international_news(item.title),
                     "priority": international_news_priority(item.title),
+                    "quality_score": quality_score(item.title, item.source, item.tags, item.published).quality_score,
                 }
             )
     if not rows:
-        return pd.DataFrame(columns=["symbol", "title", "source", "published", "tags", "link", "is_major", "priority"])
+        return pd.DataFrame(columns=["symbol", "title", "source", "source_domain", "source_reliability_score", "published", "tags", "link", "is_major", "priority", "quality_score"])
     news = pd.DataFrame(rows)
     news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
     return news.sort_values(["is_major", "priority", "published"], ascending=[False, False, False]).reset_index(drop=True)
@@ -189,7 +238,7 @@ def rule_based_news_summary(news: pd.DataFrame, max_items: int = 12) -> str:
 
 
 def portfolio_news_impact(news: pd.DataFrame, portfolio_view: pd.DataFrame | None = None, max_items: int = 8) -> pd.DataFrame:
-    columns = ["ticker", "impact_level", "impact", "headline_count", "key_tags", "sample_headline"]
+    columns = ["ticker", "impact_level", "impact", "headline_count", "key_tags", "sample_headline", "avg_quality_score", "avg_source_reliability"]
     if news.empty:
         return pd.DataFrame(columns=columns)
 
@@ -237,6 +286,8 @@ def portfolio_news_impact(news: pd.DataFrame, portfolio_view: pd.DataFrame | Non
                 "headline_count": len(group),
                 "key_tags": "、".join(tags.head(3).index.tolist()) if not tags.empty else "未分類",
                 "sample_headline": group.sort_values("published", ascending=False).iloc[0]["title"],
+                "avg_quality_score": float(pd.to_numeric(group.get("quality_score", pd.Series(dtype=float)), errors="coerce").mean()),
+                "avg_source_reliability": float(pd.to_numeric(group.get("source_reliability_score", pd.Series(dtype=float)), errors="coerce").mean()),
             }
         )
     result = pd.DataFrame(rows)

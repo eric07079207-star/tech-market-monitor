@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover - optional local dependency
     st_autorefresh = None
 
 try:
-    from src.ai_summary import ai_summary_quality, load_cached_ai_summary, openai_configuration_status
+    from src.ai_summary import ai_summary_quality, load_ai_summary_history, load_cached_ai_summary, openai_configuration_status
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def load_cached_ai_summary(path=None) -> dict:
         return {}
@@ -27,6 +27,8 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         }
     def openai_configuration_status() -> dict:
         return {"configured": False, "status": "missing_key", "model": "n/a", "api_key_preview": "n/a"}
+    def load_ai_summary_history(path=None) -> pd.DataFrame:
+        return pd.DataFrame()
 from src.config import ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
 try:
     from src.config import ANNUAL_PICK_TICKERS
@@ -82,6 +84,34 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 
     def missing_price_symbols(prices: pd.DataFrame, symbols: list[str]) -> list[str]:
         return []
+try:
+    from src.edge import summarize_quality_frame
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def summarize_quality_frame(data: pd.DataFrame, score_column: str = "quality_score") -> dict:
+        return {"rows": 0, "avg_quality": np.nan, "median_quality": np.nan, "low_quality_rows": 0, "unique_sources": 0, "dup_ratio": np.nan}
+try:
+    from src.lstm import build_lstm_status_from_artifacts, load_lstm_status, summarize_lstm_status
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def load_lstm_status(path=None) -> dict:
+        return {
+            "enabled": False,
+            "mode": "scaffold",
+            "status": "LSTM 模組尚未同步",
+            "model_version": "n/a",
+            "feature_version": "n/a",
+            "last_train_at_utc": "",
+            "last_predict_at_utc": "",
+            "last_backtest_at_utc": "",
+            "prediction_rows": 0,
+            "backtest_rows": 0,
+            "updated_at_utc": "",
+        }
+
+    def build_lstm_status_from_artifacts(predictions: pd.DataFrame | None = None, backtest: pd.DataFrame | None = None) -> dict:
+        return load_lstm_status()
+
+    def summarize_lstm_status(status: dict) -> pd.DataFrame:
+        return pd.DataFrame([{"項目": "LSTM 模組", "值": "等待同步"}])
 from src.indicators import (
     add_price_indicators,
     analog_stats,
@@ -130,8 +160,34 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 
 from src.news import fetch_news_batch
 try:
-    from src.news import international_news_selection, portfolio_news_impact
+    from src.news import DEFAULT_TSLA_KEYWORDS, filter_news_by_keywords, international_news_selection, portfolio_news_impact
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    DEFAULT_TSLA_KEYWORDS = [
+        "TSLA",
+        "Tesla",
+        "Elon Musk",
+        "Robotaxi",
+        "FSD",
+        "Autopilot",
+        "Cybertruck",
+        "Model 3",
+        "Model Y",
+        "Dojo",
+        "Optimus",
+        "Gigafactory",
+        "Megapack",
+        "energy storage",
+        "deliveries",
+        "price cut",
+        "margin pressure",
+        "recall",
+        "investigation",
+        "lawsuit",
+    ]
+
+    def filter_news_by_keywords(news: pd.DataFrame, keywords):
+        return news
+
     def international_news_selection(news: pd.DataFrame, random_count: int = 3) -> tuple[pd.DataFrame, pd.DataFrame]:
         return news.copy(), news.copy()
 
@@ -335,6 +391,39 @@ def latest_value(data: pd.DataFrame, column: str) -> str:
     return str(value.date())
 
 
+def _news_keywords_path():
+    return cache_path("news_keywords.txt")
+
+
+def load_news_keywords() -> list[str]:
+    path = _news_keywords_path()
+    if not path.exists():
+        return DEFAULT_TSLA_KEYWORDS.copy()
+    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def save_news_keywords(keywords: list[str]) -> None:
+    path = _news_keywords_path()
+    path.write_text("\n".join([kw.strip() for kw in keywords if kw.strip()]), encoding="utf-8")
+
+
+def filter_table_by_keywords(data: pd.DataFrame, keywords: list[str], columns: list[str]) -> pd.DataFrame:
+    if data.empty or not keywords:
+        return data.copy()
+    terms = [term.strip().lower() for term in keywords if term and str(term).strip()]
+    if not terms:
+        return data.copy()
+    present_columns = [col for col in columns if col in data.columns]
+    if not present_columns:
+        return data.copy()
+    mask = pd.Series(False, index=data.index)
+    for col in present_columns:
+        text = data[col].fillna("").astype(str).str.lower()
+        for term in terms:
+            mask |= text.str.contains(term, regex=False)
+    return data[mask].copy().reset_index(drop=True)
+
+
 def render_discovery_rank_table(data: pd.DataFrame, title: str) -> None:
     st.markdown(f"#### {title}")
     if data.empty:
@@ -372,7 +461,7 @@ def render_discovery_rank_table(data: pd.DataFrame, title: str) -> None:
 
 with st.sidebar:
     st.header("設定")
-    news_days = st.slider("新聞回看天數", 3, 30, 10)
+    news_days = st.slider("新聞回看天數", 3, 30, 14)
     show_health = st.button("顯示資料健康檢查", width="stretch")
     st.caption("資料由 GitHub Actions 每 6 小時自動更新；前台只讀快取，避免人為刷新造成偏差。")
     st.caption("AI 摘要每日 07:00（台灣時間）由 OpenAI 自動生成；前台只讀取摘要快取。")
@@ -392,6 +481,7 @@ kg_payload = load_knowledge_graph()
 kg_health = kg_summary(kg_payload)
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
+ai_history = load_ai_summary_history()
 openai_status = openai_configuration_status()
 indicators = add_price_indicators(prices)
 snapshot = latest_snapshot(indicators)
@@ -402,6 +492,15 @@ market_prediction = build_market_prediction(regime, conclusion, snapshot)
 prediction_log = load_prediction_log()
 metadata = load_metadata()
 annual_picks = annual_picks_table(prices)
+lstm_status = build_lstm_status_from_artifacts()
+active_news_keywords = load_news_keywords()
+keyword_news = filter_news_by_keywords(news, active_news_keywords)
+keyword_discovery_news = filter_news_by_keywords(discovery_news, active_news_keywords)
+keyword_discovery_candidates = filter_table_by_keywords(
+    discovery_candidates,
+    active_news_keywords,
+    ["ticker", "topic", "observation_reason", "risk_flags", "sample_headline"],
+)
 
 st.title("科技股量化監控儀表板")
 last_date = pd.to_datetime(snapshot["date"]).max().date() if not snapshot.empty else None
@@ -416,11 +515,26 @@ with st.sidebar:
     st.caption(f"新聞探索：{latest_value(discovery_news, 'published')}")
     st.caption(f"探索歷史：{latest_value(discovery_history, 'date')}")
     st.caption(f"AI 摘要：{ai_summary.get('generated_at_utc', '尚未產生')}")
+    st.caption(f"LSTM：{lstm_status.get('status', 'n/a')}")
     st.caption(f"快取寫入 UTC：{updated_at}")
     if openai_status.get("configured"):
         st.success(f"OpenAI 已就緒｜模型：{openai_status.get('model', 'n/a')}")
     else:
         st.warning("OpenAI API key 尚未設定，摘要目前使用規則備援。")
+
+    st.divider()
+    st.subheader("新聞關鍵字")
+    st.caption("預設已放入 TSLA 專用關鍵字，可直接修改。")
+    keyword_text = st.text_area(
+        "每行一個關鍵字",
+        value="\n".join(load_news_keywords()),
+        height=120,
+        placeholder="TSLA\nTesla\nRobotaxi\nFSD\nCybertruck",
+    )
+    if st.button("儲存關鍵字", use_container_width=True):
+        keywords = [line.strip() for line in keyword_text.splitlines() if line.strip()]
+        save_news_keywords(keywords)
+        st.success(f"已儲存 {len(keywords)} 個關鍵字，下一次更新會自動套用。")
 
 top = st.columns([1.2, 1, 1, 1])
 top[0].metric("Regime Score", pct(regime["score"] / 100 if pd.notna(regime["score"]) else np.nan))
@@ -452,6 +566,8 @@ if show_health:
             international_news,
             prediction_log,
             metadata,
+            ai_history,
+            lstm_status,
             discovery_news,
             discovery_candidates,
             discovery_history,
@@ -772,10 +888,76 @@ with tab_news:
         qcols[3].metric("品質分", num(ai_quality.get("quality_score"), 0))
         if ai_quality.get("missing_sections") not in {None, "", "無"}:
             st.caption("缺少章節：" + str(ai_quality.get("missing_sections")))
+        st.caption(
+            f"edge 品質：{num(ai_summary.get('quality_score'), 0)}｜"
+            f"來源可靠度：{num(ai_summary.get('source_reliability_score'), 2)}｜"
+            f"來源網域：{ai_summary.get('source_domain', 'n/a')}｜"
+            f"去重鍵：{ai_summary.get('dedup_key', 'n/a')}"
+        )
         st.markdown(ai_summary.get("text", ""))
+        if not ai_history.empty:
+            ai_quality_summary = summarize_quality_frame(ai_history, "quality_score")
+            hist_cols = st.columns(4)
+            hist_cols[0].metric("歷史摘要數", f"{ai_quality_summary['rows']}")
+            hist_cols[1].metric("平均品質", num(ai_quality_summary["avg_quality"], 0))
+            hist_cols[2].metric("低品質筆數", f"{ai_quality_summary['low_quality_rows']}")
+            hist_cols[3].metric("來源數", f"{ai_quality_summary['unique_sources']}")
+            with st.expander("查看 AI 摘要歷史"):
+                history_display = ai_history.rename(
+                    columns={
+                        "summary_date": "日期",
+                        "generated_at_utc": "產生時間",
+                        "provider": "來源",
+                        "model": "模型",
+                        "used_ai": "使用AI",
+                        "status": "狀態",
+                        "quality_score": "品質分",
+                        "quality_label": "品質標籤",
+                        "text_length": "文字長度",
+                        "section_count": "章節數",
+                        "missing_sections": "缺漏章節",
+                        "source_domain": "來源網域",
+                        "source_reliability_score": "來源可靠度",
+                        "text_density_score": "文字密度",
+                        "structure_score": "結構分",
+                        "quality_score_edge": "edge品質分",
+                        "prompt_version": "提示版本",
+                    }
+                )
+                st.dataframe(
+                    history_display[[c for c in [
+                        "日期",
+                        "產生時間",
+                        "來源",
+                        "模型",
+                        "使用AI",
+                        "狀態",
+                        "品質分",
+                        "品質標籤",
+                        "來源網域",
+                        "來源可靠度",
+                        "edge品質分",
+                        "章節數",
+                        "缺漏章節",
+                        "提示版本",
+                    ] if c in history_display.columns]],
+                    hide_index=True,
+                    width="stretch",
+                )
     else:
         st.warning("尚未產生每日 AI 摘要，先顯示規則摘要。GitHub Actions 會在每日 07:00 台灣時間自動生成。")
         st.markdown(rule_based_news_summary(news))
+
+    st.subheader("TSLA 關鍵字命中新聞")
+    if not active_news_keywords:
+        st.caption("目前尚未設定新聞關鍵字。")
+    elif keyword_news.empty:
+        st.caption("目前沒有命中 TSLA 關鍵字的標的新聞。")
+    else:
+        st.caption("以下新聞是依照設定欄中的 TSLA 關鍵字命中後整理。")
+        for row in keyword_news.head(20).itertuples():
+            published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
+            st.markdown(f"**{row.symbol}** · `{row.tags}` · {row.source} · {published}  \n[{row.title}]({row.link})")
 
     st.subheader("新聞標籤與連結")
     if news.empty:
@@ -831,6 +1013,7 @@ with tab_news:
 
 with tab_prediction:
     st.subheader("市場預測驗證")
+    st.caption(f"LSTM 狀態：{lstm_status.get('status', 'n/a')}｜模式：{lstm_status.get('mode', 'n/a')}｜模型版本：{lstm_status.get('model_version', 'n/a')}")
     scorecard = prediction_scorecard(prediction_log)
     score_cols = st.columns(5)
     score_cols[0].metric("已驗證樣本", f"{scorecard['validated']}")
@@ -895,6 +1078,37 @@ with tab_prediction:
 with tab_discovery:
     st.subheader("新聞探索候選股")
     st.caption("每天用日期作為隨機種子抽取市場主題，從新聞中找 ticker，再用量價規則評分；系統每日記錄 Top 15，這是觀察清單，不是買入建議。")
+
+    st.markdown("#### TSLA 關鍵字命中候選")
+    if not active_news_keywords:
+        st.caption("目前尚未設定新聞關鍵字。")
+    elif keyword_discovery_candidates.empty:
+        st.caption("今天的候選觀察股中，還沒有命中 TSLA 關鍵字的項目。")
+    else:
+        tsla_candidate_display = keyword_discovery_candidates.rename(
+            columns={
+                "ticker": "股票",
+                "topic": "相關主題",
+                "candidate_score": "候選分數",
+                "candidate_label": "分數解讀",
+                "observation_reason": "觀察理由",
+                "risk_flags": "風險標籤",
+                "sample_headline": "代表新聞",
+            }
+        )
+        st.dataframe(
+            tsla_candidate_display[[col for col in ["股票", "相關主題", "候選分數", "分數解讀", "觀察理由", "風險標籤", "代表新聞"] if col in tsla_candidate_display.columns]].head(10),
+            hide_index=True,
+            width="stretch",
+            column_config={"候選分數": st.column_config.NumberColumn(format="%.0f")},
+        )
+
+    if not keyword_discovery_news.empty:
+        with st.expander("查看 TSLA 關鍵字命中探索新聞"):
+            for row in keyword_discovery_news.head(20).itertuples():
+                published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
+                tickers_text = f"｜tickers: `{row.tickers}`" if getattr(row, "tickers", "") else ""
+                st.markdown(f"**{row.topic}** · `{row.tags}` · {row.source} · {published} {tickers_text}  \n[{row.title}]({row.link})")
 
     topic_summary = (
         discovery_news.groupby("topic").size().reset_index(name="新聞數").sort_values("新聞數", ascending=False)
@@ -1041,6 +1255,12 @@ with tab_kg:
     st.subheader("金融知識圖譜")
     st.caption("第一階段先把新聞與國際新聞拆成可回測事件，再補上敘事特徵與市場反應。")
     st.dataframe(kg_health.rename(columns={"層級": "層級", "筆數": "筆數", "最新時間": "最新時間", "說明": "說明"}), hide_index=True, width="stretch")
+    if "updated_at_utc" in metadata:
+        st.caption(
+            f"KG 更新 UTC：{metadata.get('updated_at_utc', 'n/a')}｜"
+            f"平均 fact 品質：{num(metadata.get('avg_fact_quality'), 0)}｜"
+            f"平均來源可靠度：{num(metadata.get('avg_source_reliability'), 2)}"
+        )
 
     if kg_payload.facts.empty:
         st.info("目前尚未建立知識圖譜事件。等待下一次資料更新後會自動填入。")
@@ -1049,7 +1269,7 @@ with tab_kg:
         kg_metrics[0].metric("事實事件", f"{len(kg_payload.facts)}")
         kg_metrics[1].metric("去重後事件", f"{kg_payload.facts['canonical_event_id'].nunique() if 'canonical_event_id' in kg_payload.facts else len(kg_payload.facts)}")
         kg_metrics[2].metric("平均來源可靠度", num(kg_payload.facts.get("source_reliability_score", pd.Series(dtype=float)).mean(), 2))
-        kg_metrics[3].metric("平均事件強度", num(kg_payload.facts.get("event_strength", pd.Series(dtype=float)).mean(), 2))
+        kg_metrics[3].metric("平均品質", num(kg_payload.facts.get("quality_score", pd.Series(dtype=float)).mean(), 0))
 
         left_kg, right_kg = st.columns([1, 1.2])
         with left_kg:
