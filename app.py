@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -417,28 +419,28 @@ def build_health_report(
     tsla_keyword_news: pd.DataFrame,
     kg_payload,
 ) -> pd.DataFrame:
-    base_args = (
-        prices,
-        macro,
-        news,
-        international_news,
-        prediction_log,
-        metadata,
-        ai_history,
-        lstm_status,
-        discovery_news,
-        discovery_candidates,
-        discovery_history,
-    )
-    trailing_args = (
-        kg_payload.facts,
-        kg_payload.narratives,
-        kg_payload.reactions,
-    )
-    try:
-        return data_health_report(*base_args, tsla_keyword_news, *trailing_args)
-    except TypeError:
-        return data_health_report(*base_args, *trailing_args)
+    health_inputs = {
+        "prices": prices,
+        "macro": macro,
+        "news": news,
+        "international_news": international_news,
+        "prediction_log": prediction_log,
+        "metadata": metadata,
+        "ai_summary_history": ai_history,
+        "lstm_status": lstm_status,
+        "discovery_news": discovery_news,
+        "discovery_candidates": discovery_candidates,
+        "discovery_history": discovery_history,
+        "focus_news": tsla_keyword_news,
+        "kg_fact_events": kg_payload.facts,
+        "kg_narratives": kg_payload.narratives,
+        "kg_reactions": kg_payload.reactions,
+    }
+    signature = inspect.signature(data_health_report)
+    if any(param.kind == inspect.Parameter.VAR_KEYWORD for param in signature.parameters.values()):
+        return data_health_report(**health_inputs)
+    supported = {name for name in signature.parameters if name in health_inputs}
+    return data_health_report(**{name: health_inputs[name] for name in supported})
 
 
 def _news_keywords_path():
