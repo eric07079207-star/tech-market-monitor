@@ -78,6 +78,7 @@ def update_prediction_log(
     qqq = indicators[indicators["symbol"] == prediction.get("target", "QQQ")].dropna(subset=["close"]).sort_values("date")
     if qqq.empty:
         return log
+    log = sanitize_prediction_log(log, qqq)
 
     latest = qqq.iloc[-1]
     prediction_date = pd.to_datetime(latest["date"]).normalize()
@@ -113,9 +114,38 @@ def update_prediction_log(
         log = pd.concat([log, pd.DataFrame(additions)], ignore_index=True)
 
     log = validate_prediction_log(log, qqq)
+    log = sanitize_prediction_log(log, qqq)
     path.parent.mkdir(parents=True, exist_ok=True)
     log.to_csv(path, index=False)
     return log
+
+
+def sanitize_prediction_log(log: pd.DataFrame, target_history: pd.DataFrame) -> pd.DataFrame:
+    if log.empty:
+        return _empty_log()
+
+    result = log.copy()
+    if "prediction_date" not in result:
+        result["prediction_date"] = pd.NaT
+    result["prediction_date"] = pd.to_datetime(result["prediction_date"], errors="coerce")
+
+    if not target_history.empty and "close" in result and "date" in target_history:
+        history = target_history.dropna(subset=["date", "close"]).copy()
+        history["date"] = pd.to_datetime(history["date"], errors="coerce").dt.normalize()
+        history["close_key"] = history["close"].astype(float).round(4)
+        close_to_date = history.drop_duplicates("close_key", keep="last").set_index("close_key")["date"].to_dict()
+        missing_date = result["prediction_date"].isna()
+        close_keys = pd.to_numeric(result.get("close_at_prediction"), errors="coerce").round(4)
+        inferred_dates = close_keys.map(close_to_date)
+        result.loc[missing_date & inferred_dates.notna(), "prediction_date"] = inferred_dates[missing_date & inferred_dates.notna()]
+
+    result = result.dropna(subset=["prediction_date", "target", "horizon"]).copy()
+    result["prediction_date"] = result["prediction_date"].dt.normalize().dt.date.astype(str)
+    result["horizon_days"] = pd.to_numeric(result.get("horizon_days"), errors="coerce")
+    result = result.dropna(subset=["horizon_days"]).copy()
+    result["horizon_days"] = result["horizon_days"].astype(int)
+    result = result.drop_duplicates(["prediction_date", "target", "horizon"], keep="last")
+    return result.sort_values(["prediction_date", "target", "horizon_days"]).reset_index(drop=True)
 
 
 def validate_prediction_log(log: pd.DataFrame, target_history: pd.DataFrame) -> pd.DataFrame:
