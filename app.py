@@ -160,7 +160,7 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 
 from src.news import fetch_news_batch
 try:
-    from src.news import DEFAULT_TSLA_KEYWORDS, filter_news_by_keywords, international_news_selection, portfolio_news_impact
+    from src.news import DEFAULT_TSLA_KEYWORDS, international_news_selection, portfolio_news_impact, summarize_keyword_news
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     DEFAULT_TSLA_KEYWORDS = [
         "TSLA",
@@ -185,8 +185,8 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         "lawsuit",
     ]
 
-    def filter_news_by_keywords(news: pd.DataFrame, keywords):
-        return news
+    def summarize_keyword_news(news: pd.DataFrame, symbol: str = "TSLA") -> dict:
+        return {"symbol": symbol, "headline_count": 0, "top_keywords": "", "top_groups": "", "risk_keywords": "", "latest_published": "", "summary": f"近期沒有抓到 {symbol} 關鍵字命中的新聞。"}
 
     def international_news_selection(news: pd.DataFrame, random_count: int = 3) -> tuple[pd.DataFrame, pd.DataFrame]:
         return news.copy(), news.copy()
@@ -301,6 +301,17 @@ def load_discovery() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataF
     return discovery_news, mentions, candidates, history
 
 
+@st.cache_data(show_spinner=False, ttl=60 * 60 * 3)
+def load_tsla_keyword_news() -> pd.DataFrame:
+    path = cache_path("tsla_keyword_news.parquet")
+    if not path.exists():
+        return pd.DataFrame()
+    data = pd.read_parquet(path)
+    if "published" in data:
+        data["published"] = pd.to_datetime(data["published"], utc=True, errors="coerce")
+    return data
+
+
 @st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
 def load_discovery_perf() -> pd.DataFrame:
     return load_discovery_performance()
@@ -391,6 +402,45 @@ def latest_value(data: pd.DataFrame, column: str) -> str:
     return str(value.date())
 
 
+def build_health_report(
+    prices: pd.DataFrame,
+    macro: pd.DataFrame,
+    news: pd.DataFrame,
+    international_news: pd.DataFrame,
+    prediction_log: pd.DataFrame,
+    metadata: dict,
+    ai_history: pd.DataFrame,
+    lstm_status: dict,
+    discovery_news: pd.DataFrame,
+    discovery_candidates: pd.DataFrame,
+    discovery_history: pd.DataFrame,
+    tsla_keyword_news: pd.DataFrame,
+    kg_payload,
+) -> pd.DataFrame:
+    base_args = (
+        prices,
+        macro,
+        news,
+        international_news,
+        prediction_log,
+        metadata,
+        ai_history,
+        lstm_status,
+        discovery_news,
+        discovery_candidates,
+        discovery_history,
+    )
+    trailing_args = (
+        kg_payload.facts,
+        kg_payload.narratives,
+        kg_payload.reactions,
+    )
+    try:
+        return data_health_report(*base_args, tsla_keyword_news, *trailing_args)
+    except TypeError:
+        return data_health_report(*base_args, *trailing_args)
+
+
 def _news_keywords_path():
     return cache_path("news_keywords.txt")
 
@@ -476,6 +526,7 @@ if prices.empty:
 news = load_news(news_days)
 international_news = load_international_news(min(news_days, 7))
 discovery_news, discovery_mentions, discovery_candidates, discovery_history = load_discovery()
+tsla_keyword_news = load_tsla_keyword_news()
 discovery_performance = load_discovery_perf()
 kg_payload = load_knowledge_graph()
 kg_health = kg_summary(kg_payload)
@@ -494,13 +545,8 @@ metadata = load_metadata()
 annual_picks = annual_picks_table(prices)
 lstm_status = build_lstm_status_from_artifacts()
 active_news_keywords = load_news_keywords()
-keyword_news = filter_news_by_keywords(news, active_news_keywords)
-keyword_discovery_news = filter_news_by_keywords(discovery_news, active_news_keywords)
-keyword_discovery_candidates = filter_table_by_keywords(
-    discovery_candidates,
-    active_news_keywords,
-    ["ticker", "topic", "observation_reason", "risk_flags", "sample_headline"],
-)
+keyword_discovery_news = tsla_keyword_news.copy()
+tsla_keyword_summary = summarize_keyword_news(keyword_discovery_news, "TSLA")
 
 st.title("科技股量化監控儀表板")
 last_date = pd.to_datetime(snapshot["date"]).max().date() if not snapshot.empty else None
@@ -521,20 +567,8 @@ with st.sidebar:
         st.success(f"OpenAI 已就緒｜模型：{openai_status.get('model', 'n/a')}")
     else:
         st.warning("OpenAI API key 尚未設定，摘要目前使用規則備援。")
-
     st.divider()
-    st.subheader("新聞關鍵字")
-    st.caption("預設已放入 TSLA 專用關鍵字，可直接修改。")
-    keyword_text = st.text_area(
-        "每行一個關鍵字",
-        value="\n".join(load_news_keywords()),
-        height=120,
-        placeholder="TSLA\nTesla\nRobotaxi\nFSD\nCybertruck",
-    )
-    if st.button("儲存關鍵字", use_container_width=True):
-        keywords = [line.strip() for line in keyword_text.splitlines() if line.strip()]
-        save_news_keywords(keywords)
-        st.success(f"已儲存 {len(keywords)} 個關鍵字，下一次更新會自動套用。")
+    st.caption("TSLA 關鍵字設定與分析結果已移到「重點個股追蹤」，避免影響主新聞觀看。")
 
 top = st.columns([1.2, 1, 1, 1])
 top[0].metric("Regime Score", pct(regime["score"] / 100 if pd.notna(regime["score"]) else np.nan))
@@ -559,7 +593,7 @@ for card_col, card in zip(card_cols, conclusion_cards(regime, conclusion, market
 if show_health:
     st.subheader("資料健康檢查")
     st.dataframe(
-        data_health_report(
+        build_health_report(
             prices,
             macro,
             news,
@@ -571,9 +605,8 @@ if show_health:
             discovery_news,
             discovery_candidates,
             discovery_history,
-            kg_payload.facts,
-            kg_payload.narratives,
-            kg_payload.reactions,
+            tsla_keyword_news,
+            kg_payload,
         ),
         hide_index=True,
         width="stretch",
@@ -584,8 +617,8 @@ if show_health:
     else:
         st.success("主要追蹤標的價格資料完整。")
 
-tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_kg, tab_charts, tab_portfolio = st.tabs(
-    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "金融知識圖譜", "走勢圖", "我的持倉"]
+tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_focus, tab_kg, tab_charts, tab_portfolio = st.tabs(
+    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "重點個股追蹤", "金融知識圖譜", "走勢圖", "我的持倉"]
 )
 
 with tab_overview:
@@ -948,17 +981,6 @@ with tab_news:
         st.warning("尚未產生每日 AI 摘要，先顯示規則摘要。GitHub Actions 會在每日 07:00 台灣時間自動生成。")
         st.markdown(rule_based_news_summary(news))
 
-    st.subheader("TSLA 關鍵字命中新聞")
-    if not active_news_keywords:
-        st.caption("目前尚未設定新聞關鍵字。")
-    elif keyword_news.empty:
-        st.caption("目前沒有命中 TSLA 關鍵字的標的新聞。")
-    else:
-        st.caption("以下新聞是依照設定欄中的 TSLA 關鍵字命中後整理。")
-        for row in keyword_news.head(20).itertuples():
-            published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
-            st.markdown(f"**{row.symbol}** · `{row.tags}` · {row.source} · {published}  \n[{row.title}]({row.link})")
-
     st.subheader("新聞標籤與連結")
     if news.empty:
         st.info("目前沒有抓到近期新聞。")
@@ -1079,37 +1101,6 @@ with tab_discovery:
     st.subheader("新聞探索候選股")
     st.caption("每天用日期作為隨機種子抽取市場主題，從新聞中找 ticker，再用量價規則評分；系統每日記錄 Top 15，這是觀察清單，不是買入建議。")
 
-    st.markdown("#### TSLA 關鍵字命中候選")
-    if not active_news_keywords:
-        st.caption("目前尚未設定新聞關鍵字。")
-    elif keyword_discovery_candidates.empty:
-        st.caption("今天的候選觀察股中，還沒有命中 TSLA 關鍵字的項目。")
-    else:
-        tsla_candidate_display = keyword_discovery_candidates.rename(
-            columns={
-                "ticker": "股票",
-                "topic": "相關主題",
-                "candidate_score": "候選分數",
-                "candidate_label": "分數解讀",
-                "observation_reason": "觀察理由",
-                "risk_flags": "風險標籤",
-                "sample_headline": "代表新聞",
-            }
-        )
-        st.dataframe(
-            tsla_candidate_display[[col for col in ["股票", "相關主題", "候選分數", "分數解讀", "觀察理由", "風險標籤", "代表新聞"] if col in tsla_candidate_display.columns]].head(10),
-            hide_index=True,
-            width="stretch",
-            column_config={"候選分數": st.column_config.NumberColumn(format="%.0f")},
-        )
-
-    if not keyword_discovery_news.empty:
-        with st.expander("查看 TSLA 關鍵字命中探索新聞"):
-            for row in keyword_discovery_news.head(20).itertuples():
-                published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
-                tickers_text = f"｜tickers: `{row.tickers}`" if getattr(row, "tickers", "") else ""
-                st.markdown(f"**{row.topic}** · `{row.tags}` · {row.source} · {published} {tickers_text}  \n[{row.title}]({row.link})")
-
     topic_summary = (
         discovery_news.groupby("topic").size().reset_index(name="新聞數").sort_values("新聞數", ascending=False)
         if not discovery_news.empty else pd.DataFrame(columns=["topic", "新聞數"])
@@ -1176,6 +1167,59 @@ with tab_discovery:
                         "相對QQQ": st.column_config.NumberColumn(format="%.2%"),
                     },
                 )
+
+with tab_focus:
+    st.subheader("重點個股追蹤")
+    st.caption("這裡是獨立的 TSLA 專題資料流，只讀取專題關鍵字新聞，不會回寫或污染主新聞、新聞探索與候選觀察股。")
+
+    focus_left, focus_right = st.columns([0.95, 1.45])
+    with focus_left:
+        st.markdown("#### TSLA 關鍵字設定")
+        keyword_text = st.text_area(
+            "每行一個關鍵字",
+            value="\n".join(active_news_keywords),
+            height=240,
+            placeholder="TSLA\nTesla\nRobotaxi\nFSD\nCybertruck",
+            key="focus_keyword_text",
+        )
+        if st.button("儲存 TSLA 關鍵字", use_container_width=True):
+            keywords = [line.strip() for line in keyword_text.splitlines() if line.strip()]
+            save_news_keywords(keywords)
+            st.success(f"已儲存 {len(keywords)} 個關鍵字；下一次資料更新會套用到 TSLA 專題新聞。")
+            st.rerun()
+        st.caption("這些關鍵字只影響 TSLA 專題追蹤，不會縮窄全市場新聞流。")
+
+    with focus_right:
+        st.markdown("#### TSLA 關鍵字分析總結")
+        if not active_news_keywords:
+            st.info("目前尚未設定 TSLA 專題關鍵字。")
+        else:
+            summary_cols = st.columns(4)
+            summary_cols[0].metric("命中新聞數", f"{tsla_keyword_summary.get('headline_count', 0)}")
+            summary_cols[1].metric("主要分類", tsla_keyword_summary.get("top_groups", "n/a") or "n/a")
+            summary_cols[2].metric("風險關鍵字", tsla_keyword_summary.get("risk_keywords", "無") or "無")
+            latest_kw = tsla_keyword_summary.get("latest_published", "")
+            latest_kw_text = str(pd.to_datetime(latest_kw).date()) if latest_kw else "n/a"
+            summary_cols[3].metric("最近新聞", latest_kw_text)
+            st.caption("主要命中關鍵字：" + (tsla_keyword_summary.get("top_keywords", "") or "n/a"))
+            st.info(tsla_keyword_summary.get("summary", "目前沒有 TSLA 關鍵字分析結果。"))
+
+    st.markdown("#### TSLA 關鍵字命中新聞")
+    if keyword_discovery_news.empty:
+        st.caption("目前沒有抓到 TSLA 專題新聞。")
+    else:
+        for row in keyword_discovery_news.head(25).itertuples():
+            published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
+            matched = getattr(row, "matched_keywords", "")
+            keyword_group = getattr(row, "keyword_group", "")
+            meta_bits = [f"`{row.tags}`", row.source, published]
+            if matched:
+                meta_bits.append(f"命中：`{matched}`")
+            if keyword_group:
+                meta_bits.append(f"分類：`{keyword_group}`")
+            st.markdown(" · ".join([bit for bit in meta_bits if bit]) + f"  \n[{row.title}]({row.link})")
+            if getattr(row, "analysis_note", ""):
+                st.caption(getattr(row, "analysis_note"))
 
     weekly_candidates = summarize_discovery_history(discovery_history, days=7, top_n=15)
     monthly_candidates = summarize_discovery_history(discovery_history, days=30, top_n=15)
