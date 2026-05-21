@@ -42,6 +42,41 @@ def _load_keywords(path: Path | None = None) -> list[str]:
     return [term for term in keywords if term]
 
 
+def _backfill_prediction_log(indicators: pd.DataFrame, macro: pd.DataFrame, prediction_log: pd.DataFrame) -> pd.DataFrame:
+    if indicators.empty or prediction_log.empty or "prediction_date" not in prediction_log:
+        return prediction_log
+    existing_dates = pd.to_datetime(prediction_log["prediction_date"], errors="coerce").dropna()
+    if existing_dates.empty:
+        return prediction_log
+
+    qqq_dates = (
+        indicators[indicators["symbol"] == "QQQ"]["date"]
+        .pipe(pd.to_datetime, errors="coerce")
+        .dropna()
+        .dt.normalize()
+        .drop_duplicates()
+        .sort_values()
+    )
+    if qqq_dates.empty:
+        return prediction_log
+    start_date = existing_dates.min().normalize()
+    target_dates = qqq_dates[(qqq_dates >= start_date) & (qqq_dates <= qqq_dates.max())].tail(10)
+
+    log = prediction_log
+    for target_date in target_dates:
+        indicator_slice = indicators[pd.to_datetime(indicators["date"], errors="coerce").dt.normalize() <= target_date].copy()
+        macro_slice = macro.copy()
+        if not macro_slice.empty and "date" in macro_slice:
+            macro_slice = macro_slice[pd.to_datetime(macro_slice["date"], errors="coerce").dt.normalize() <= target_date]
+        snapshot_slice = latest_snapshot(indicator_slice)
+        anomalies_slice = detect_anomalies(snapshot_slice)
+        regime_slice = regime_summary(indicator_slice, macro_slice)
+        conclusion_slice = today_conclusion(regime_slice, snapshot_slice, anomalies_slice)
+        prediction_slice = build_market_prediction(regime_slice, conclusion_slice, snapshot_slice)
+        log = update_prediction_log(indicator_slice, prediction_slice)
+    return log
+
+
 def main() -> None:
     fetched_at_utc = datetime.now(timezone.utc).isoformat(timespec="seconds")
     keywords = _load_keywords()
@@ -89,6 +124,7 @@ def main() -> None:
     save_knowledge_graph(kg)
     prediction = build_market_prediction(regime, conclusion, snapshot)
     prediction_log = update_prediction_log(indicators, prediction)
+    prediction_log = _backfill_prediction_log(indicators, macro, prediction_log)
     lstm_features = build_lstm_feature_table(prices=prices)
     if not lstm_features.empty:
         save_lstm_feature_table(lstm_features)
