@@ -30,6 +30,13 @@ jobs:
       - name: Refresh cached data
         run: python scripts/update_data.py
 
+      - name: Build LSTM features
+        run: python scripts/build_lstm_features.py
+
+      - name: Train LSTM model
+        if: github.event.schedule == '0 23 * * *' || github.event_name == 'workflow_dispatch'
+        run: python scripts/train_lstm.py
+
       - name: Generate daily AI summary
         if: github.event.schedule == '0 23 * * *' || github.event_name == 'workflow_dispatch'
         env:
@@ -44,7 +51,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/cache/prices.parquet data/cache/macro.parquet data/cache/news.parquet data/cache/international_news.parquet data/cache/discovery_news.parquet data/cache/discovery_mentions.parquet data/cache/discovery_candidates.parquet data/cache/discovery_history.parquet data/cache/discovery_performance.parquet data/cache/ai_summary.json data/cache/prediction_log.csv data/cache/metadata.json data/觀察版資料
+          git add data/cache data/觀察版資料
           git diff --cached --quiet && exit 0
           git commit -m "Update market data cache"
           git push
