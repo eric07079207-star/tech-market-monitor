@@ -314,6 +314,14 @@ def load_tsla_keyword_news() -> pd.DataFrame:
     return data
 
 
+@st.cache_data(show_spinner=False, ttl=60 * 60 * 3)
+def load_governance_summary() -> pd.DataFrame:
+    path = cache_path("governance_summary.parquet")
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(path)
+
+
 @st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
 def load_discovery_perf() -> pd.DataFrame:
     return load_discovery_performance()
@@ -417,6 +425,7 @@ def build_health_report(
     discovery_candidates: pd.DataFrame,
     discovery_history: pd.DataFrame,
     tsla_keyword_news: pd.DataFrame,
+    governance_summary: pd.DataFrame,
     kg_payload,
 ) -> pd.DataFrame:
     health_inputs = {
@@ -432,6 +441,7 @@ def build_health_report(
         "discovery_candidates": discovery_candidates,
         "discovery_history": discovery_history,
         "focus_news": tsla_keyword_news,
+        "governance": governance_summary,
         "kg_fact_events": kg_payload.facts,
         "kg_narratives": kg_payload.narratives,
         "kg_reactions": kg_payload.reactions,
@@ -529,6 +539,7 @@ news = load_news(news_days)
 international_news = load_international_news(min(news_days, 7))
 discovery_news, discovery_mentions, discovery_candidates, discovery_history = load_discovery()
 tsla_keyword_news = load_tsla_keyword_news()
+governance = load_governance_summary()
 discovery_performance = load_discovery_perf()
 kg_payload = load_knowledge_graph()
 kg_health = kg_summary(kg_payload)
@@ -608,11 +619,27 @@ if show_health:
             discovery_candidates,
             discovery_history,
             tsla_keyword_news,
+            governance,
             kg_payload,
         ),
         hide_index=True,
         width="stretch",
     )
+    if not governance.empty:
+        st.markdown("#### 資料治理分層摘要")
+        governance_display = governance.rename(
+            columns={
+                "dataset": "資料流",
+                "rows": "總筆數",
+                "official": "正式",
+                "pending_short": "短期待確認",
+                "pending_medium": "中期待確認",
+                "pending_long": "長期待確認",
+                "rejected": "拒收",
+                "top_reasons": "主要原因",
+            }
+        )
+        st.dataframe(governance_display, hide_index=True, width="stretch")
     missing = missing_price_symbols(prices, ETF_TICKERS + STOCK_TICKERS + ANNUAL_PICK_TICKERS + ["SPY", "QQQ"])
     if missing:
         st.warning("缺少價格資料：" + ", ".join(missing[:20]))

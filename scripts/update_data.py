@@ -4,16 +4,19 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pandas as pd
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.config import NEWS_QUERIES, default_start_date
 from src.data import cache_path, refresh_market_data
 from src.discovery import build_discovery_candidates, fetch_discovery_news, update_discovery_history, update_discovery_performance
+from src.governance import annotate_governance, governance_summary
 from src.kg import build_knowledge_graph, save_knowledge_graph
 from src.indicators import add_price_indicators, detect_anomalies, latest_snapshot, regime_summary, today_conclusion
 from src.lstm import build_lstm_feature_table, build_lstm_status_from_artifacts, save_lstm_feature_table, save_lstm_status
-from src.news import DEFAULT_TSLA_KEYWORDS, fetch_international_news, fetch_news_batch, filter_news_by_keywords
+from src.news import DEFAULT_TSLA_KEYWORDS, fetch_international_news, fetch_news_batch, fetch_symbol_keyword_news
 from src.predictions import build_market_prediction, update_prediction_log
 
 
@@ -22,6 +25,13 @@ def _stamp_fetch_time(data, fetched_at_utc: str):
         data = data.copy()
         data["fetched_at_utc"] = fetched_at_utc
     return data
+
+
+def _write_parquet(data, filename: str) -> None:
+    path = cache_path(filename)
+    frame = data.copy() if data is not None else pd.DataFrame()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_parquet(path, index=False)
 
 
 def _load_keywords(path: Path | None = None) -> list[str]:
@@ -37,26 +47,38 @@ def main() -> None:
     keywords = _load_keywords()
     prices, macro = refresh_market_data(start=default_start_date())
     news = _stamp_fetch_time(fetch_news_batch(symbols=list(NEWS_QUERIES), days=10, limit_per_symbol=8), fetched_at_utc)
-    news = filter_news_by_keywords(news, keywords)
-    if not news.empty:
-        news.to_parquet(cache_path("news.parquet"), index=False)
+    news = annotate_governance(news, "watchlist_news")
+    _write_parquet(news, "news.parquet")
     international_news = _stamp_fetch_time(fetch_international_news(days=7, limit_per_topic=8), fetched_at_utc)
-    international_news = filter_news_by_keywords(international_news, keywords)
-    if not international_news.empty:
-        international_news.to_parquet(cache_path("international_news.parquet"), index=False)
+    international_news = annotate_governance(international_news, "international_news")
+    _write_parquet(international_news, "international_news.parquet")
     discovery_news = _stamp_fetch_time(fetch_discovery_news(days=7, topics_per_day=5, limit_per_topic=7), fetched_at_utc)
-    discovery_news = filter_news_by_keywords(discovery_news, keywords)
+    discovery_news = annotate_governance(discovery_news, "discovery_news")
+    tsla_keyword_news = _stamp_fetch_time(
+        fetch_symbol_keyword_news("TSLA", keywords or DEFAULT_TSLA_KEYWORDS, base_query="Tesla OR TSLA", days=7, limit_per_keyword=3),
+        fetched_at_utc,
+    )
+    tsla_keyword_news = annotate_governance(tsla_keyword_news, "tsla_keyword_news")
     discovery_mentions, discovery_candidates = build_discovery_candidates(discovery_news, top_n=15)
     discovery_mentions = _stamp_fetch_time(discovery_mentions, fetched_at_utc)
     discovery_candidates = _stamp_fetch_time(discovery_candidates, fetched_at_utc)
     discovery_history = update_discovery_history(discovery_candidates)
     discovery_performance = update_discovery_performance(discovery_history)
-    if not discovery_news.empty:
-        discovery_news.to_parquet(cache_path("discovery_news.parquet"), index=False)
-    if not discovery_mentions.empty:
-        discovery_mentions.to_parquet(cache_path("discovery_mentions.parquet"), index=False)
-    if not discovery_candidates.empty:
-        discovery_candidates.to_parquet(cache_path("discovery_candidates.parquet"), index=False)
+    _write_parquet(discovery_news, "discovery_news.parquet")
+    _write_parquet(tsla_keyword_news, "tsla_keyword_news.parquet")
+    _write_parquet(discovery_mentions, "discovery_mentions.parquet")
+    _write_parquet(discovery_candidates, "discovery_candidates.parquet")
+    _write_parquet(
+        governance_summary(
+            {
+                "watchlist_news": news,
+                "international_news": international_news,
+                "discovery_news": discovery_news,
+                "tsla_keyword_news": tsla_keyword_news,
+            }
+        ),
+        "governance_summary.parquet",
+    )
 
     indicators = add_price_indicators(prices)
     snapshot = latest_snapshot(indicators)
