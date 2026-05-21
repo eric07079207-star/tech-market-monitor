@@ -29,6 +29,7 @@ EXPORTS = [
     ExportItem("macro.parquet", "02_總經與市場壓力", "總經市場壓力", "FRED 總經、利率、信用利差與市場壓力資料。"),
     ExportItem("news.parquet", "03_標的新聞", "標的新聞", "科技股、ETF 與 watchlist 相關新聞。"),
     ExportItem("international_news.parquet", "04_國際新聞", "國際新聞", "國際重大新聞、戰爭、貿易、央行與能源消息。"),
+    ExportItem("tsla_keyword_news.parquet", "04_國際新聞", "TSLA專題新聞", "TSLA 專用關鍵字追蹤新聞與分類結果。"),
     ExportItem("discovery_news.parquet", "05_潛力股探索", "探索新聞", "隨機市場主題新聞，用來尋找潛在個股。"),
     ExportItem("discovery_mentions.parquet", "05_潛力股探索", "探索股票提及", "從探索新聞中擷取出的股票代號與新聞來源。"),
     ExportItem("discovery_candidates.parquet", "06_候選股追蹤", "每日候選股", "每日量化後的候選觀察股名單。"),
@@ -42,6 +43,15 @@ EXPORTS = [
     ExportItem("kg/market_reactions.parquet", "09_金融知識圖譜", "反應層", "事件後市場反應與驗證結果。"),
     ExportItem("kg/event_links.parquet", "09_金融知識圖譜", "事件連結", "事件與標的關聯關係。"),
     ExportItem("kg/kg_metadata.json", "09_金融知識圖譜", "知識圖譜資訊", "金融知識圖譜更新時間與筆數。"),
+    ExportItem("governance_summary.parquet", "11_資料治理", "資料治理摘要", "新聞資料流 official、pending 與 rejected 分層統計。"),
+    ExportItem("lstm/lstm_features.parquet", "10_LSTM模型", "LSTM特徵表", "LSTM 訓練與回測使用的序列特徵表。"),
+    ExportItem("lstm/lstm_split.parquet", "10_LSTM模型", "LSTM切分表", "LSTM 訓練/驗證/測試切分。"),
+    ExportItem("lstm/lstm_predictions.parquet", "10_LSTM模型", "LSTM最新預測", "LSTM 每次更新產生的最新預測結果。"),
+    ExportItem("lstm/lstm_backtest.parquet", "10_LSTM模型", "LSTM回測", "LSTM 歷史回測與驗證紀錄。"),
+    ExportItem("lstm/lstm_model.pt", "10_LSTM模型", "LSTM模型權重", "LSTM 訓練後輸出的模型權重。"),
+    ExportItem("lstm/lstm_model.json", "10_LSTM模型", "LSTM模型資訊", "LSTM 模型版本、訓練指標與 metadata。"),
+    ExportItem("lstm/lstm_scaler.json", "10_LSTM模型", "LSTM標準化器", "LSTM 特徵標準化參數。"),
+    ExportItem("lstm/lstm_status.json", "10_LSTM模型", "LSTM流程狀態", "LSTM 更新狀態、最後訓練時間與工件統計。"),
     ExportItem("metadata.json", "00_資料說明", "快取更新資訊", "目前快取更新時間、資料起始日與資料筆數。"),
 ]
 
