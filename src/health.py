@@ -34,7 +34,7 @@ def data_health_report(
         _row("國際新聞", "主資料", "international_news.parquet", international_news, "published", "國際重大與隨機新聞", cache_updated, 12),
         _row("AI摘要歷史", "摘要", "ai_summary_history.parquet", ai_summary_history, "generated_at_utc", "每日摘要版本與品質紀錄", cache_updated, 72),
         _status_row("LSTM流程", "模型", "lstm/lstm_status.json", lstm_status, cache_updated),
-        _row("預測紀錄", "模型", "prediction_log.csv", prediction_log, "prediction_date", "5D/20D/60D 驗證資料", cache_updated, 72),
+        _prediction_row(prediction_log, prices, cache_updated),
         _row("新聞探索", "探索", "discovery_news.parquet", discovery_news, "published", "隨機主題新聞", cache_updated, 12),
         _row("候選觀察股", "探索", "discovery_candidates.parquet", discovery_candidates, "", "新聞探索量化候選", cache_updated, 12),
         _row("候選歷史紀錄", "探索", "discovery_history.parquet", discovery_history, "date", "每日 Top 15 候選追蹤", cache_updated, 36),
@@ -128,6 +128,73 @@ def _governance_row(governance: pd.DataFrame | None, cache_updated: str) -> dict
         "Streamlit使用": "是",
         "說明": f"official / pending / rejected 分層統計；{detail}",
     }
+
+
+def _prediction_row(prediction_log: pd.DataFrame | None, prices: pd.DataFrame | None, cache_updated: str) -> dict:
+    count = 0 if prediction_log is None else len(prediction_log)
+    fetched_at = cache_updated
+    file_size = _file_size(cache_path("prediction_log.csv"))
+    latest = _max_date(prediction_log, "prediction_date")
+    status, freshness = _health_status(count, fetched_at, 72)
+    detail = _prediction_integrity_detail(prediction_log, prices)
+    if count > 0 and detail != "交易日與 horizon 完整":
+        status = "🟡 注意"
+    return {
+        "狀態": status,
+        "資料分類": "模型",
+        "資料項目": "預測紀錄",
+        "筆數": int(count),
+        "最新資料日期": _format_dateish(latest),
+        "最近抓取 UTC": _format_datetimeish(fetched_at),
+        "檔案大小": file_size,
+        "自動更新": "是",
+        "Streamlit使用": "是",
+        "說明": f"5D/20D/60D 驗證資料；{freshness}；{detail}",
+    }
+
+
+def _prediction_integrity_detail(prediction_log: pd.DataFrame | None, prices: pd.DataFrame | None) -> str:
+    if prediction_log is None or prediction_log.empty:
+        return "目前沒有預測紀錄"
+    if "prediction_date" not in prediction_log:
+        return "缺少 prediction_date 欄位"
+    data = prediction_log.copy()
+    data["prediction_date"] = pd.to_datetime(data["prediction_date"], errors="coerce").dt.normalize()
+    blank_dates = int(data["prediction_date"].isna().sum())
+    if blank_dates:
+        return f"有 {blank_dates} 筆 prediction_date 空白"
+    required_horizons = {"5D", "20D", "60D"}
+    duplicate_count = int(data.duplicated(["prediction_date", "target", "horizon"]).sum()) if {"target", "horizon"}.issubset(data.columns) else 0
+    if duplicate_count:
+        return f"有 {duplicate_count} 筆重複日期/標的/horizon"
+    if prices is None or prices.empty or "symbol" not in prices or "date" not in prices:
+        return "無法比對 QQQ 交易日"
+    qqq_dates = (
+        prices[prices["symbol"].astype(str).eq("QQQ")]["date"]
+        .pipe(pd.to_datetime, errors="coerce")
+        .dropna()
+        .dt.normalize()
+        .drop_duplicates()
+        .sort_values()
+    )
+    if qqq_dates.empty:
+        return "缺少 QQQ 交易日基準"
+    pred_dates = set(data["prediction_date"].dropna())
+    start = min(pred_dates)
+    end = min(max(pred_dates), qqq_dates.max())
+    expected_dates = qqq_dates[(qqq_dates >= start) & (qqq_dates <= end)]
+    missing_dates = [date.date().isoformat() for date in expected_dates if date not in pred_dates]
+    if missing_dates:
+        return "缺少交易日：" + "、".join(missing_dates[:5])
+    missing_horizons = []
+    for date, group in data.groupby("prediction_date"):
+        horizons = set(group.get("horizon", pd.Series(dtype=str)).dropna().astype(str))
+        missing = sorted(required_horizons - horizons)
+        if missing:
+            missing_horizons.append(f"{date.date().isoformat()} 缺 {','.join(missing)}")
+    if missing_horizons:
+        return "；".join(missing_horizons[:3])
+    return "交易日與 horizon 完整"
 
 
 def _max_date(data: pd.DataFrame | None, column: str) -> str:
