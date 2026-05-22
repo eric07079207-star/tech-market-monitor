@@ -15,38 +15,34 @@ summary_date,generated_at_utc,provider,model,used_ai,status,quality_score,qualit
 - How Nvidia Stock Can Hit $300 After Earnings - Barron's
 - Software's ""Baby with the Bathwater"" Moment - TradingView
 - Lawsuit Over Full Self-Driving Promises Succeeds, Tesla Stock (NASDAQ:TSLA) Sinks - TipRanks",,,,,,
-2026-05-22,2026-05-22T18:37:12+00:00,rules,rule_based,False,尚未設定 OPENAI_API_KEY，已使用規則摘要。,91.0,規則備援,1250,6,無,2026-05-19-v2,"## 今日市場結論
-目前市場判讀偏向偏多，信心中。
-QQQ 近 20 日報酬 8.4%，相對 50DMA 12.1%；SMH 近 20 日報酬 14.5%，相對 50DMA 23.8%；VIX 單日變動 -1.1%，20 日位置對風險偏好仍有影響。
+2026-05-22,2026-05-22T19:03:07+00:00,openai,gpt-4.1-mini,True,OpenAI AI 摘要已成功產生。,100.0,完整,1067,6,無,2026-05-19-v2,"## 今日市場結論  
+科技股整體呈現偏多格局，尤其半導體類股持續展現強勢，短期動能仍在，但成交量相對平淡，顯示市場仍有觀望情緒。整體信心屬中等偏上，需留意波動率指標及國際地緣政治風險。
 
-## 量化訊號
-- SMH：20 日波動位於近一年高檔
-- SOXX：20 日波動位於近一年高檔
-- AMD：跳空超過 3%；20 日波動位於近一年高檔
-- GOOGL：20 日波動位於近一年高檔
-- META：同時低於 50/200 日均線
+## 量化訊號  
+1. QQQ、IYW、VGT、XLK等大型科技ETF均站上50日及200日均線，呈現多頭排列。  
+2. SMH與SOXX半導體ETF的20日波動率達近一年高點，顯示短期波動加劇。  
+3. VIX指數持續低於50及200日均線，波動率處於低檔，市場風險偏好尚存。  
+4. AMD、RKLB、IONQ等個股出現單日超過5%漲幅，且成交量放大，顯示短線資金活躍。  
+5. 部分個股如META、PLTR、HOOD持續低於50及200日均線，短期仍面臨壓力。
 
-## 新聞與國際風險
-近期新聞集中在 AI/晶片、產品/需求、財報/財測、國際/戰爭，主要覆蓋 AAPL, SMH, AMZN, XLK, NVDA, IYW, META, VGT。
-- Apple Stock at 52-Week High: Buy, Sell or Hold? - 24/7 Wall St.
-- Is the VanEck Semiconductor ETF the Right ETF to Own as We Head Into June? - Yahoo Finance
-- Amazon.com Stock On A Winning Streak: Time To Get In Or Book Profits? - Trefis
-- Where Will Apple Stock Be In 3 Years? - Trefis
-- Which Is the Better Tech ETF, Vanguard's VGT or State Street's XLK? - AOL.com
-- How is the Middle East Conflict Impacting Global Oil Prices - Kavout（Kavout）
-- Iran war rewrites global risk map for investors - ynetnews（ynetnews）
+## 新聞與國際風險  
+- 美國與中國的貿易談判持續進展，涵蓋關稅、農產品、稀土出口管制等議題，短期仍有不確定性。  
+- 中東地緣政治緊張升溫，特別是伊朗戰爭相關消息，可能對能源價格及市場情緒造成影響。  
+- 多家科技巨頭（如Nvidia、Amazon）發布財報，整體表現穩健，但仍需關注未來指引。  
+- AMD宣布將投資台灣AI產業，顯示晶片產業布局持續深化。  
+- ETF相關報導聚焦於半導體與AI晶片領域，顯示市場對該板塊持續關注。
 
-## 對持倉影響
-- 目前沒有命中持倉的新增新聞，先以市場整體風險與趨勢判讀為主。
+## 對持倉影響  
+持有半導體相關ETF（如SMH、SOXX）及個股（AMD、NVDA）者，應注意近期波動率提升及國際政治風險可能帶來的短期震盪。META、PLTR等低於均線的持倉需留意技術面壓力。整體建議保持警覺，關注財報及政策面變化。
 
-## 候選觀察股
-- CRWD（高優先觀察）：新聞提及 2 次，且價格站上 50DMA，值得加入觀察清單。
-- PANW（高優先觀察）：新聞提及 2 次，且價格站上 50DMA，值得加入觀察清單。
-- AMD（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。
-- FTNT（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。
-- ASML（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。
+## 候選觀察股  
+1. CRWD（CrowdStrike）：股價站上50日均線，新聞提及多次，具網安成長題材，風險為市場波動及競爭加劇。  
+2. PANW（Palo Alto Networks）：同樣站上50日均線，受惠網安需求，需留意估值壓力。  
+3. ZS（Zscaler）：價格穩健，新聞支持成長故事，風險包括產業競爭與宏觀經濟波動。  
+4. AMD：強勢領先半導體板塊，新聞聚焦AI投資，風險為高波動及供應鏈挑戰。  
+5. FTNT（Fortinet）：網安類股，基本面穩健，需關注整體科技板塊情緒變化。
 
-## 明日觀察重點
-- 觀察 QQQ 是否能守住 50DMA 附近，近 20 日報酬目前為 8.4%
-- 留意 SMH、SOXX、AMD 的異常是否延續到下一個交易日
-- 追蹤國際新聞是否從單一事件擴散到利率、貿易或風險資產",rules,0.62,1.0,1.0,## 今日市場結論 目前市場判讀偏向偏多，信心中。 qqq 近 20 日報酬 8.4%，相對 50dma 12.1%；smh 近 20 日報酬 14.5%，相對 50dma 23.8%；vix 單日變動 -1.1%，20 日位置對風險偏好仍有影響。  ## 量化訊號 - smh：20 日波動位於近一年高檔 - soxx：20 日波動位於近一年高檔 - amd：跳空超過 3%；20 日波動位於近一年 | rules | rules；rule_based；尚未設定 openai_api_key，已使用規則摘要。,79.1
+## 明日觀察重點  
+1. 觀察半導體ETF（SMH、SOXX）及龍頭股AMD、NVDA的成交量與價格走勢。  
+2. 留意VIX指數變化，評估市場風險偏好是否轉向。  
+3. 關注國際地緣政治消息，特別是中東局勢及中美貿易談判最新進展。",openai,0.62,1.0,1.0,## 今日市場結論   科技股整體呈現偏多格局，尤其半導體類股持續展現強勢，短期動能仍在，但成交量相對平淡，顯示市場仍有觀望情緒。整體信心屬中等偏上，需留意波動率指標及國際地緣政治風險。  ## 量化訊號   1. qqq、iyw、vgt、xlk等大型科技etf均站上50日及200日均線，呈現多頭排列。   2. smh與soxx半導體etf的20日波動率達近一年高點，顯示短期波動加劇。   3. | openai | openai；gpt-4.1-mini；openai ai 摘要已成功產生。,79.1
