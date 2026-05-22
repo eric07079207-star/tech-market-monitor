@@ -15,19 +15,38 @@ summary_date,generated_at_utc,provider,model,used_ai,status,quality_score,qualit
 - How Nvidia Stock Can Hit $300 After Earnings - Barron's
 - Software's ""Baby with the Bathwater"" Moment - TradingView
 - Lawsuit Over Full Self-Driving Promises Succeeds, Tesla Stock (NASDAQ:TSLA) Sinks - TipRanks",,,,,,
-2026-05-22,2026-05-22T16:50:45+00:00,rules,rule_based,False,尚未設定 OPENAI_API_KEY，已使用規則摘要。,37.53333333333333,需檢查,646,0,今日市場結論、量化訊號、新聞與國際風險、對持倉影響、候選觀察股、明日觀察重點,2026-05-19-v2,"今日主要異常：
-- SMH: 20 日波動位於近一年高檔
-- SOXX: 20 日波動位於近一年高檔
-- AMD: 跳空超過 3%；20 日波動位於近一年高檔
-- GOOGL: 20 日波動位於近一年高檔
-- META: 同時低於 50/200 日均線
-- NVDA: 20 日波動位於近一年高檔
-- TLT: 同時低於 50/200 日均線
-- ^VIX: 同時低於 50/200 日均線
+2026-05-22,2026-05-22T18:37:12+00:00,rules,rule_based,False,尚未設定 OPENAI_API_KEY，已使用規則摘要。,91.0,規則備援,1250,6,無,2026-05-19-v2,"## 今日市場結論
+目前市場判讀偏向偏多，信心中。
+QQQ 近 20 日報酬 8.4%，相對 50DMA 12.1%；SMH 近 20 日報酬 14.5%，相對 50DMA 23.8%；VIX 單日變動 -1.1%，20 日位置對風險偏好仍有影響。
 
+## 量化訊號
+- SMH：20 日波動位於近一年高檔
+- SOXX：20 日波動位於近一年高檔
+- AMD：跳空超過 3%；20 日波動位於近一年高檔
+- GOOGL：20 日波動位於近一年高檔
+- META：同時低於 50/200 日均線
+
+## 新聞與國際風險
 近期新聞集中在 AI/晶片、產品/需求、財報/財測、國際/戰爭，主要覆蓋 AAPL, SMH, AMZN, XLK, NVDA, IYW, META, VGT。
 - Apple Stock at 52-Week High: Buy, Sell or Hold? - 24/7 Wall St.
 - Is the VanEck Semiconductor ETF the Right ETF to Own as We Head Into June? - Yahoo Finance
 - Amazon.com Stock On A Winning Streak: Time To Get In Or Book Profits? - Trefis
 - Where Will Apple Stock Be In 3 Years? - Trefis
-- Which Is the Better Tech ETF, Vanguard's VGT or State Street's XLK? - AOL.com",rules,0.62,1.0,1.0,今日主要異常： - smh: 20 日波動位於近一年高檔 - soxx: 20 日波動位於近一年高檔 - amd: 跳空超過 3%；20 日波動位於近一年高檔 - googl: 20 日波動位於近一年高檔 - meta: 同時低於 50/200 日均線 - nvda: 20 日波動位於近一年高檔 - tlt: 同時低於 50/200 日均線 - ^vix: 同時低於 50/200 日均線  近期新 | rules | rules；rule_based；尚未設定 openai_api_key，已使用規則摘要。,79.1
+- Which Is the Better Tech ETF, Vanguard's VGT or State Street's XLK? - AOL.com
+- How is the Middle East Conflict Impacting Global Oil Prices - Kavout（Kavout）
+- Iran war rewrites global risk map for investors - ynetnews（ynetnews）
+
+## 對持倉影響
+- 目前沒有命中持倉的新增新聞，先以市場整體風險與趨勢判讀為主。
+
+## 候選觀察股
+- CRWD（高優先觀察）：新聞提及 2 次，且價格站上 50DMA，值得加入觀察清單。
+- PANW（高優先觀察）：新聞提及 2 次，且價格站上 50DMA，值得加入觀察清單。
+- AMD（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。
+- FTNT（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。
+- ASML（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。
+
+## 明日觀察重點
+- 觀察 QQQ 是否能守住 50DMA 附近，近 20 日報酬目前為 8.4%
+- 留意 SMH、SOXX、AMD 的異常是否延續到下一個交易日
+- 追蹤國際新聞是否從單一事件擴散到利率、貿易或風險資產",rules,0.62,1.0,1.0,## 今日市場結論 目前市場判讀偏向偏多，信心中。 qqq 近 20 日報酬 8.4%，相對 50dma 12.1%；smh 近 20 日報酬 14.5%，相對 50dma 23.8%；vix 單日變動 -1.1%，20 日位置對風險偏好仍有影響。  ## 量化訊號 - smh：20 日波動位於近一年高檔 - soxx：20 日波動位於近一年高檔 - amd：跳空超過 3%；20 日波動位於近一年 | rules | rules；rule_based；尚未設定 openai_api_key，已使用規則摘要。,79.1

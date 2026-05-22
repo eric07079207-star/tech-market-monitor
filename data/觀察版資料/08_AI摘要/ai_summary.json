@@ -1,8 +1,8 @@
 {
-  "text": "今日主要異常：\n- SMH: 20 日波動位於近一年高檔\n- SOXX: 20 日波動位於近一年高檔\n- AMD: 跳空超過 3%；20 日波動位於近一年高檔\n- GOOGL: 20 日波動位於近一年高檔\n- META: 同時低於 50/200 日均線\n- NVDA: 20 日波動位於近一年高檔\n- TLT: 同時低於 50/200 日均線\n- ^VIX: 同時低於 50/200 日均線\n\n近期新聞集中在 AI/晶片、產品/需求、財報/財測、國際/戰爭，主要覆蓋 AAPL, SMH, AMZN, XLK, NVDA, IYW, META, VGT。\n- Apple Stock at 52-Week High: Buy, Sell or Hold? - 24/7 Wall St.\n- Is the VanEck Semiconductor ETF the Right ETF to Own as We Head Into June? - Yahoo Finance\n- Amazon.com Stock On A Winning Streak: Time To Get In Or Book Profits? - Trefis\n- Where Will Apple Stock Be In 3 Years? - Trefis\n- Which Is the Better Tech ETF, Vanguard's VGT or State Street's XLK? - AOL.com",
+  "text": "## 今日市場結論\n目前市場判讀偏向偏多，信心中。\nQQQ 近 20 日報酬 8.4%，相對 50DMA 12.1%；SMH 近 20 日報酬 14.5%，相對 50DMA 23.8%；VIX 單日變動 -1.1%，20 日位置對風險偏好仍有影響。\n\n## 量化訊號\n- SMH：20 日波動位於近一年高檔\n- SOXX：20 日波動位於近一年高檔\n- AMD：跳空超過 3%；20 日波動位於近一年高檔\n- GOOGL：20 日波動位於近一年高檔\n- META：同時低於 50/200 日均線\n\n## 新聞與國際風險\n近期新聞集中在 AI/晶片、產品/需求、財報/財測、國際/戰爭，主要覆蓋 AAPL, SMH, AMZN, XLK, NVDA, IYW, META, VGT。\n- Apple Stock at 52-Week High: Buy, Sell or Hold? - 24/7 Wall St.\n- Is the VanEck Semiconductor ETF the Right ETF to Own as We Head Into June? - Yahoo Finance\n- Amazon.com Stock On A Winning Streak: Time To Get In Or Book Profits? - Trefis\n- Where Will Apple Stock Be In 3 Years? - Trefis\n- Which Is the Better Tech ETF, Vanguard's VGT or State Street's XLK? - AOL.com\n- How is the Middle East Conflict Impacting Global Oil Prices - Kavout（Kavout）\n- Iran war rewrites global risk map for investors - ynetnews（ynetnews）\n\n## 對持倉影響\n- 目前沒有命中持倉的新增新聞，先以市場整體風險與趨勢判讀為主。\n\n## 候選觀察股\n- CRWD（高優先觀察）：新聞提及 2 次，且價格站上 50DMA，值得加入觀察清單。\n- PANW（高優先觀察）：新聞提及 2 次，且價格站上 50DMA，值得加入觀察清單。\n- AMD（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。\n- FTNT（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。\n- ASML（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。\n\n## 明日觀察重點\n- 觀察 QQQ 是否能守住 50DMA 附近，近 20 日報酬目前為 8.4%\n- 留意 SMH、SOXX、AMD 的異常是否延續到下一個交易日\n- 追蹤國際新聞是否從單一事件擴散到利率、貿易或風險資產",
   "provider": "rules",
   "model": "rule_based",
-  "generated_at_utc": "2026-05-22T16:50:45+00:00",
+  "generated_at_utc": "2026-05-22T18:37:12+00:00",
   "used_ai": false,
   "status": "尚未設定 OPENAI_API_KEY，已使用規則摘要。",
   "prompt_version": "2026-05-19-v2",
@@ -10,9 +10,9 @@
   "source_reliability_score": 0.62,
   "text_density_score": 1.0,
   "structure_score": 1.0,
-  "dedup_key": "今日主要異常： - smh: 20 日波動位於近一年高檔 - soxx: 20 日波動位於近一年高檔 - amd: 跳空超過 3%；20 日波動位於近一年高檔 - googl: 20 日波動位於近一年高檔 - meta: 同時低於 50/200 日均線 - nvda: 20 日波動位於近一年高檔 - tlt: 同時低於 50/200 日均線 - ^vix: 同時低於 50/200 日均線  近期新 | rules | rules；rule_based；尚未設定 openai_api_key，已使用規則摘要。",
+  "dedup_key": "## 今日市場結論 目前市場判讀偏向偏多，信心中。 qqq 近 20 日報酬 8.4%，相對 50dma 12.1%；smh 近 20 日報酬 14.5%，相對 50dma 23.8%；vix 單日變動 -1.1%，20 日位置對風險偏好仍有影響。  ## 量化訊號 - smh：20 日波動位於近一年高檔 - soxx：20 日波動位於近一年高檔 - amd：跳空超過 3%；20 日波動位於近一年 | rules | rules；rule_based；尚未設定 openai_api_key，已使用規則摘要。",
   "quality_score_edge": 79.1,
-  "quality_score": 37.53333333333333,
-  "quality_label": "需檢查",
-  "history_dedup_key": "2026-05-22t16:50:45+00:00 | rule_based | rules"
+  "quality_score": 91.0,
+  "quality_label": "規則備援",
+  "history_dedup_key": "2026-05-22t18:37:12+00:00 | rule_based | rules"
 }
