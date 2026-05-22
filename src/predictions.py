@@ -144,6 +144,14 @@ def sanitize_prediction_log(log: pd.DataFrame, target_history: pd.DataFrame) -> 
     result["horizon_days"] = pd.to_numeric(result.get("horizon_days"), errors="coerce")
     result = result.dropna(subset=["horizon_days"]).copy()
     result["horizon_days"] = result["horizon_days"].astype(int)
+    if "success" in result:
+        result["success"] = pd.array(result["success"], dtype="boolean")
+    else:
+        result["success"] = pd.array([pd.NA] * len(result), dtype="boolean")
+    if "validated_at" in result:
+        result["validated_at"] = pd.to_datetime(result["validated_at"], errors="coerce")
+    else:
+        result["validated_at"] = pd.NaT
     result = result.drop_duplicates(["prediction_date", "target", "horizon"], keep="last")
     return result.sort_values(["prediction_date", "target", "horizon_days"]).reset_index(drop=True)
 
@@ -156,6 +164,14 @@ def validate_prediction_log(log: pd.DataFrame, target_history: pd.DataFrame) -> 
     closes = history["close"].astype(float).to_numpy()
 
     result = log.copy()
+    if "success" in result:
+        result["success"] = pd.array(result["success"], dtype="boolean")
+    else:
+        result["success"] = pd.array([pd.NA] * len(result), dtype="boolean")
+    if "validated_at" in result:
+        result["validated_at"] = pd.to_datetime(result["validated_at"], errors="coerce")
+    else:
+        result["validated_at"] = pd.NaT
     for idx, row in result.iterrows():
         if pd.notna(row.get("success")):
             continue
@@ -182,7 +198,7 @@ def validate_prediction_log(log: pd.DataFrame, target_history: pd.DataFrame) -> 
         result.at[idx, "actual_return"] = actual_return
         result.at[idx, "max_drawdown"] = max_drawdown
         result.at[idx, "success"] = success
-        result.at[idx, "validated_at"] = dates.iloc[end_pos].date().isoformat()
+        result.at[idx, "validated_at"] = dates.iloc[end_pos]
     return result
 
 
