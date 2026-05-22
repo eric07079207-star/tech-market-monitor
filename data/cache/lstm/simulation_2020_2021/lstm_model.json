@@ -1,0 +1,43 @@
+{
+  "model_version": "lstm-sim-v1",
+  "feature_version": "lstm-demo-v1",
+  "train_rows": 353,
+  "valid_rows": 76,
+  "test_rows": 76,
+  "valid_loss": 0.724107027053833,
+  "valid_acc": 0.07894736842105263,
+  "test_acc": 0.4342105263157895,
+  "trained_at_utc": "2026-05-20T05:43:11+00:00",
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.7306385756214347,
+      "valid_loss": 0.7754431366920471,
+      "valid_acc": 0.07894736842105263
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.7188685124386471,
+      "valid_loss": 0.7626041769981384,
+      "valid_acc": 0.07894736842105263
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.708380799793319,
+      "valid_loss": 0.7487687468528748,
+      "valid_acc": 0.07894736842105263
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.6959536095854243,
+      "valid_loss": 0.7366164326667786,
+      "valid_acc": 0.07894736842105263
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.6779477440939409,
+      "valid_loss": 0.724107027053833,
+      "valid_acc": 0.07894736842105263
+    }
+  ]
+}

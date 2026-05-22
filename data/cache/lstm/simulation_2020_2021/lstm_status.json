@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "mode": "simulation",
+  "status": "模擬版已完成",
+  "model_version": "lstm-sim-v1",
+  "feature_version": "lstm-demo-v1",
+  "horizon_days": 20,
+  "sequence_length": 60,
+  "last_train_at_utc": "2026-05-20T05:43:11+00:00",
+  "last_predict_at_utc": "2026-05-20T05:43:11+00:00",
+  "last_backtest_at_utc": "2026-05-20T05:43:11+00:00",
+  "prediction_rows": 76,
+  "backtest_rows": 76,
+  "feature_rows": 505,
+  "updated_at_utc": "2026-05-20T05:43:11+00:00"
+}

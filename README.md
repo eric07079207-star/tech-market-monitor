@@ -31,6 +31,12 @@ bash scripts/run_dashboard.sh
 .venv/bin/python scripts/update_data.py
 ```
 
+或直接：
+
+```bash
+bash scripts/run_update.sh
+```
+
 更新結果會寫到 `data/cache/`。儀表板按鈕也可以手動更新市場資料與新聞。
 
 ## AI 摘要

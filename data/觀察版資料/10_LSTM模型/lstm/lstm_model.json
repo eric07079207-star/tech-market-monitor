@@ -1,0 +1,52 @@
+{
+  "model_version": "lstm-direction-v1",
+  "feature_version": "lstm-demo-v1",
+  "sequence_length": 60,
+  "horizon_days": 20,
+  "epochs": 5,
+  "hidden_size": 48,
+  "num_layers": 1,
+  "learning_rate": 0.001,
+  "train_ratio": 0.7,
+  "valid_ratio": 0.15,
+  "test_ratio": 0.15,
+  "train_rows": 172,
+  "valid_rows": 37,
+  "test_rows": 38,
+  "valid_loss": 0.7062774300575256,
+  "valid_acc": 0.43243243243243246,
+  "test_acc": 0.47368421052631576,
+  "trained_at_utc": "2026-05-20T05:43:04+00:00",
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.7044427616651668,
+      "valid_loss": 0.7098551392555237,
+      "valid_acc": 0.43243243243243246
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.7005358920540921,
+      "valid_loss": 0.7083128690719604,
+      "valid_acc": 0.43243243243243246
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.6974824680838474,
+      "valid_loss": 0.7073675990104675,
+      "valid_acc": 0.43243243243243246
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.6942269122877787,
+      "valid_loss": 0.7069482803344727,
+      "valid_acc": 0.43243243243243246
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.691590661226317,
+      "valid_loss": 0.7062774300575256,
+      "valid_acc": 0.43243243243243246
+    }
+  ]
+}
