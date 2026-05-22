@@ -576,10 +576,12 @@ with st.sidebar:
     st.caption(f"AI 摘要：{ai_summary.get('generated_at_utc', '尚未產生')}")
     st.caption(f"LSTM：{lstm_status.get('status', 'n/a')}")
     st.caption(f"快取寫入 UTC：{updated_at}")
-    if openai_status.get("configured"):
+    if ai_summary.get("used_ai"):
+        st.success(f"AI 摘要已由雲端 OpenAI 產生｜模型：{ai_summary.get('model', 'n/a')}")
+    elif openai_status.get("configured"):
         st.success(f"OpenAI 已就緒｜模型：{openai_status.get('model', 'n/a')}")
     else:
-        st.warning("OpenAI API key 尚未設定，摘要目前使用規則備援。")
+        st.warning("前台未讀到 OpenAI API key；目前顯示規則備援摘要。")
     st.divider()
     st.caption("TSLA 關鍵字設定與分析結果已移到「重點個股追蹤」，避免影響主新聞觀看。")
 
@@ -938,11 +940,14 @@ with tab_news:
         generated = ai_summary.get("generated_at_utc", "n/a")
         (st.success if used_ai else st.warning)(status)
         st.caption(f"來源：{provider}｜模型：{model}｜生成 UTC：{generated}｜排程：每日 07:00 台灣時間")
-        st.caption(
-            f"OpenAI 狀態：{openai_status.get('status', 'n/a')}｜"
-            f"模型：{openai_status.get('model', 'n/a')}｜"
-            f"Key：{openai_status.get('api_key_preview', 'n/a')}"
-        )
+        if used_ai:
+            st.caption("OpenAI 狀態：本摘要已由雲端排程使用 OpenAI 產生。")
+        else:
+            st.caption(
+                f"OpenAI 狀態：{openai_status.get('status', 'n/a')}｜"
+                f"模型：{openai_status.get('model', 'n/a')}｜"
+                f"Key：{openai_status.get('api_key_preview', 'n/a')}"
+            )
         qcols = st.columns(4)
         qcols[0].metric("摘要品質", ai_quality.get("quality_label", "n/a"))
         qcols[1].metric("完整度", f"{ai_quality.get('section_count', 0)}/{ai_quality.get('required_sections', 6)}")

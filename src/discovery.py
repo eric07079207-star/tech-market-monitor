@@ -19,6 +19,7 @@ FALSE_TICKERS = {
     "TSE", "TSX", "LSE", "HKEX", "OTC", "CBOE", "AMEX", "NIKKEI", "DAX", "CAC",
     "API", "SAAS", "USD", "EUR", "CPI", "PPI", "FOMC", "ISM", "PMI", "OPEC",
     "WHO", "UN", "NATO", "GOP", "IRS", "FTC", "EURO", "AP", "PR", "DJIA", "ISG",
+    "SHS", "NV", "NY", "HDFC", "SP",
 }
 
 TICKER_CONTEXT_WORDS = {
@@ -84,6 +85,9 @@ def build_discovery_candidates(news: pd.DataFrame, lookback_days: int = 180, top
                     "published": row.published,
                     "tags": row.tags,
                     "link": row.link,
+                    "matched_keywords": getattr(row, "matched_keywords", ""),
+                    "keyword_group": getattr(row, "keyword_group", ""),
+                    "analysis_note": getattr(row, "analysis_note", ""),
                 }
             )
     if not mentions:
@@ -364,6 +368,9 @@ def _candidate_metrics(prices: pd.DataFrame, mentions: pd.DataFrame) -> pd.DataF
                 "sample_headline": group.sort_values("published", ascending=False).iloc[0]["title"],
                 "source": group.sort_values("published", ascending=False).iloc[0]["source"],
                 "link": group.sort_values("published", ascending=False).iloc[0]["link"],
+                "matched_keywords": "、".join(sorted(set("、".join(group.get("matched_keywords", pd.Series(dtype=str)).fillna("").astype(str)).split("、")) - {""}))[:160],
+                "keyword_group": "、".join(group.get("keyword_group", pd.Series(dtype=str)).fillna("").astype(str).replace("", pd.NA).dropna().drop_duplicates().head(3).tolist()),
+                "analysis_note": " ".join(group.get("analysis_note", pd.Series(dtype=str)).fillna("").astype(str).replace("", pd.NA).dropna().drop_duplicates().head(2).tolist()),
                 "current_price": latest["close"],
                 "ret_5d": latest.get("ret_5d", np.nan),
                 "ret_20d": latest.get("ret_20d", np.nan),

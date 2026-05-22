@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 
 from .config import CACHE_DIR
+from .edge import dedup_key as edge_dedup_key
+from .edge import quality_score as edge_quality_score
 
 
 KG_DIR = CACHE_DIR / "kg"
@@ -106,6 +108,8 @@ def save_knowledge_graph(payload: KGOutput) -> None:
                 "reaction_rows": int(len(payload.reactions)),
                 "link_rows": int(len(payload.links)),
                 "max_dedup_group_size": int(payload.facts["dedup_group_size"].max()) if "dedup_group_size" in payload.facts and not payload.facts.empty else 0,
+                "avg_fact_quality": float(payload.facts["quality_score"].mean()) if "quality_score" in payload.facts and not payload.facts.empty else np.nan,
+                "avg_source_reliability": float(payload.facts["source_reliability_score"].mean()) if "source_reliability_score" in payload.facts and not payload.facts.empty else np.nan,
             },
             ensure_ascii=False,
             indent=2,
@@ -170,6 +174,8 @@ def _build_fact_events(
                     "source": source,
                     "source_domain": _source_domain(getattr(row, "link", "") or source),
                     "source_reliability_score": _source_reliability_score(getattr(row, "link", "") or source),
+                    "quality_score": edge_quality_score(title, source=getattr(row, "link", "") or source, tags=getattr(row, "tags", ""), published=timestamp, raw_text=title).quality_score,
+                    "dedup_key": edge_dedup_key(canonical_event, event_type_primary, source_layer, affected),
                     "regime_context": _regime_label(regime_context),
                     "source_url": str(getattr(row, "link", "") or ""),
                     "raw_title": title,
@@ -186,7 +192,7 @@ def _build_fact_events(
                 "affected_tickers", "event_type_primary", "event_type_secondary", "canonical_event",
                 "event_title", "event_value", "event_unit", "impact_direction", "impact_score", "confidence",
                 "source", "source_domain", "source_reliability_score", "regime_context", "source_url",
-                "raw_title", "raw_tags", "source_layer", "created_at_utc",
+                "quality_score", "dedup_key", "raw_title", "raw_tags", "source_layer", "created_at_utc",
             ]
         )
     return facts.drop_duplicates(subset=["event_hash", "source_url", "event_title"]).sort_values("timestamp_utc", ascending=False).reset_index(drop=True)
