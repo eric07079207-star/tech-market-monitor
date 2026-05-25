@@ -30,9 +30,6 @@ jobs:
       - name: Refresh cached data
         run: python scripts/update_data.py
 
-      - name: Build LSTM features
-        run: python scripts/build_lstm_features.py
-
       - name: Install LSTM dependencies
         if: github.event.schedule == '0 23 * * *' || github.event_name == 'workflow_dispatch'
         run: pip install "torch>=2.3"

@@ -106,9 +106,15 @@ def build_discovery_candidates(news: pd.DataFrame, lookback_days: int = 180, top
     return mention_df, metrics.sort_values("candidate_score", ascending=False).head(top_n).reset_index(drop=True)
 
 
-def update_discovery_history(candidates: pd.DataFrame, path=None, run_date: date | str | None = None) -> pd.DataFrame:
+def update_discovery_history(
+    candidates: pd.DataFrame,
+    path=None,
+    run_date: date | str | None = None,
+    history: pd.DataFrame | None = None,
+    save: bool = True,
+) -> pd.DataFrame:
     path = path or cache_path("discovery_history.parquet")
-    history = load_discovery_history(path)
+    history = history.copy() if history is not None else load_discovery_history(path)
     if candidates.empty:
         return history
 
@@ -124,8 +130,9 @@ def update_discovery_history(candidates: pd.DataFrame, path=None, run_date: date
     history = pd.concat([history, today], ignore_index=True)
     if "date" in history:
         history["date"] = pd.to_datetime(history["date"], errors="coerce").dt.date.astype(str)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    history.to_parquet(path, index=False)
+    if save:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        history.to_parquet(path, index=False)
     return history
 
 
@@ -188,7 +195,7 @@ def summarize_discovery_history(history: pd.DataFrame, days: int, top_n: int = 1
     return pd.DataFrame(rows).sort_values("rank_score", ascending=False).head(top_n).reset_index(drop=True)
 
 
-def update_discovery_performance(history: pd.DataFrame, path=None) -> pd.DataFrame:
+def update_discovery_performance(history: pd.DataFrame, path=None, save: bool = True) -> pd.DataFrame:
     path = path or cache_path("discovery_performance.parquet")
     if history.empty or "ticker" not in history or "date" not in history:
         return pd.DataFrame()
@@ -200,7 +207,7 @@ def update_discovery_performance(history: pd.DataFrame, path=None) -> pd.DataFra
         return pd.DataFrame()
     prices = fetch_price_history(tickers=tickers + ["QQQ"], start=start.date())
     performance = discovery_performance_table(entries, prices)
-    if not performance.empty:
+    if not performance.empty and save:
         path.parent.mkdir(parents=True, exist_ok=True)
         performance.to_parquet(path, index=False)
     return performance

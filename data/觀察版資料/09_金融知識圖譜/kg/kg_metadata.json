@@ -1,10 +1,7 @@
 {
-  "updated_at_utc": "2026-05-23T15:48:53+00:00",
+  "updated_at_utc": "2026-05-25T10:35:57+00:00",
   "fact_rows": 154,
   "narrative_rows": 154,
-  "reaction_rows": 488,
-  "link_rows": 250,
-  "max_dedup_group_size": 3,
-  "avg_fact_quality": 64.23257575757576,
-  "avg_source_reliability": 0.6799999999999999
+  "reaction_rows": 504,
+  "link_rows": 266
 }

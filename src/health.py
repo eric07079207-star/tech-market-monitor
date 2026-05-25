@@ -28,6 +28,7 @@ def data_health_report(
 ) -> pd.DataFrame:
     cache_updated = metadata.get("updated_at_utc", "尚未寫入")
     rows = [
+        _pipeline_row(metadata),
         _row("市場價格", "主資料", "prices.parquet", prices, "date", "價格與量能快取", cache_updated, 36),
         _row("總經資料", "主資料", "macro.parquet", macro, "date", "FRED 與市場壓力資料", cache_updated, 72),
         _row("標的新聞", "主資料", "news.parquet", news, "published", "watchlist 新聞", cache_updated, 12),
@@ -127,6 +128,38 @@ def _governance_row(governance: pd.DataFrame | None, cache_updated: str) -> dict
         "自動更新": "是",
         "Streamlit使用": "是",
         "說明": f"official / pending / rejected 分層統計；{detail}",
+    }
+
+
+def _pipeline_row(metadata: dict, cache_updated: str | None = None) -> dict:
+    cache_updated = cache_updated or metadata.get("updated_at_utc", "尚未寫入")
+    status_value = str(metadata.get("pipeline_status", "") or "")
+    success_count = int(metadata.get("pipeline_success_count", 0) or 0)
+    fallback_count = int(metadata.get("pipeline_fallback_count", 0) or 0)
+    failure_count = int(metadata.get("pipeline_failure_count", 0) or 0)
+    failed_modules = metadata.get("pipeline_failed_modules", []) or []
+    if status_value == "success":
+        status = "🟢 正常"
+    elif status_value == "partial":
+        status = "🟡 注意"
+    elif status_value == "failed":
+        status = "🔴 過期"
+    else:
+        status = "🟡 未知"
+    detail = f"成功 {success_count}；fallback {fallback_count}；失敗 {failure_count}"
+    if failed_modules:
+        detail += "；失敗模組：" + "、".join(map(str, failed_modules))
+    return {
+        "狀態": status,
+        "資料分類": "治理",
+        "資料項目": "更新流程摘要",
+        "筆數": success_count + fallback_count + failure_count,
+        "最新資料日期": _format_dateish(metadata.get("pipeline_finished_at_utc") or cache_updated),
+        "最近抓取 UTC": _format_datetimeish(metadata.get("pipeline_finished_at_utc") or cache_updated),
+        "檔案大小": _file_size(cache_path("metadata.json")),
+        "自動更新": "是",
+        "Streamlit使用": "是",
+        "說明": f"模組化更新與 fallback 保護；{detail}",
     }
 
 

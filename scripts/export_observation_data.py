@@ -44,6 +44,8 @@ EXPORTS = [
     ExportItem("kg/event_links.parquet", "09_金融知識圖譜", "事件連結", "事件與標的關聯關係。"),
     ExportItem("kg/kg_metadata.json", "09_金融知識圖譜", "知識圖譜資訊", "金融知識圖譜更新時間與筆數。"),
     ExportItem("governance_summary.parquet", "11_資料治理", "資料治理摘要", "新聞資料流 official、pending 與 rejected 分層統計。"),
+    ExportItem("update_runs.csv", "11_資料治理", "更新執行紀錄", "每次更新流程的整體結果與成功/失敗統計。"),
+    ExportItem("update_modules.csv", "11_資料治理", "更新模組紀錄", "每個更新模組的 success、fallback 或 failed 狀態與原因。"),
     ExportItem("lstm/lstm_features.parquet", "10_LSTM模型", "LSTM特徵表", "LSTM 訓練與回測使用的序列特徵表。"),
     ExportItem("lstm/lstm_split.parquet", "10_LSTM模型", "LSTM切分表", "LSTM 訓練/驗證/測試切分。"),
     ExportItem("lstm/lstm_predictions.parquet", "10_LSTM模型", "LSTM最新預測", "LSTM 每次更新產生的最新預測結果。"),

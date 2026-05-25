@@ -72,9 +72,11 @@ def update_prediction_log(
     indicators: pd.DataFrame,
     prediction: dict,
     path: Path | None = None,
+    existing_log: pd.DataFrame | None = None,
+    save: bool = True,
 ) -> pd.DataFrame:
     path = path or cache_path("prediction_log.csv")
-    log = load_prediction_log(path)
+    log = existing_log.copy() if existing_log is not None else load_prediction_log(path)
     qqq = indicators[indicators["symbol"] == prediction.get("target", "QQQ")].dropna(subset=["close"]).sort_values("date")
     if qqq.empty:
         return log
@@ -115,8 +117,9 @@ def update_prediction_log(
 
     log = validate_prediction_log(log, qqq)
     log = sanitize_prediction_log(log, qqq)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    log.to_csv(path, index=False)
+    if save:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        log.to_csv(path, index=False)
     return log
 
 
