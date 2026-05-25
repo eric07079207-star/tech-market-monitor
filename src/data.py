@@ -36,12 +36,15 @@ def _normalize_yfinance(raw: pd.DataFrame, tickers: list[str]) -> pd.DataFrame:
 
             if not set(sub.columns).intersection(price_fields):
                 continue
+            sub = sub.reset_index()
+            sub = _ensure_date_column(sub, raw.index)
             sub["symbol"] = ticker
-            frames.append(sub.reset_index())
+            frames.append(sub)
     else:
-        sub = raw.copy()
+        sub = raw.copy().reset_index()
+        sub = _ensure_date_column(sub, raw.index)
         sub["symbol"] = tickers[0]
-        frames.append(sub.reset_index())
+        frames.append(sub)
 
     if not frames:
         return pd.DataFrame()
@@ -59,6 +62,26 @@ def _normalize_yfinance(raw: pd.DataFrame, tickers: list[str]) -> pd.DataFrame:
             prices[col] = pd.to_numeric(prices[col], errors="coerce")
     prices = prices.dropna(subset=["date", "symbol", "close"]).sort_values(["symbol", "date"])
     return prices.reset_index(drop=True)
+
+
+def _ensure_date_column(frame: pd.DataFrame, source_index: pd.Index) -> pd.DataFrame:
+    frame = frame.copy()
+    frame.columns = [str(col) for col in frame.columns]
+    lowered = {str(col).lower(): str(col) for col in frame.columns}
+    if "date" in lowered:
+        return frame.rename(columns={lowered["date"]: "date"})
+    if "datetime" in lowered:
+        return frame.rename(columns={lowered["datetime"]: "date"})
+
+    first_col = str(frame.columns[0]) if len(frame.columns) else ""
+    if first_col and first_col.lower().startswith("unnamed"):
+        frame = frame.rename(columns={first_col: "date"})
+        return frame
+
+    if len(frame) == len(source_index):
+        frame.insert(0, "date", pd.Index(source_index))
+        return frame
+    raise KeyError("date")
 
 
 def fetch_price_history(
