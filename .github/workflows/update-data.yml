@@ -38,12 +38,11 @@ jobs:
         if: github.event.schedule == '0 23 * * *' || github.event_name == 'workflow_dispatch'
         run: python scripts/train_lstm.py
 
-      - name: Generate daily AI summary
-        if: github.event.schedule == '0 23 * * *' || github.event_name == 'workflow_dispatch'
+      - name: Generate daily AI summary if needed
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
-        run: python scripts/generate_ai_summary.py
+        run: python scripts/generate_ai_summary_if_needed.py
 
       - name: Export observation data
         run: python scripts/export_observation_data.py
