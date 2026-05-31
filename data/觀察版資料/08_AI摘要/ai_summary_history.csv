@@ -188,3 +188,38 @@ summary_date,generated_at_utc,provider,model,used_ai,status,quality_score,qualit
 1. 觀察MSFT及IGV後續成交量與價格走勢，判斷短期趨勢持續性。  
 2. 留意中東局勢及油價變化對市場風險偏好的影響。  
 3. 關注Fed官員言論及利率政策動向，評估對科技股資金流向的影響。",openai,0.62,1.0,1.0,## 今日市場結論   科技股整體呈現觀望態勢，部分指數如igv與msft出現單日異常波動，顯示市場短期內仍有較大不確定性。vix持續走低，反映風險偏好略有回升，但成交量分布不均，信心屬中等偏保守。  ## 量化訊號   1. igv單日漲幅超過6%，成交量較20日均量高出近80%，顯示軟體類股短線活躍。   2. msft單日上漲超過5%，成交量超過20日均量兩倍，成交量z-score異常。 | openai | openai；gpt-4.1-mini；openai ai 摘要已成功產生。,79.1
+2026-05-31,2026-05-31T09:40:00+00:00,rules,rule_based,False,OpenAI 摘要失敗，已改用規則摘要：HTTPError: 500 Server Error: Internal Server Error for url: https://api.openai.com/v1/responses,91.0,規則備援,1382,6,無,2026-05-19-v2,"## 今日市場結論
+目前市場判讀偏向偏多，信心中。
+QQQ 近 20 日報酬 10.6%，相對 50DMA 13.1%；SMH 近 20 日報酬 18.2%，相對 50DMA 23.6%；VIX 單日變動 -2.7%，20 日位置對風險偏好仍有影響。
+
+## 量化訊號
+- IGV：單日漲跌超過 5%；日報酬 z-score 異常
+- SMH：20 日波動位於近一年高檔
+- SOXX：20 日波動位於近一年高檔
+- AMD：20 日波動位於近一年高檔
+- MSFT：單日漲跌超過 5%；日報酬 z-score 異常；成交量超過 20 日均量 2 倍；成交量 z-score 異常
+
+## 新聞與國際風險
+近期新聞集中在 AI/晶片、財報/財測、大盤風險、國際/戰爭，主要覆蓋 IGV, TSLA, GOOGL, IYW, VGT, MSFT, QQQ, XLK。
+- Software Stocks Post Best Month Since 2001 as Snowflake, Okta Surge on AI Catalysts - MLQ.ai
+- Tesla Stock Forecast: How Much Will TSLA Stock Be Worth in 2030? Can It Hit $3,000? - TradingKey
+- Alphabet Inc - A (GOOGL) Stock Price Quote Today & Current Price Chart - Capital.com
+- Better Tech ETF for Artificial Intelligence (AI): Vanguard's VGT vs. iShares' IYW - AOL.com
+- Better Tech ETF for Artificial Intelligence (AI): Vanguard's VGT vs. iShares' IYW - AOL.com
+- How to Win a Trade War - Paul Krugman | Substack（Paul Krugman | Substack）
+- How Are Markets Reacting to the Escalating Mideast Conflict - Kavout（Kavout）
+
+## 對持倉影響
+- 目前沒有命中持倉的新增新聞，先以市場整體風險與趨勢判讀為主。
+
+## 候選觀察股
+- RGTI（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。
+- QBTS（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。
+- TKR（高優先觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。
+- ARQQ（可觀察）：新聞提及 1 次，且價格站上 50DMA，值得加入觀察清單。
+- USAR（可觀察）：新聞提及 1 次，量價訊號尚需確認。
+
+## 明日觀察重點
+- 觀察 QQQ 是否能守住 50DMA 附近，近 20 日報酬目前為 10.6%
+- 留意 IGV、SMH、SOXX 的異常是否延續到下一個交易日
+- 追蹤國際新聞是否從單一事件擴散到利率、貿易或風險資產",rules,0.62,1.0,1.0,## 今日市場結論 目前市場判讀偏向偏多，信心中。 qqq 近 20 日報酬 10.6%，相對 50dma 13.1%；smh 近 20 日報酬 18.2%，相對 50dma 23.6%；vix 單日變動 -2.7%，20 日位置對風險偏好仍有影響。  ## 量化訊號 - igv：單日漲跌超過 5%；日報酬 z-score 異常 - smh：20 日波動位於近一年高檔 - soxx：20 日波動位 | rules | rules；rule_based；openai 摘要失敗，已改用規則摘要：httperror: 500 server error: internal server error for url: https://api.openai.com/v1/responses,79.1
