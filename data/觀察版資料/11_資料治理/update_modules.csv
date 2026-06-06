@@ -721,3 +721,22 @@ run_id,module_name,category,status,critical,rows,latest_value,message,finished_a
 20260606T155912+0000,prediction_log,模型,success,False,45,2026-06-05T00:00:00+00:00,updated prediction_log.csv,2026-06-06T16:03:43+00:00
 20260606T155912+0000,lstm_features,模型,success,False,69,2026-05-05T00:00:00+00:00,updated lstm/lstm_features.parquet,2026-06-06T16:03:48+00:00
 20260606T155912+0000,lstm_status,模型,success,False,69,2026-06-06T16:03:48+00:00,updated lstm status,2026-06-06T16:03:48+00:00
+20260606T214421+0000,market_prices,主資料,success,True,116903,2026-06-05T00:00:00+00:00,updated prices.parquet,2026-06-06T21:48:16+00:00
+20260606T214421+0000,market_macro,主資料,fallback,True,17619,2026-06-01T00:00:00+00:00,row count 2616 below 20% of previous cache (17619),2026-06-06T21:48:16+00:00
+20260606T214421+0000,watchlist_news,新聞,success,True,119,2026-06-06T16:05:00+00:00,updated news.parquet,2026-06-06T21:48:22+00:00
+20260606T214421+0000,international_news,新聞,success,False,36,2026-06-06T15:26:00+00:00,updated international_news.parquet,2026-06-06T21:48:24+00:00
+20260606T214421+0000,discovery_news,探索,success,False,35,2026-06-06T19:31:01+00:00,updated discovery_news.parquet,2026-06-06T21:48:27+00:00
+20260606T214421+0000,tsla_focus_news,專題,success,False,57,2026-06-06T18:16:58+00:00,updated tsla_keyword_news.parquet,2026-06-06T21:48:36+00:00
+20260606T214421+0000,discovery_mentions,探索,success,False,6,2026-06-06T19:31:01+00:00,updated discovery_mentions.parquet,2026-06-06T21:48:41+00:00
+20260606T214421+0000,discovery_candidates,探索,success,False,6,2026-06-06T21:44:21+00:00,updated discovery_candidates.parquet,2026-06-06T21:48:41+00:00
+20260606T214421+0000,discovery_history,探索,success,False,150,2026-06-06T00:00:00+00:00,updated discovery_history.parquet,2026-06-06T21:48:41+00:00
+20260606T214421+0000,discovery_performance,探索,success,False,432,2026-06-05T00:00:00+00:00,updated discovery_performance.parquet,2026-06-06T21:48:41+00:00
+20260606T214421+0000,governance_summary,治理,success,False,4,,updated governance_summary.parquet,2026-06-06T21:48:41+00:00
+20260606T214421+0000,kg_fact_events,知識圖譜,success,False,155,2026-06-06T16:05:00+00:00,updated kg/fact_events.parquet,2026-06-06T21:48:43+00:00
+20260606T214421+0000,kg_narratives,知識圖譜,success,False,155,2026-06-06T16:05:00+00:00,updated kg/narrative_features.parquet,2026-06-06T21:48:43+00:00
+20260606T214421+0000,kg_reactions,知識圖譜,success,False,456,2026-06-05T00:00:00+00:00,updated kg/market_reactions.parquet,2026-06-06T21:48:43+00:00
+20260606T214421+0000,kg_links,知識圖譜,success,False,271,2026-06-06T21:48:42+00:00,updated kg/event_links.parquet,2026-06-06T21:48:43+00:00
+20260606T214421+0000,kg_metadata,知識圖譜,success,False,1,2026-06-06T21:44:21+00:00,updated kg/kg_metadata.json,2026-06-06T21:48:43+00:00
+20260606T214421+0000,prediction_log,模型,success,False,45,2026-06-05T00:00:00+00:00,updated prediction_log.csv,2026-06-06T21:48:44+00:00
+20260606T214421+0000,lstm_features,模型,success,False,69,2026-05-05T00:00:00+00:00,updated lstm/lstm_features.parquet,2026-06-06T21:48:50+00:00
+20260606T214421+0000,lstm_status,模型,success,False,69,2026-06-06T21:48:50+00:00,updated lstm status,2026-06-06T21:48:50+00:00
