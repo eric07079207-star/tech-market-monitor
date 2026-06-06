@@ -1,16 +1,16 @@
 {
   "enabled": true,
-  "mode": "scaffold",
-  "status": "已接上特徵表",
+  "mode": "train",
+  "status": "已訓練完成，驗證準確率 45.95%，測試準確率 44.74%",
   "model_version": "lstm-direction-v1",
   "feature_version": "lstm-demo-v1",
   "horizon_days": 20,
   "sequence_length": 60,
-  "last_train_at_utc": "2026-06-05T11:45:06+00:00",
-  "last_predict_at_utc": "2026-06-05T11:45:06+00:00",
-  "last_backtest_at_utc": "2026-06-05T11:45:06+00:00",
+  "last_train_at_utc": "2026-06-06T08:22:10+00:00",
+  "last_predict_at_utc": "2026-06-06T08:22:10+00:00",
+  "last_backtest_at_utc": "2026-06-06T08:22:10+00:00",
   "prediction_rows": 1,
   "backtest_rows": 38,
-  "feature_rows": 69,
-  "updated_at_utc": "2026-06-05T18:35:13+00:00"
+  "feature_rows": 247,
+  "updated_at_utc": "2026-06-06T08:22:10+00:00"
 }
