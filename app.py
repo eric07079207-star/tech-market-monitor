@@ -13,7 +13,7 @@ except ImportError:  # pragma: no cover - optional local dependency
     st_autorefresh = None
 
 try:
-    from src.ai_summary import ai_summary_quality, load_ai_summary_history, load_cached_ai_summary, openai_configuration_status
+    from src.ai_summary import ai_summary_quality, latest_ai_history_entry, load_ai_summary_history, load_cached_ai_summary, openai_configuration_status
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def load_cached_ai_summary(path=None) -> dict:
         return {}
@@ -31,6 +31,9 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         return {"configured": False, "status": "missing_key", "model": "n/a", "api_key_preview": "n/a"}
     def load_ai_summary_history(path=None) -> pd.DataFrame:
         return pd.DataFrame()
+
+    def latest_ai_history_entry(history: pd.DataFrame | None = None) -> dict:
+        return {}
 from src.config import ETF_TICKERS, NEWS_QUERIES, STOCK_TICKERS, default_start_date
 try:
     from src.config import ANNUAL_PICK_TICKERS
@@ -86,6 +89,11 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 
     def missing_price_symbols(prices: pd.DataFrame, symbols: list[str]) -> list[str]:
         return []
+try:
+    from src.sentiment import EVENT_WINDOWS_CACHE, SENTIMENT_CACHE
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    SENTIMENT_CACHE = cache_path("sentiment.parquet")
+    EVENT_WINDOWS_CACHE = cache_path("market_event_windows.parquet")
 try:
     from src.edge import summarize_quality_frame
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
@@ -323,6 +331,27 @@ def load_governance_summary() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+def load_sentiment_layer() -> pd.DataFrame:
+    if not SENTIMENT_CACHE.exists():
+        return pd.DataFrame()
+    data = pd.read_parquet(SENTIMENT_CACHE)
+    if "date" in data:
+        data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    return data
+
+
+@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+def load_market_event_windows() -> pd.DataFrame:
+    if not EVENT_WINDOWS_CACHE.exists():
+        return pd.DataFrame()
+    data = pd.read_parquet(EVENT_WINDOWS_CACHE)
+    for column in ["start_date", "end_date"]:
+        if column in data:
+            data[column] = pd.to_datetime(data[column], errors="coerce")
+    return data
+
+
+@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
 def load_discovery_perf() -> pd.DataFrame:
     return load_discovery_performance()
 
@@ -412,6 +441,19 @@ def latest_value(data: pd.DataFrame, column: str) -> str:
     return str(value.date())
 
 
+def summary_freshness_status(ai_summary: dict, metadata: dict) -> tuple[str, bool]:
+    generated = pd.to_datetime(ai_summary.get("generated_at_utc"), errors="coerce", utc=True)
+    cache_updated = pd.to_datetime(metadata.get("updated_at_utc"), errors="coerce", utc=True)
+    if pd.isna(generated):
+        return "摘要時間未知", False
+    if pd.isna(cache_updated):
+        return "摘要時間正常", False
+    gap_hours = (cache_updated - generated).total_seconds() / 3600
+    if gap_hours > 36:
+        return f"摘要比最新資料落後約 {gap_hours:.0f} 小時，建議等待下一輪雲端摘要。", True
+    return "摘要時間正常", False
+
+
 def build_health_report(
     prices: pd.DataFrame,
     macro: pd.DataFrame,
@@ -426,6 +468,8 @@ def build_health_report(
     discovery_history: pd.DataFrame,
     tsla_keyword_news: pd.DataFrame,
     governance_summary: pd.DataFrame,
+    sentiment: pd.DataFrame,
+    market_event_windows: pd.DataFrame,
     kg_payload,
 ) -> pd.DataFrame:
     health_inputs = {
@@ -442,6 +486,8 @@ def build_health_report(
         "discovery_history": discovery_history,
         "focus_news": tsla_keyword_news,
         "governance": governance_summary,
+        "sentiment": sentiment,
+        "market_event_windows": market_event_windows,
         "kg_fact_events": kg_payload.facts,
         "kg_narratives": kg_payload.narratives,
         "kg_reactions": kg_payload.reactions,
@@ -540,12 +586,17 @@ international_news = load_international_news(min(news_days, 7))
 discovery_news, discovery_mentions, discovery_candidates, discovery_history = load_discovery()
 tsla_keyword_news = load_tsla_keyword_news()
 governance = load_governance_summary()
+sentiment = load_sentiment_layer()
+market_event_windows = load_market_event_windows()
 discovery_performance = load_discovery_perf()
 kg_payload = load_knowledge_graph()
 kg_health = kg_summary(kg_payload)
+metadata = load_metadata()
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
+ai_freshness_text, ai_is_stale = summary_freshness_status(ai_summary, metadata) if ai_summary else ("尚未產生摘要", True)
 ai_history = load_ai_summary_history()
+latest_ai_entry = latest_ai_history_entry(ai_history)
 openai_status = openai_configuration_status()
 indicators = add_price_indicators(prices)
 snapshot = latest_snapshot(indicators)
@@ -554,7 +605,6 @@ regime = regime_summary(indicators, macro)
 conclusion = today_conclusion(regime, snapshot, anomalies)
 market_prediction = build_market_prediction(regime, conclusion, snapshot)
 prediction_log = load_prediction_log()
-metadata = load_metadata()
 annual_picks = annual_picks_table(prices)
 lstm_status = build_lstm_status_from_artifacts()
 active_news_keywords = load_news_keywords()
@@ -582,6 +632,13 @@ with st.sidebar:
         st.success(f"OpenAI 已就緒｜模型：{openai_status.get('model', 'n/a')}")
     else:
         st.warning("前台未讀到 OpenAI API key；目前顯示規則備援摘要。")
+    if latest_ai_entry and not ai_summary.get("used_ai"):
+        st.caption(
+            "最近一次 OpenAI 摘要："
+            f"{latest_ai_entry.get('generated_at_utc', 'n/a')}｜模型：{latest_ai_entry.get('model', 'n/a')}"
+        )
+    if ai_summary:
+        (st.warning if ai_is_stale else st.caption)(ai_freshness_text)
     st.divider()
     st.caption("TSLA 關鍵字設定與分析結果已移到「重點個股追蹤」，避免影響主新聞觀看。")
 
@@ -622,6 +679,8 @@ if show_health:
             discovery_history,
             tsla_keyword_news,
             governance,
+            sentiment,
+            market_event_windows,
             kg_payload,
         ),
         hide_index=True,
@@ -940,6 +999,8 @@ with tab_news:
         generated = ai_summary.get("generated_at_utc", "n/a")
         (st.success if used_ai else st.warning)(status)
         st.caption(f"來源：{provider}｜模型：{model}｜生成 UTC：{generated}｜排程：每日 07:00 台灣時間")
+        if ai_is_stale:
+            st.warning(ai_freshness_text)
         if used_ai:
             st.caption("OpenAI 狀態：本摘要已由雲端排程使用 OpenAI 產生。")
         else:

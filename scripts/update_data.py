@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.config import NEWS_QUERIES, default_start_date
-from src.data import fetch_fred_series, fetch_price_history, load_cached_market_data
+from src.data import fetch_macro_series, fetch_price_history, load_cached_market_data
 from src.discovery import (
     build_discovery_candidates,
     fetch_discovery_news,
@@ -37,6 +37,7 @@ from src.lstm import (
 )
 from src.news import DEFAULT_TSLA_KEYWORDS, fetch_international_news, fetch_news_batch, fetch_symbol_keyword_news
 from src.predictions import build_market_prediction, load_prediction_log, update_prediction_log
+from src.sentiment import build_market_event_windows, build_sentiment_features
 from src.update_pipeline import (
     FrameValidation,
     append_update_logs,
@@ -213,7 +214,8 @@ def main() -> None:
     # Market data
     try:
         fresh_prices = fetch_price_history(start=default_start_date())
-        fresh_macro = fetch_fred_series(start=default_start_date())
+        previous_macro = load_cached_frame("macro.parquet")
+        fresh_macro = fetch_macro_series(start=default_start_date(), previous=previous_macro)
     except Exception as exc:
         fresh_prices = pd.DataFrame()
         fresh_macro = pd.DataFrame()
@@ -398,6 +400,36 @@ def main() -> None:
     anomalies = detect_anomalies(snapshot)
     regime = regime_summary(indicators, macro)
     conclusion = today_conclusion(regime, snapshot, anomalies)
+
+    # Sentiment layer
+    try:
+        sentiment = build_sentiment_features(prices, macro, news, international_news)
+        market_event_windows = build_market_event_windows(prices, sentiment)
+    except Exception as exc:
+        _record(module_records, "sentiment_layer", "情緒", "fallback" if not load_cached_frame("sentiment.parquet").empty else "failed", f"exception: {exc}", False)
+        sentiment = load_cached_frame("sentiment.parquet")
+        market_event_windows = load_cached_frame("market_event_windows.parquet")
+    else:
+        sentiment = _write_frame_module(
+            module_records,
+            module_name="sentiment_layer",
+            category="情緒",
+            filename="sentiment.parquet",
+            frame=sentiment,
+            validation=FrameValidation(required_columns=("date", "market_mood_score", "market_mood_label"), allow_empty=False, min_rows=252),
+            critical=False,
+            latest_columns=["date"],
+        )
+        market_event_windows = _write_frame_module(
+            module_records,
+            module_name="market_event_windows",
+            category="情緒",
+            filename="market_event_windows.parquet",
+            frame=market_event_windows,
+            validation=FrameValidation(required_columns=("symbol", "start_date", "end_date", "window_return"), allow_empty=True),
+            critical=False,
+            latest_columns=["end_date"],
+        )
 
     # Knowledge graph
     try:

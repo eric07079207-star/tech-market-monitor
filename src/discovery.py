@@ -19,7 +19,7 @@ FALSE_TICKERS = {
     "TSE", "TSX", "LSE", "HKEX", "OTC", "CBOE", "AMEX", "NIKKEI", "DAX", "CAC",
     "API", "SAAS", "USD", "EUR", "CPI", "PPI", "FOMC", "ISM", "PMI", "OPEC",
     "WHO", "UN", "NATO", "GOP", "IRS", "FTC", "EURO", "AP", "PR", "DJIA", "ISG",
-    "SHS", "NV", "NY", "HDFC", "SP",
+    "SHS", "NV", "NY", "HDFC", "SP", "JOL", "MEXC",
 }
 
 TICKER_CONTEXT_WORDS = {

@@ -14,7 +14,7 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 ETF_TICKERS = ["QQQ", "XLK", "SMH", "SOXX", "IGV", "IYW", "VGT"]
 STOCK_TICKERS = ["AAPL", "MSFT", "NVDA", "AMD", "META", "GOOGL", "AMZN", "TSLA"]
-MARKET_TICKERS = ["SPY", "IWM", "^VIX", "TLT", "HYG", "DX-Y.NYB"]
+MARKET_TICKERS = ["SPY", "VOO", "IWM", "^VIX", "TLT", "HYG", "DX-Y.NYB"]
 ANNUAL_PICK_TICKERS = ["TSLA", "PLTR", "CRWD", "VST", "RKLB", "IONQ", "OKLO", "SOFI", "HOOD", "TMDX"]
 ALL_TICKERS = ETF_TICKERS + STOCK_TICKERS + MARKET_TICKERS + ANNUAL_PICK_TICKERS
 
@@ -44,6 +44,7 @@ DISPLAY_NAMES = {
     "HOOD": "Robinhood",
     "TMDX": "TransMedics",
     "SPY": "S&P 500",
+    "VOO": "Vanguard S&P 500",
     "IWM": "Russell 2000",
     "^VIX": "VIX",
     "TLT": "Long Treasury",
@@ -65,6 +66,9 @@ FRED_SERIES = {
     "BAMLH0A0HYM2": "High Yield OAS",
     "BAMLC0A0CM": "Investment Grade OAS",
     "NFCI": "Chicago Fed NFCI",
+    "CPIAUCSL": "US CPI",
+    "UNRATE": "US Unemployment Rate",
+    "PAYEMS": "US Nonfarm Payrolls",
 }
 
 NEWS_QUERIES = {

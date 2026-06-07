@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import os
 import re
-import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -18,6 +18,8 @@ from .news import rule_based_news_summary
 AI_SUMMARY_CACHE = cache_path("ai_summary.json")
 AI_SUMMARY_HISTORY_CACHE = cache_path("ai_summary_history.parquet")
 AI_SUMMARY_PROMPT_VERSION = "2026-05-19-v2"
+TAIPEI = ZoneInfo("Asia/Taipei")
+PRESERVE_AI_SUMMARY_HOURS = 72
 
 
 def build_openai_summary(
@@ -95,6 +97,9 @@ def build_openai_summary(
 def save_ai_summary(payload: dict, path=None) -> None:
     path = path or AI_SUMMARY_CACHE
     path.parent.mkdir(parents=True, exist_ok=True)
+    existing = load_cached_ai_summary(path)
+    if _should_preserve_existing_summary(existing, payload):
+        return
     payload = _attach_edge_metadata(payload)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
     if path == AI_SUMMARY_CACHE:
@@ -122,6 +127,25 @@ def load_ai_summary_history(path=None) -> pd.DataFrame:
     if "generated_at_utc" in history:
         history["generated_at_utc"] = pd.to_datetime(history["generated_at_utc"], errors="coerce", utc=True)
     return history
+
+
+def latest_ai_history_entry(history: pd.DataFrame | None = None) -> dict:
+    history = load_ai_summary_history() if history is None else history
+    if history is None or history.empty:
+        return {}
+    frame = history.copy()
+    if "generated_at_utc" in frame:
+        frame["generated_at_utc"] = pd.to_datetime(frame["generated_at_utc"], errors="coerce", utc=True)
+        frame = frame.sort_values("generated_at_utc")
+    ai_only = frame[frame.get("used_ai", False).fillna(False).astype(bool)] if "used_ai" in frame else pd.DataFrame()
+    target = ai_only if not ai_only.empty else frame
+    if target.empty:
+        return {}
+    row = target.iloc[-1].to_dict()
+    value = row.get("generated_at_utc")
+    if isinstance(value, pd.Timestamp):
+        row["generated_at_utc"] = value.isoformat()
+    return row
 
 
 def load_cached_ai_summary(path=None) -> dict:
@@ -229,6 +253,25 @@ def _summary_payload(text: str, provider: str, model: str, generated_at: str, us
         "status": status,
         "prompt_version": AI_SUMMARY_PROMPT_VERSION,
     }
+
+
+def _should_preserve_existing_summary(existing: dict, incoming: dict) -> bool:
+    if not existing:
+        return False
+    if bool(incoming.get("used_ai")):
+        return False
+    if not bool(existing.get("used_ai")):
+        return False
+    existing_ts = pd.to_datetime(existing.get("generated_at_utc"), errors="coerce", utc=True)
+    incoming_ts = pd.to_datetime(incoming.get("generated_at_utc"), errors="coerce", utc=True)
+    if pd.isna(existing_ts) or pd.isna(incoming_ts):
+        return False
+    existing_local = existing_ts.tz_convert(TAIPEI).date()
+    incoming_local = incoming_ts.tz_convert(TAIPEI).date()
+    if existing_local >= incoming_local:
+        return True
+    age_hours = (incoming_ts - existing_ts).total_seconds() / 3600
+    return age_hours <= PRESERVE_AI_SUMMARY_HOURS
 
 
 def _attach_edge_metadata(payload: dict) -> dict:

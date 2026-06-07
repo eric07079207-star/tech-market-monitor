@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+import csv
+import io
+import re
 from datetime import date, datetime, timezone
+from io import StringIO
 from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
+import requests
 import yfinance as yf
 
 from .config import ALL_TICKERS, CACHE_DIR, FRED_SERIES, default_start_date
@@ -14,6 +19,20 @@ from .config import ALL_TICKERS, CACHE_DIR, FRED_SERIES, default_start_date
 PRICE_CACHE = CACHE_DIR / "prices.parquet"
 MACRO_CACHE = CACHE_DIR / "macro.parquet"
 METADATA_CACHE = CACHE_DIR / "metadata.json"
+
+BLS_PUBLIC_SERIES = {
+    "CPIAUCSL": {"provider_series": "CUUR0000SA0", "label": "US CPI"},
+    "UNRATE": {"provider_series": "LNS14000000", "label": "US Unemployment Rate"},
+    "PAYEMS": {"provider_series": "CES0000000001", "label": "US Nonfarm Payrolls"},
+}
+
+BEA_PAGE_SERIES = {
+    "PCEPI": {"label": "US PCE YoY"},
+}
+
+DOL_SERIES = {
+    "ICSA": {"label": "US Initial Jobless Claims"},
+}
 
 
 def _normalize_yfinance(raw: pd.DataFrame, tickers: list[str]) -> pd.DataFrame:
@@ -103,13 +122,19 @@ def fetch_price_history(
     return _normalize_yfinance(raw, ticker_list)
 
 
-def fetch_fred_series(start: date | str | None = None) -> pd.DataFrame:
+def fetch_fred_series(
+    start: date | str | None = None,
+    series_map: dict[str, str] | None = None,
+) -> pd.DataFrame:
     start_ts = pd.to_datetime(start or default_start_date())
+    series_map = series_map or FRED_SERIES
     frames = []
-    for series_id, label in FRED_SERIES.items():
+    for series_id, label in series_map.items():
         url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
         try:
-            data = pd.read_csv(url)
+            response = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+            response.raise_for_status()
+            data = pd.read_csv(StringIO(response.text))
         except Exception:
             continue
 
@@ -121,16 +146,199 @@ def fetch_fred_series(start: date | str | None = None) -> pd.DataFrame:
         data = data[data["date"] >= start_ts].dropna(subset=["value"])
         data["series"] = series_id
         data["label"] = label
-        frames.append(data[["date", "series", "label", "value"]])
+        data["source"] = "FRED"
+        data["provider_series"] = series_id
+        frames.append(data[["date", "series", "label", "value", "source", "provider_series"]])
 
     if not frames:
-        return pd.DataFrame(columns=["date", "series", "label", "value"])
+        return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
     return pd.concat(frames, ignore_index=True).sort_values(["series", "date"])
 
 
+def fetch_bls_series(start: date | str | None = None) -> pd.DataFrame:
+    start_ts = pd.to_datetime(start or default_start_date())
+    start_year = int(start_ts.year)
+    end_year = int(pd.Timestamp.today().year)
+    frames = []
+    provider_to_canonical = {meta["provider_series"]: canonical for canonical, meta in BLS_PUBLIC_SERIES.items()}
+    series_ids = list(provider_to_canonical)
+
+    for year_start in range(start_year, end_year + 1, 10):
+        year_end = min(year_start + 9, end_year)
+        payload = {
+            "seriesid": series_ids,
+            "startyear": str(year_start),
+            "endyear": str(year_end),
+        }
+        try:
+            response = requests.post(
+                "https://api.bls.gov/publicAPI/v2/timeseries/data/",
+                json=payload,
+                timeout=20,
+                headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+            )
+            response.raise_for_status()
+            payload_json = response.json()
+        except Exception:
+            continue
+
+        for series_blob in payload_json.get("Results", {}).get("series", []):
+            provider_series = str(series_blob.get("seriesID", "") or "")
+            canonical = provider_to_canonical.get(provider_series)
+            if not canonical:
+                continue
+            label = BLS_PUBLIC_SERIES[canonical]["label"]
+            for point in series_blob.get("data", []):
+                period = str(point.get("period", "") or "")
+                if not period.startswith("M") or period == "M13":
+                    continue
+                try:
+                    year = int(point["year"])
+                    month = int(period[1:])
+                    value = float(str(point["value"]).replace(",", ""))
+                except Exception:
+                    continue
+                frames.append(
+                    {
+                        "date": pd.Timestamp(year=year, month=month, day=1),
+                        "series": canonical,
+                        "label": label,
+                        "value": value,
+                        "source": "BLS",
+                        "provider_series": provider_series,
+                    }
+                )
+
+    if not frames:
+        return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
+    data = pd.DataFrame(frames).drop_duplicates(subset=["series", "date"]).sort_values(["series", "date"])
+    data = data[data["date"] >= start_ts]
+    return data.reset_index(drop=True)
+
+
+def fetch_bea_pce_series(start: date | str | None = None) -> pd.DataFrame:
+    start_ts = pd.to_datetime(start or default_start_date())
+    try:
+        response = requests.get(
+            "https://www.bea.gov/data/personal-consumption-expenditures-price-index",
+            timeout=20,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        response.raise_for_status()
+        html = response.text
+    except Exception:
+        return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
+
+    rows = []
+    for month_name, pct_text in re.findall(r"<tr class=\"item-fact-row\"><td>([^<]+)</td><td>\+?([0-9.]+)%</td></tr>", html):
+        ts = pd.to_datetime(month_name, format="%B %Y", errors="coerce")
+        if pd.isna(ts) or ts < start_ts:
+            continue
+        rows.append(
+            {
+                "date": ts.normalize(),
+                "series": "PCEPI",
+                "label": BEA_PAGE_SERIES["PCEPI"]["label"],
+                "value": float(pct_text),
+                "source": "BEA",
+                "provider_series": "bea_pce_yoy_page",
+            }
+        )
+    if not rows:
+        return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
+    return pd.DataFrame(rows).drop_duplicates(subset=["series", "date"]).sort_values("date").reset_index(drop=True)
+
+
+def fetch_dol_initial_claims_series(start: date | str | None = None) -> pd.DataFrame:
+    start_ts = pd.to_datetime(start or default_start_date())
+    try:
+        response = requests.get(
+            "https://oui.doleta.gov/unemploy/csv/ar539.csv",
+            timeout=30,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        response.raise_for_status()
+    except Exception:
+        return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
+
+    try:
+        reader = csv.DictReader(io.StringIO(response.text))
+        rows = list(reader)
+    except Exception:
+        return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
+
+    if not rows:
+        return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
+
+    data = pd.DataFrame(rows)
+    if "c2" not in data or "c3" not in data:
+        return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
+
+    data["date"] = pd.to_datetime(data["c2"], errors="coerce")
+    data["value"] = pd.to_numeric(data["c3"], errors="coerce")
+    data = data.dropna(subset=["date", "value"])
+    data = data[data["date"] >= start_ts]
+    weekly = data.groupby("date", as_index=False)["value"].sum().sort_values("date")
+    weekly["series"] = "ICSA"
+    weekly["label"] = DOL_SERIES["ICSA"]["label"]
+    weekly["source"] = "DOL"
+    weekly["provider_series"] = "eta539_c3_aggregate"
+    return weekly[["date", "series", "label", "value", "source", "provider_series"]]
+
+
+def fetch_macro_series(start: date | str | None = None, previous: pd.DataFrame | None = None) -> pd.DataFrame:
+    previous = previous.copy() if previous is not None else pd.DataFrame()
+    official_canonicals = set(BLS_PUBLIC_SERIES)
+    fred_only_map = {series_id: label for series_id, label in FRED_SERIES.items() if series_id not in official_canonicals}
+
+    frames = [
+        fetch_fred_series(start=start, series_map=fred_only_map),
+        fetch_bls_series(start=start),
+        fetch_bea_pce_series(start=start),
+        fetch_dol_initial_claims_series(start=start),
+    ]
+
+    if previous.empty and all(frame.empty for frame in frames):
+        return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
+    return _merge_macro_frames(previous, frames)
+
+
+def _merge_macro_frames(previous: pd.DataFrame, frames: list[pd.DataFrame]) -> pd.DataFrame:
+    pieces = []
+    candidate_series = set(FRED_SERIES) | set(BLS_PUBLIC_SERIES) | set(BEA_PAGE_SERIES) | set(DOL_SERIES)
+    previous = previous.copy()
+    if not previous.empty and "date" in previous:
+        previous["date"] = pd.to_datetime(previous["date"], errors="coerce")
+
+    combined_new = pd.concat([frame for frame in frames if frame is not None and not frame.empty], ignore_index=True) if any(frame is not None and not frame.empty for frame in frames) else pd.DataFrame()
+    if not combined_new.empty and "date" in combined_new:
+        combined_new["date"] = pd.to_datetime(combined_new["date"], errors="coerce")
+
+    for series_id in sorted(candidate_series):
+        new_slice = combined_new[combined_new["series"] == series_id].copy() if not combined_new.empty else pd.DataFrame()
+        if not new_slice.empty:
+            pieces.append(new_slice)
+            continue
+        if not previous.empty and "series" in previous:
+            old_slice = previous[previous["series"] == series_id].copy()
+            if not old_slice.empty:
+                pieces.append(old_slice)
+
+    if not pieces:
+        return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
+    merged = pd.concat(pieces, ignore_index=True)
+    if "source" not in merged:
+        merged["source"] = "unknown"
+    if "provider_series" not in merged:
+        merged["provider_series"] = merged["series"]
+    merged = merged.drop_duplicates(subset=["series", "date"], keep="last").sort_values(["series", "date"]).reset_index(drop=True)
+    return merged
+
+
 def refresh_market_data(start: date | str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+    previous_macro = pd.read_parquet(MACRO_CACHE) if MACRO_CACHE.exists() else pd.DataFrame()
     prices = fetch_price_history(start=start)
-    macro = fetch_fred_series(start=start)
+    macro = fetch_macro_series(start=start, previous=previous_macro)
     if not prices.empty:
         prices.to_parquet(PRICE_CACHE, index=False)
     if not macro.empty:
