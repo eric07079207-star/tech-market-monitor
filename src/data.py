@@ -12,6 +12,8 @@ from typing import Iterable
 import pandas as pd
 import requests
 import yfinance as yf
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .config import ALL_TICKERS, CACHE_DIR, FRED_SERIES, default_start_date
 
@@ -33,6 +35,30 @@ BEA_PAGE_SERIES = {
 DOL_SERIES = {
     "ICSA": {"label": "US Initial Jobless Claims"},
 }
+
+HTTP_TIMEOUT_SHORT = 8
+HTTP_TIMEOUT_MEDIUM = 20
+HTTP_TIMEOUT_LONG = 30
+YFINANCE_TIMEOUT = 20
+
+
+def _build_http_session() -> requests.Session:
+    session = requests.Session()
+    retry = Retry(
+        total=3,
+        backoff_factor=1.0,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset(["GET", "POST"]),
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    session.headers.update({"User-Agent": "Mozilla/5.0"})
+    return session
+
+
+HTTP = _build_http_session()
 
 
 def _normalize_yfinance(raw: pd.DataFrame, tickers: list[str]) -> pd.DataFrame:
@@ -118,6 +144,7 @@ def fetch_price_history(
         group_by="ticker",
         threads=True,
         progress=False,
+        timeout=YFINANCE_TIMEOUT,
     )
     return _normalize_yfinance(raw, ticker_list)
 
@@ -132,7 +159,7 @@ def fetch_fred_series(
     for series_id, label in series_map.items():
         url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
         try:
-            response = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+            response = HTTP.get(url, timeout=HTTP_TIMEOUT_SHORT)
             response.raise_for_status()
             data = pd.read_csv(StringIO(response.text))
         except Exception:
@@ -171,11 +198,11 @@ def fetch_bls_series(start: date | str | None = None) -> pd.DataFrame:
             "endyear": str(year_end),
         }
         try:
-            response = requests.post(
+            response = HTTP.post(
                 "https://api.bls.gov/publicAPI/v2/timeseries/data/",
                 json=payload,
-                timeout=20,
-                headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+                timeout=HTTP_TIMEOUT_MEDIUM,
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
             payload_json = response.json()
@@ -219,10 +246,9 @@ def fetch_bls_series(start: date | str | None = None) -> pd.DataFrame:
 def fetch_bea_pce_series(start: date | str | None = None) -> pd.DataFrame:
     start_ts = pd.to_datetime(start or default_start_date())
     try:
-        response = requests.get(
+        response = HTTP.get(
             "https://www.bea.gov/data/personal-consumption-expenditures-price-index",
-            timeout=20,
-            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=HTTP_TIMEOUT_MEDIUM,
         )
         response.raise_for_status()
         html = response.text
@@ -252,10 +278,9 @@ def fetch_bea_pce_series(start: date | str | None = None) -> pd.DataFrame:
 def fetch_dol_initial_claims_series(start: date | str | None = None) -> pd.DataFrame:
     start_ts = pd.to_datetime(start or default_start_date())
     try:
-        response = requests.get(
+        response = HTTP.get(
             "https://oui.doleta.gov/unemploy/csv/ar539.csv",
-            timeout=30,
-            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=HTTP_TIMEOUT_LONG,
         )
         response.raise_for_status()
     except Exception:

@@ -573,6 +573,7 @@ with st.sidebar:
     show_health = st.button("顯示資料健康檢查", width="stretch")
     st.caption("資料由 GitHub Actions 每 6 小時自動更新；前台只讀快取，避免人為刷新造成偏差。")
     st.caption("AI 摘要每日 07:00（台灣時間）由 OpenAI 自動生成；前台只讀取摘要快取。")
+    st.caption("就算 Streamlit 頁面因閒置睡著，雲端資料更新仍會照常進行；重新打開頁面後會讀取最新快取。")
 
 with st.spinner("讀取市場資料..."):
     prices, macro = load_market(str(default_start_date()))

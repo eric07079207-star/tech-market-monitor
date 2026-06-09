@@ -8,12 +8,17 @@ on:
     - cron: "0 23 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: tech-market-monitor-update-data
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
 jobs:
   update-data:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -28,6 +33,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Refresh cached data
+        id: refresh_data
         run: python scripts/update_data.py
 
       - name: Install LSTM dependencies
@@ -39,15 +45,18 @@ jobs:
         run: python scripts/train_lstm.py
 
       - name: Generate daily AI summary if needed
+        if: always()
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
         run: python scripts/generate_ai_summary_if_needed.py
 
       - name: Export observation data
+        if: always()
         run: python scripts/export_observation_data.py
 
       - name: Commit updated cache
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
