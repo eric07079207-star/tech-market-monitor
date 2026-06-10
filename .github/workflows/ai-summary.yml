@@ -1,0 +1,54 @@
+name: Generate AI summary
+
+on:
+  schedule:
+    # Retry after 07:00 Asia/Taipei so one missed cron does not skip the daily summary.
+    - cron: "5 23 * * *"
+    - cron: "5 0 * * *"
+    - cron: "5 2 * * *"
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/ai-summary.yml"
+
+concurrency:
+  group: tech-market-monitor-ai-summary
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  generate-ai-summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate daily AI summary if needed
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        run: python scripts/generate_ai_summary_if_needed.py
+
+      - name: Export observation data
+        run: python scripts/export_observation_data.py
+
+      - name: Commit updated summary cache
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/cache/ai_summary.json data/cache/ai_summary_history.parquet data/觀察版資料/08_AI摘要
+          git diff --cached --quiet && exit 0
+          git commit -m "Update AI summary cache"
+          git push
