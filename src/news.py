@@ -8,9 +8,30 @@ import xml.etree.ElementTree as ET
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .config import INTERNATIONAL_NEWS_QUERIES, NEWS_QUERIES
 from .edge import quality_score, source_domain
+
+
+def _build_http_session() -> requests.Session:
+    session = requests.Session()
+    retry = Retry(
+        total=3,
+        backoff_factor=1.0,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset(["GET"]),
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    session.headers.update({"User-Agent": "Mozilla/5.0"})
+    return session
+
+
+HTTP = _build_http_session()
 
 DEFAULT_TSLA_KEYWORDS = [
     "TSLA",
@@ -88,7 +109,7 @@ def fetch_google_news(symbol: str, query: str, days: int = 7, limit: int = 8) ->
     q = quote_plus(f"{query} when:{days}d")
     url = f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
     try:
-        response = requests.get(url, timeout=12, headers={"User-Agent": "Mozilla/5.0"})
+        response = HTTP.get(url, timeout=12)
         response.raise_for_status()
     except Exception:
         return []

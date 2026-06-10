@@ -40,6 +40,7 @@ HTTP_TIMEOUT_SHORT = 8
 HTTP_TIMEOUT_MEDIUM = 20
 HTTP_TIMEOUT_LONG = 30
 YFINANCE_TIMEOUT = 20
+YFINANCE_BATCH_SIZE = 8
 
 
 def _build_http_session() -> requests.Session:
@@ -136,17 +137,31 @@ def fetch_price_history(
 ) -> pd.DataFrame:
     ticker_list = list(dict.fromkeys(tickers))
     start = start or default_start_date()
-    raw = yf.download(
-        ticker_list,
-        start=str(start),
-        end=str(end) if end else None,
-        auto_adjust=True,
-        group_by="ticker",
-        threads=True,
-        progress=False,
-        timeout=YFINANCE_TIMEOUT,
-    )
-    return _normalize_yfinance(raw, ticker_list)
+    frames: list[pd.DataFrame] = []
+    for batch in _chunked(ticker_list, YFINANCE_BATCH_SIZE):
+        raw = yf.download(
+            batch,
+            start=str(start),
+            end=str(end) if end else None,
+            auto_adjust=True,
+            group_by="ticker",
+            threads=False,
+            progress=False,
+            timeout=YFINANCE_TIMEOUT,
+        )
+        normalized = _normalize_yfinance(raw, batch)
+        if not normalized.empty:
+            frames.append(normalized)
+    if not frames:
+        return pd.DataFrame(columns=["date", "symbol", "open", "high", "low", "close", "adj_close", "volume"])
+    prices = pd.concat(frames, ignore_index=True)
+    prices = prices.sort_values(["symbol", "date"]).drop_duplicates(["symbol", "date"], keep="last")
+    return prices.reset_index(drop=True)
+
+
+def _chunked(items: list[str], size: int) -> Iterable[list[str]]:
+    for index in range(0, len(items), max(size, 1)):
+        yield items[index : index + max(size, 1)]
 
 
 def fetch_fred_series(

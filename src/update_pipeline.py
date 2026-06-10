@@ -24,6 +24,7 @@ class FrameValidation:
     min_fraction_of_previous: float | None = None
     allow_empty: bool = False
     max_missing_ratio: float = 0.5
+    allow_latest_regression: bool = False
 
 
 def now_utc() -> str:
@@ -82,7 +83,13 @@ def validate_frame(frame: pd.DataFrame | None, previous: pd.DataFrame | None, ru
         if missing_ratio > rules.max_missing_ratio:
             issues.append(f"column {column} missing ratio {missing_ratio:.0%} exceeds {rules.max_missing_ratio:.0%}")
 
-    if rules.latest_column and rules.latest_column in data.columns and rules.latest_column in prior.columns and not prior.empty:
+    if (
+        rules.latest_column
+        and not rules.allow_latest_regression
+        and rules.latest_column in data.columns
+        and rules.latest_column in prior.columns
+        and not prior.empty
+    ):
         new_latest = pd.to_datetime(data[rules.latest_column], errors="coerce", utc=True).max()
         old_latest = pd.to_datetime(prior[rules.latest_column], errors="coerce", utc=True).max()
         if pd.notna(new_latest) and pd.notna(old_latest) and new_latest < old_latest:

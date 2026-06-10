@@ -55,6 +55,10 @@ jobs:
         if: always()
         run: python scripts/export_observation_data.py
 
+      - name: Smoke check app
+        if: always()
+        run: python scripts/smoke_check.py
+
       - name: Commit updated cache
         if: always()
         run: |

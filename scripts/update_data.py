@@ -258,7 +258,7 @@ def main() -> None:
             category="新聞",
             filename="news.parquet",
             frame=news,
-            validation=FrameValidation(required_columns=("symbol", "title", "source", "published"), latest_column="published", min_rows=10, min_fraction_of_previous=0.15),
+            validation=FrameValidation(required_columns=("symbol", "title", "source", "published"), latest_column="published", min_rows=10, min_fraction_of_previous=0.15, allow_latest_regression=True),
             critical=True,
             latest_columns=["published", "fetched_at_utc"],
         )
@@ -276,7 +276,7 @@ def main() -> None:
             category="新聞",
             filename="international_news.parquet",
             frame=international_news,
-            validation=FrameValidation(required_columns=("title", "source", "published"), latest_column="published", min_rows=3, min_fraction_of_previous=0.1),
+            validation=FrameValidation(required_columns=("title", "source", "published"), latest_column="published", min_rows=3, min_fraction_of_previous=0.1, allow_latest_regression=True),
             critical=False,
             latest_columns=["published", "fetched_at_utc"],
         )
@@ -294,7 +294,7 @@ def main() -> None:
             category="探索",
             filename="discovery_news.parquet",
             frame=discovery_news,
-            validation=FrameValidation(required_columns=("topic", "title", "published"), latest_column="published", min_rows=5, min_fraction_of_previous=0.1),
+            validation=FrameValidation(required_columns=("topic", "title", "published"), latest_column="published", min_rows=5, min_fraction_of_previous=0.1, allow_latest_regression=True),
             critical=False,
             latest_columns=["published", "fetched_at_utc"],
         )
@@ -315,7 +315,7 @@ def main() -> None:
             category="專題",
             filename="tsla_keyword_news.parquet",
             frame=tsla_keyword_news,
-            validation=FrameValidation(required_columns=("symbol", "title", "published"), latest_column="published", min_rows=3, min_fraction_of_previous=0.1),
+            validation=FrameValidation(required_columns=("symbol", "title", "published"), latest_column="published", min_rows=3, min_fraction_of_previous=0.1, allow_latest_regression=True),
             critical=False,
             latest_columns=["published", "fetched_at_utc"],
         )

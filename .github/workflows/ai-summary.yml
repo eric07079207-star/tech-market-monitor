@@ -44,6 +44,9 @@ jobs:
       - name: Export observation data
         run: python scripts/export_observation_data.py
 
+      - name: Smoke check app
+        run: python scripts/smoke_check.py
+
       - name: Commit updated summary cache
         run: |
           git config user.name "github-actions[bot]"

@@ -47,7 +47,19 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 
     def annual_picks_summary(table: pd.DataFrame) -> dict:
         return {"avg_return": np.nan, "win_rate": np.nan, "best": "n/a", "worst": "n/a", "avg_rel_qqq": np.nan}
-from src.data import MACRO_CACHE, PRICE_CACHE, cache_path, load_metadata
+try:
+    from src.data import MACRO_CACHE, PRICE_CACHE, cache_path, load_metadata
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    from pathlib import Path
+
+    def cache_path(name: str) -> Path:
+        return Path("data/cache") / name
+
+    PRICE_CACHE = cache_path("prices.parquet")
+    MACRO_CACHE = cache_path("macro.parquet")
+
+    def load_metadata(path=None) -> dict:
+        return {}
 try:
     from src.discovery import discovery_performance_summary, load_discovery_history, load_discovery_performance, summarize_discovery_history
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
@@ -168,9 +180,14 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
             "confidence": "低",
         }
 
-from src.news import fetch_news_batch
 try:
-    from src.news import DEFAULT_TSLA_KEYWORDS, international_news_selection, portfolio_news_impact, summarize_keyword_news
+    from src.news import (
+        DEFAULT_TSLA_KEYWORDS,
+        fetch_news_batch,
+        international_news_selection,
+        portfolio_news_impact,
+        summarize_keyword_news,
+    )
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     DEFAULT_TSLA_KEYWORDS = [
         "TSLA",
@@ -194,6 +211,9 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         "investigation",
         "lawsuit",
     ]
+
+    def fetch_news_batch(symbols: list[str] | None = None, days: int = 7, limit_per_symbol: int = 6) -> pd.DataFrame:
+        return pd.DataFrame(columns=["symbol", "title", "source", "source_domain", "source_reliability_score", "published", "tags", "link", "quality_score"])
 
     def summarize_keyword_news(news: pd.DataFrame, symbol: str = "TSLA") -> dict:
         return {"symbol": symbol, "headline_count": 0, "top_keywords": "", "top_groups": "", "risk_keywords": "", "latest_published": "", "summary": f"近期沒有抓到 {symbol} 關鍵字命中的新聞。"}
