@@ -1,2 +1,2 @@
 symbol,prediction_date,target_date,horizon_days,model_version,feature_version,predicted_prob_up,predicted_label,prediction_direction,created_at_utc
-TSLA,2026-05-08 00:00:00+00:00,2026-06-08 00:00:00+00:00,20,lstm-direction-v1,lstm-demo-v1,0.4859538972377777,0,看跌,2026-06-12T12:07:14+00:00
+TSLA,2026-05-08 00:00:00+00:00,2026-06-08 00:00:00+00:00,20,lstm-direction-v1,lstm-demo-v1,0.5383980870246887,1,看漲,2026-06-13T10:13:49+00:00
