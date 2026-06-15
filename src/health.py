@@ -43,7 +43,9 @@ def data_health_report(
         _row("候選歷史紀錄", "探索", "discovery_history.parquet", discovery_history, "date", "每日 Top 15 候選追蹤", cache_updated, 36),
         _row("TSLA專題新聞", "專題", "tsla_keyword_news.parquet", focus_news, "published", "特定個股關鍵字專題追蹤", cache_updated, 12),
         _governance_row(governance, cache_updated),
+        _data_hygiene_row(governance, cache_updated),
         _row("市場情緒層", "情緒", "sentiment.parquet", sentiment, "date", "VIX、信用、相對強弱與新聞情緒特徵", cache_updated, 72),
+        _sentiment_signal_row(sentiment, cache_updated),
         _row("大盤事件窗", "情緒", "market_event_windows.parquet", market_event_windows, "end_date", "VOO/QQQ 20 交易日絕對波動超過 10% 的事件樣本", cache_updated, 168),
         _row("知識圖譜事實層", "知識圖譜", "kg/fact_events.parquet", kg_fact_events, "timestamp_utc", "客觀事件與來源", cache_updated, 72),
         _row("知識圖譜敘事層", "知識圖譜", "kg/narrative_features.parquet", kg_narratives, "timestamp_utc", "量化敘事與情緒", cache_updated, 72),
@@ -132,6 +134,81 @@ def _governance_row(governance: pd.DataFrame | None, cache_updated: str) -> dict
         "自動更新": "是",
         "Streamlit使用": "是",
         "說明": f"official / pending / rejected 分層統計；{detail}",
+    }
+
+
+def _data_hygiene_row(governance: pd.DataFrame | None, cache_updated: str) -> dict:
+    count = 0
+    garbage = 0
+    duplicates = 0
+    rejected = 0
+    if governance is not None and not governance.empty:
+        count = int(pd.to_numeric(governance.get("rows", pd.Series(0, index=governance.index)), errors="coerce").fillna(0).sum())
+        garbage = int(pd.to_numeric(governance.get("garbage_rows", pd.Series(0, index=governance.index)), errors="coerce").fillna(0).sum())
+        duplicates = int(pd.to_numeric(governance.get("duplicate_rows", pd.Series(0, index=governance.index)), errors="coerce").fillna(0).sum())
+        rejected = int(pd.to_numeric(governance.get("rejected", pd.Series(0, index=governance.index)), errors="coerce").fillna(0).sum())
+    problem_count = max(garbage, rejected)
+    problem_ratio = problem_count / max(count, 1)
+    if count <= 0:
+        status = "🔴 無資料"
+        detail = "尚未建立資料治理統計"
+    elif problem_ratio <= 0.05:
+        status = "🟢 正常"
+        detail = f"垃圾/拒收比例 {problem_ratio:.1%}"
+    elif problem_ratio <= 0.15:
+        status = "🟡 注意"
+        detail = f"垃圾/拒收比例 {problem_ratio:.1%}"
+    else:
+        status = "🔴 異常"
+        detail = f"垃圾/拒收比例 {problem_ratio:.1%}，需要檢查來源品質"
+    return {
+        "狀態": status,
+        "資料分類": "治理",
+        "資料項目": "垃圾訊息防護",
+        "筆數": int(count),
+        "最新資料日期": _format_dateish(cache_updated),
+        "最近抓取 UTC": _format_datetimeish(cache_updated),
+        "檔案大小": _file_size(cache_path("governance_summary.parquet")),
+        "自動更新": "是",
+        "Streamlit使用": "是",
+        "說明": f"垃圾 {garbage}；重複群 {duplicates}；拒收 {rejected}；{detail}",
+    }
+
+
+def _sentiment_signal_row(sentiment: pd.DataFrame | None, cache_updated: str) -> dict:
+    count = 0 if sentiment is None else len(sentiment)
+    if sentiment is None or sentiment.empty:
+        status = "🔴 無資料"
+        latest = "n/a"
+        detail = "尚未建立情緒資料"
+        confidence = 0.0
+        signal_rows = 0
+        rejected_rows = 0
+    else:
+        data = sentiment.copy()
+        latest_row = data.sort_values("date").tail(1).squeeze()
+        latest = latest_row.get("date", "n/a") if isinstance(latest_row, pd.Series) else "n/a"
+        confidence = _numeric_value(latest_row.get("news_sentiment_confidence", 0), 0.0) if isinstance(latest_row, pd.Series) else 0.0
+        signal_rows = int(_numeric_value(latest_row.get("news_signal_rows", 0), 0.0)) if isinstance(latest_row, pd.Series) else 0
+        rejected_rows = int(_numeric_value(latest_row.get("news_rejected_rows", 0), 0.0)) if isinstance(latest_row, pd.Series) else 0
+        if confidence >= 60:
+            status = "🟢 正常"
+        elif confidence >= 35 or signal_rows > 0:
+            status = "🟡 注意"
+        else:
+            status = "🔴 無資料"
+        detail = f"最新情緒信心 {confidence:.1f}/100；可用新聞 {signal_rows}；拒收 {rejected_rows}"
+    return {
+        "狀態": status,
+        "資料分類": "情緒",
+        "資料項目": "情緒訊號品質",
+        "筆數": int(count),
+        "最新資料日期": _format_dateish(latest),
+        "最近抓取 UTC": _format_datetimeish(cache_updated),
+        "檔案大小": _file_size(cache_path("sentiment.parquet")),
+        "自動更新": "是",
+        "Streamlit使用": "是",
+        "說明": detail,
     }
 
 
@@ -295,3 +372,8 @@ def _format_datetimeish(value) -> str:
     if pd.isna(dt):
         return str(value)
     return dt.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _numeric_value(value, default: float = 0.0) -> float:
+    numeric = pd.to_numeric(value, errors="coerce")
+    return float(numeric) if pd.notna(numeric) else default

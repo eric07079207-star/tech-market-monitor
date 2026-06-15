@@ -52,9 +52,14 @@ def build_sentiment_features(
                 "hy_oas_20d_change",
                 "curve_10y2y",
                 "news_count",
+                "news_signal_rows",
+                "news_official_rows",
+                "news_pending_rows",
+                "news_rejected_rows",
                 "news_fear_score",
                 "news_hype_score",
                 "policy_risk_score",
+                "news_sentiment_confidence",
                 "vix_percentile_252d",
                 "hy_oas_percentile_252d",
                 "fear_percentile_252d",
@@ -229,9 +234,14 @@ def _daily_news_sentiment(
     if not frames:
         empty = pd.DataFrame(index=pd.Index(index, name="date"))
         empty["news_count"] = 0
+        empty["news_signal_rows"] = 0
+        empty["news_official_rows"] = 0
+        empty["news_pending_rows"] = 0
+        empty["news_rejected_rows"] = 0
         empty["news_fear_score"] = 0.0
         empty["news_hype_score"] = 0.0
         empty["policy_risk_score"] = 0.0
+        empty["news_sentiment_confidence"] = 0.0
         return empty
 
     data = pd.concat(frames, ignore_index=True)
@@ -241,22 +251,80 @@ def _daily_news_sentiment(
         return _daily_news_sentiment(None, None, index)
 
     data["date"] = data["published"].dt.normalize()
+    if "governance_status" not in data:
+        data["governance_status"] = "official"
+    if "usable_for_sentiment" not in data:
+        data["usable_for_sentiment"] = data["governance_status"].astype(str).ne("rejected")
+    data["usable_for_sentiment"] = data["usable_for_sentiment"].fillna(False).astype(bool)
+    all_daily = _daily_governance_counts(data)
+    data = data[data["usable_for_sentiment"]].copy()
+    if data.empty:
+        daily = all_daily.copy()
+        for column in ["news_fear_score", "news_hype_score", "policy_risk_score", "news_sentiment_confidence"]:
+            daily[column] = 0.0
+        return _reindex_news_daily(daily, index)
+
     data["news_fear_score"] = data["title"].astype(str).str.lower().apply(lambda text: _term_hits(text, FEAR_TERMS))
     data["news_hype_score"] = data["title"].astype(str).str.lower().apply(lambda text: _term_hits(text, HYPE_TERMS))
     data["policy_risk_score"] = data["title"].astype(str).str.lower().apply(lambda text: _term_hits(text, POLICY_TERMS))
+    data["source_reliability_score"] = pd.to_numeric(data.get("source_reliability_score", pd.Series(0.62, index=data.index)), errors="coerce").fillna(0.62)
     daily = (
         data.groupby("date")
         .agg(
-            news_count=("title", "size"),
+            news_signal_rows=("title", "size"),
             news_fear_score=("news_fear_score", "mean"),
             news_hype_score=("news_hype_score", "mean"),
             policy_risk_score=("policy_risk_score", "mean"),
+            avg_source_reliability=("source_reliability_score", "mean"),
         )
         .sort_index()
     )
+    daily = all_daily.join(daily, how="left")
+    daily["news_signal_rows"] = pd.to_numeric(daily["news_signal_rows"], errors="coerce").fillna(0)
+    daily["news_count"] = pd.to_numeric(daily["news_count"], errors="coerce").fillna(0)
+    official_ratio = daily["news_official_rows"] / daily["news_count"].replace(0, np.nan)
+    coverage = np.clip(np.log1p(daily["news_signal_rows"]) / np.log1p(8), 0, 1)
+    reliability = pd.to_numeric(daily.get("avg_source_reliability"), errors="coerce").fillna(0.5)
+    daily["news_sentiment_confidence"] = (100 * (0.45 * reliability + 0.35 * official_ratio.fillna(0) + 0.20 * coverage)).round(2)
+    daily = daily.drop(columns=["avg_source_reliability"], errors="ignore")
+    return _reindex_news_daily(daily, index)
+
+
+def _daily_governance_counts(data: pd.DataFrame) -> pd.DataFrame:
+    status = data["governance_status"].fillna("official").astype(str)
+    temp = data.assign(_status=status)
+    rows = []
+    for date, group in temp.groupby("date"):
+        statuses = group["_status"]
+        rows.append(
+            {
+                "date": date,
+                "news_count": int(len(group)),
+                "news_official_rows": int(statuses.eq("official").sum()),
+                "news_pending_rows": int(statuses.str.startswith("pending").sum()),
+                "news_rejected_rows": int(statuses.eq("rejected").sum()),
+            }
+        )
+    return pd.DataFrame(rows).set_index("date").sort_index() if rows else pd.DataFrame()
+
+
+def _reindex_news_daily(daily: pd.DataFrame, index: Iterable[pd.Timestamp]) -> pd.DataFrame:
     full_index = pd.Index(index, name="date")
-    daily = daily.reindex(full_index).fillna({"news_count": 0, "news_fear_score": 0.0, "news_hype_score": 0.0, "policy_risk_score": 0.0})
-    return daily
+    fill_values = {
+        "news_count": 0,
+        "news_signal_rows": 0,
+        "news_official_rows": 0,
+        "news_pending_rows": 0,
+        "news_rejected_rows": 0,
+        "news_fear_score": 0.0,
+        "news_hype_score": 0.0,
+        "policy_risk_score": 0.0,
+        "news_sentiment_confidence": 0.0,
+    }
+    for column, value in fill_values.items():
+        if column not in daily:
+            daily[column] = value
+    return daily.reindex(full_index).fillna(fill_values)
 
 
 def _term_hits(text: str, terms: list[str]) -> float:
