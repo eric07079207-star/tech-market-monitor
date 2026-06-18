@@ -11816,7 +11816,6 @@ date,series,label,value,source,provider_series
 2026-05-26,DGS2,US 2Y Yield,4.01,,
 2026-05-27,DGS2,US 2Y Yield,4.0,,
 2026-05-28,DGS2,US 2Y Yield,3.99,,
-2006-06-17,ICSA,US Initial Jobless Claims,286905.0,DOL,eta539_c3_aggregate
 2006-06-24,ICSA,US Initial Jobless Claims,304172.0,DOL,eta539_c3_aggregate
 2006-07-01,ICSA,US Initial Jobless Claims,417572.0,DOL,eta539_c3_aggregate
 2006-07-08,ICSA,US Initial Jobless Claims,376890.0,DOL,eta539_c3_aggregate
