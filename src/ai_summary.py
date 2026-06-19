@@ -4,6 +4,8 @@ import json
 import os
 import re
 from datetime import datetime, timezone
+from pathlib import Path
+import tomllib
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -248,7 +250,15 @@ def _get_secret(name: str) -> str | None:
         if name in st.secrets:
             return str(st.secrets[name])
     except Exception:
-        return None
+        pass
+    secrets_path = Path(__file__).resolve().parents[1] / ".streamlit" / "secrets.toml"
+    if secrets_path.exists():
+        try:
+            data = tomllib.loads(secrets_path.read_text(encoding="utf-8"))
+            if name in data and data[name] not in {None, ""}:
+                return str(data[name])
+        except Exception:
+            return None
     return None
 
 
