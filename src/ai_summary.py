@@ -17,7 +17,7 @@ from .news import rule_based_news_summary
 
 AI_SUMMARY_CACHE = cache_path("ai_summary.json")
 AI_SUMMARY_HISTORY_CACHE = cache_path("ai_summary_history.parquet")
-AI_SUMMARY_PROMPT_VERSION = "2026-05-19-v2"
+AI_SUMMARY_PROMPT_VERSION = "2026-06-19-v3"
 TAIPEI = ZoneInfo("Asia/Taipei")
 PRESERVE_AI_SUMMARY_HOURS = 72
 
@@ -179,7 +179,16 @@ def openai_configuration_status() -> dict:
 
 def ai_summary_quality(payload: dict) -> dict:
     text = str(payload.get("text", "") or "")
-    required_sections = ["今日市場結論", "量化訊號", "新聞與國際風險", "對持倉影響", "候選觀察股", "明日觀察重點"]
+    required_sections = [
+        "今日市場結論",
+        "與昨日相比",
+        "量化訊號",
+        "新聞與國際風險",
+        "對持倉影響",
+        "候選觀察股",
+        "明日觀察重點",
+        "一句話行動意義",
+    ]
     present = [section for section in required_sections if section in text]
     word_count = len(text)
     used_ai = bool(payload.get("used_ai"))
@@ -338,6 +347,11 @@ def _fallback(
         lines.append("今天以量價與均線結構作為主要判讀依據。")
     lines.append("")
 
+    lines.append("## 與昨日相比")
+    for bullet in _fallback_change_lines(snapshot, anomalies, international_news):
+        lines.append(f"- {bullet}")
+    lines.append("")
+
     lines.append("## 量化訊號")
     if not anomalies.empty:
         top = anomalies[["symbol", "flags"]].head(5)
@@ -368,6 +382,9 @@ def _fallback(
     lines.append("## 明日觀察重點")
     for bullet in _fallback_watchlist(snapshot, anomalies, international_news):
         lines.append(f"- {bullet}")
+    lines.append("")
+    lines.append("## 一句話行動意義")
+    lines.append(_fallback_action_line(snapshot, anomalies, international_news))
     return "\n".join(lines)
 
 
@@ -476,6 +493,45 @@ def _fallback_watchlist(
     return bullets[:3]
 
 
+def _fallback_change_lines(
+    snapshot: pd.DataFrame,
+    anomalies: pd.DataFrame,
+    international_news: pd.DataFrame | None,
+) -> list[str]:
+    bullets: list[str] = []
+    qqq = _snapshot_row(snapshot, "QQQ")
+    smh = _snapshot_row(snapshot, "SMH")
+    vix = _snapshot_row(snapshot, "^VIX")
+    if qqq is not None:
+        bullets.append(f"QQQ 單日變動 {_num(qqq.get('ret_1d')) * 100:.1f}%，20 日報酬 {_num(qqq.get('ret_20d')) * 100:.1f}%")
+    if smh is not None:
+        bullets.append(f"SMH 相對 50DMA {_num(smh.get('dist_ma_50')) * 100:.1f}%，反映半導體相對強弱變化")
+    if vix is not None:
+        bullets.append(f"VIX 單日變動 {_num(vix.get('ret_1d')) * 100:.1f}%，可用來觀察風險偏好是否升降")
+    if not anomalies.empty:
+        bullets.append(f"今日異常主要集中在 {'、'.join(anomalies['symbol'].astype(str).head(3).tolist())}")
+    if international_news is not None and not international_news.empty:
+        bullets.append("國際新聞仍在影響市場風險評價，需確認是否擴散到利率或供應鏈")
+    return bullets[:3] or ["今日與昨日相比沒有明顯結構翻轉，先聚焦量價與波動變化。"]
+
+
+def _fallback_action_line(
+    snapshot: pd.DataFrame,
+    anomalies: pd.DataFrame,
+    international_news: pd.DataFrame | None,
+) -> str:
+    qqq = _snapshot_row(snapshot, "QQQ")
+    qqq_ret = _num(qqq.get("ret_1d")) * 100 if qqq is not None else 0.0
+    anomaly_count = len(anomalies) if anomalies is not None else 0
+    if qqq_ret > 1.5 and anomaly_count <= 3:
+        return "短線仍偏多，但真正要追的是量價延續，不是只看單日上漲。"
+    if qqq_ret < -1.5 or anomaly_count >= 6:
+        return "今天最重要的是風險在擴散，先確認賣壓是否從個股蔓延到整體科技板塊。"
+    if international_news is not None and not international_news.empty:
+        return "今天不必急著改變方向，但要特別確認國際事件是否開始影響資金風險偏好。"
+    return "今天的重點不是預測轉折，而是確認強弱分化是否持續。"
+
+
 def _snapshot_row(snapshot: pd.DataFrame, symbol: str) -> pd.Series | None:
     if snapshot.empty or "symbol" not in snapshot.columns:
         return None
@@ -523,27 +579,61 @@ def _build_summary_prompt(
         .to_dict("records")
         if portfolio_impact is not None and not portfolio_impact.empty else []
     )
+    previous_context = _previous_summary_context()
+    market_change_rows = _market_change_rows(snapshot)
+    anomaly_change_rows = _anomaly_change_rows(anomalies)
+    news_focus_rows = _news_focus_rows(news, international_news, portfolio_impact)
     return f"""
-你是一位謹慎的市場研究助理。請用繁體中文輸出每日科技股監控摘要，避免保證式預測，避免直接叫使用者買賣。
+你是一位謹慎、務實、資訊密度高的市場研究助理。請用繁體中文輸出每日科技股監控摘要，避免保證式預測，避免直接叫使用者買賣。
+
+你的目標不是把新聞重寫一遍，而是回答：
+1. 今天和昨天相比，真正變了什麼？
+2. 哪些變化最值得投資人注意？
+3. 這些變化對持倉、候選股、明日觀察有什麼意義？
+
+請嚴格遵守以下規則：
+- 不要使用空泛句子，例如「留意利率風險」「市場保持觀望」；除非後面立刻接具體證據。
+- 每個段落至少要出現具體標的、數值、事件或新聞主題。
+- 如果今天和昨天差異不大，要明說「差異有限」，但仍要指出最值得注意的1到2個新變化。
+- 不要把長期背景重複當成今日重點，除非今天有新的證據。
+- 對持倉影響請優先排序最值得注意的1到3檔，不要平均分配篇幅。
 
 輸出格式請固定為：
 ## 今日市場結論
-用 2-4 句話說現在偏多、觀望、風險升溫或防守，並說明信心等級。
+先用 2-3 句話直接說明今日市場最重要的變化、目前偏多/觀望/風險升溫/防守，以及信心等級。
+
+## 與昨日相比
+列出 3 點「今天和昨天真正不同」的地方。若差異有限，也要點出最不一樣的1到2項，不要留白。
 
 ## 量化訊號
-列出 3-5 點，連結 QQQ、SMH、VIX、均線、成交量或異常雷達。
+列出 3-5 點，只保留最重要的量化證據。要連結 QQQ、SMH、VIX、均線、成交量或異常雷達，並說明這代表什麼。
 
 ## 新聞與國際風險
-整理消息面線索，特別留意戰爭、貿易談判、出口管制、利率、財報、增發與指引下修。
+整理真正有增量的消息面線索，特別留意戰爭、貿易談判、出口管制、利率、財報、增發與指引下修。不要把舊主題重講成新主題。
 
 ## 對持倉影響
-根據命中的持倉新聞與市場背景，用中性語氣說需要注意哪些持倉。
+只聚焦最值得注意的 1-3 檔持倉。要說明：為什麼是它、是價格/量能/新聞/情緒哪一類風險、目前偏短期噪音還是結構變化。
 
 ## 候選觀察股
-只解讀 Top 5 候選觀察股，說明為什麼值得觀察與主要風險。
+只解讀 Top 5 候選觀察股，優先指出今天新冒出來或排序明顯前進的標的，說明值得觀察的理由與主要風險。
 
 ## 明日觀察重點
-列出 3 點下一個交易日要看的指標或事件。
+列出 3 點下一個交易日最該追蹤的指標、價位、事件或新聞驗證點。
+
+## 一句話行動意義
+用 1 句話總結：今天最值得記住的是什麼。不要空泛。
+
+前一版摘要參考：
+{previous_context}
+
+今日市場變化重點：
+{market_change_rows}
+
+今日異常變化重點：
+{anomaly_change_rows}
+
+今日新聞焦點：
+{news_focus_rows}
 
 市場快照：
 {market}
@@ -588,5 +678,73 @@ def _extract_openai_text(data: dict) -> str:
 def _is_complete_summary(text: str) -> bool:
     if len(text.strip()) < 350:
         return False
-    required = ["今日市場結論", "量化訊號", "新聞與國際風險", "明日觀察重點"]
+    required = ["今日市場結論", "與昨日相比", "量化訊號", "新聞與國際風險", "明日觀察重點", "一句話行動意義"]
     return all(section in text for section in required)
+
+
+def _previous_summary_context() -> str:
+    history = load_ai_summary_history()
+    if history.empty or "text" not in history.columns:
+        return "無前一日摘要可供對照。"
+    frame = history.copy()
+    if "generated_at_utc" in frame.columns:
+        frame["generated_at_utc"] = pd.to_datetime(frame["generated_at_utc"], errors="coerce", utc=True)
+        frame = frame.sort_values("generated_at_utc")
+    if len(frame) < 1:
+        return "無前一日摘要可供對照。"
+    previous = frame.iloc[-1]
+    summary_date = str(previous.get("summary_date", "n/a"))
+    text = re.sub(r"\s+", " ", str(previous.get("text", "") or "")).strip()
+    snippet = text[:420] + ("..." if len(text) > 420 else "")
+    return f"{summary_date}：{snippet}" if snippet else f"{summary_date}：無內容"
+
+
+def _market_change_rows(snapshot: pd.DataFrame) -> list[dict]:
+    focus = ["QQQ", "SMH", "SOXX", "IGV", "IYW", "XLK", "^VIX", "NVDA", "AMD", "MSFT", "META", "TSLA"]
+    rows: list[dict] = []
+    if snapshot.empty or "symbol" not in snapshot.columns:
+        return rows
+    for symbol in focus:
+        matched = snapshot[snapshot["symbol"].astype(str).eq(symbol)]
+        if matched.empty:
+            continue
+        row = matched.iloc[0]
+        rows.append(
+            {
+                "symbol": symbol,
+                "ret_1d": round(_num(row.get("ret_1d")) * 100, 2),
+                "ret_20d": round(_num(row.get("ret_20d")) * 100, 2),
+                "dist_ma_50": round(_num(row.get("dist_ma_50")) * 100, 2),
+                "dist_ma_200": round(_num(row.get("dist_ma_200")) * 100, 2),
+                "volume_ratio_20d": round(_num(row.get("volume_ratio_20d")), 2),
+            }
+        )
+    return rows
+
+
+def _anomaly_change_rows(anomalies: pd.DataFrame) -> list[dict]:
+    if anomalies.empty:
+        return []
+    cols = [col for col in ["symbol", "flags", "ret_1d", "volume_ratio_20d", "dist_ma_50", "dist_ma_200"] if col in anomalies.columns]
+    return anomalies[cols].head(10).to_dict("records")
+
+
+def _news_focus_rows(
+    news: pd.DataFrame,
+    international_news: pd.DataFrame | None,
+    portfolio_impact: pd.DataFrame | None,
+) -> dict:
+    result: dict[str, list[dict]] = {"watchlist": [], "international": [], "portfolio": []}
+    if news is not None and not news.empty:
+        cols = [col for col in ["symbol", "title", "source", "tags", "published"] if col in news.columns]
+        result["watchlist"] = news[cols].head(8).to_dict("records")
+    if international_news is not None and not international_news.empty:
+        cols = [col for col in ["title", "source", "tags", "is_major", "published"] if col in international_news.columns]
+        major = international_news.copy()
+        if "is_major" in major.columns:
+            major = major[major["is_major"].fillna(False)]
+        result["international"] = (major if not major.empty else international_news)[cols].head(5).to_dict("records")
+    if portfolio_impact is not None and not portfolio_impact.empty:
+        cols = [col for col in ["ticker", "impact_level", "impact", "headline_count", "sample_headline"] if col in portfolio_impact.columns]
+        result["portfolio"] = portfolio_impact[cols].head(5).to_dict("records")
+    return result
