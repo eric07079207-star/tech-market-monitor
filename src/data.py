@@ -356,13 +356,10 @@ def _merge_macro_frames(previous: pd.DataFrame, frames: list[pd.DataFrame]) -> p
 
     for series_id in sorted(candidate_series):
         new_slice = combined_new[combined_new["series"] == series_id].copy() if not combined_new.empty else pd.DataFrame()
-        if not new_slice.empty:
-            pieces.append(new_slice)
-            continue
-        if not previous.empty and "series" in previous:
-            old_slice = previous[previous["series"] == series_id].copy()
-            if not old_slice.empty:
-                pieces.append(old_slice)
+        old_slice = previous[previous["series"] == series_id].copy() if not previous.empty and "series" in previous else pd.DataFrame()
+        merged_slice = _merge_macro_series_slice(new_slice, old_slice)
+        if not merged_slice.empty:
+            pieces.append(merged_slice)
 
     if not pieces:
         return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
@@ -373,6 +370,24 @@ def _merge_macro_frames(previous: pd.DataFrame, frames: list[pd.DataFrame]) -> p
         merged["provider_series"] = merged["series"]
     merged = merged.drop_duplicates(subset=["series", "date"], keep="last").sort_values(["series", "date"]).reset_index(drop=True)
     return merged
+
+
+def _merge_macro_series_slice(new_slice: pd.DataFrame, old_slice: pd.DataFrame) -> pd.DataFrame:
+    if new_slice.empty:
+        return old_slice
+    if old_slice.empty:
+        return new_slice
+
+    new_slice = new_slice.copy()
+    old_slice = old_slice.copy()
+    if "date" in new_slice:
+        new_slice["date"] = pd.to_datetime(new_slice["date"], errors="coerce")
+    if "date" in old_slice:
+        old_slice["date"] = pd.to_datetime(old_slice["date"], errors="coerce")
+
+    merged = pd.concat([old_slice, new_slice], ignore_index=True)
+    merged = merged.drop_duplicates(subset=["series", "date"], keep="last")
+    return merged.sort_values(["series", "date"]).reset_index(drop=True)
 
 
 def refresh_market_data(start: date | str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
