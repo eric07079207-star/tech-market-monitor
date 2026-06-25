@@ -12858,6 +12858,7 @@ date,series,label,value,source,provider_series
 2026-05-23,ICSA,US Initial Jobless Claims,185894.0,DOL,eta539_c3_aggregate
 2026-05-30,ICSA,US Initial Jobless Claims,228433.0,DOL,eta539_c3_aggregate
 2026-06-06,ICSA,US Initial Jobless Claims,220094.0,DOL,eta539_c3_aggregate
+2026-06-13,ICSA,US Initial Jobless Claims,204969.0,DOL,eta539_c3_aggregate
 2006-06-02,NFCI,Chicago Fed NFCI,-0.568,,
 2006-06-09,NFCI,Chicago Fed NFCI,-0.554,,
 2006-06-16,NFCI,Chicago Fed NFCI,-0.542,,
@@ -14144,6 +14145,7 @@ date,series,label,value,source,provider_series
 2026-02-01,PCEPI,US PCE YoY,2.9,BEA,bea_pce_yoy_page
 2026-03-01,PCEPI,US PCE YoY,3.5,BEA,bea_pce_yoy_page
 2026-04-01,PCEPI,US PCE YoY,3.8,BEA,bea_pce_yoy_page
+2026-05-01,PCEPI,US PCE YoY,4.1,BEA,bea_pce_yoy_page
 2006-05-30,T10Y2Y,10Y-2Y Curve,0.1,,
 2006-05-31,T10Y2Y,10Y-2Y Curve,0.08,,
 2006-06-01,T10Y2Y,10Y-2Y Curve,0.07,,
