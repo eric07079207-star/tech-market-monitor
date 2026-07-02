@@ -12859,6 +12859,7 @@ date,series,label,value,source,provider_series
 2026-05-30,ICSA,US Initial Jobless Claims,228433.0,DOL,eta539_c3_aggregate
 2026-06-06,ICSA,US Initial Jobless Claims,220094.0,DOL,eta539_c3_aggregate
 2026-06-13,ICSA,US Initial Jobless Claims,207532.0,DOL,eta539_c3_aggregate
+2026-06-20,ICSA,US Initial Jobless Claims,197908.0,DOL,eta539_c3_aggregate
 2006-06-02,NFCI,Chicago Fed NFCI,-0.568,,
 2006-06-09,NFCI,Chicago Fed NFCI,-0.554,,
 2006-06-16,NFCI,Chicago Fed NFCI,-0.542,,
@@ -14139,8 +14140,9 @@ date,series,label,value,source,provider_series
 2026-01-01,PAYEMS,US Nonfarm Payrolls,158592.0,BLS,CES0000000001
 2026-02-01,PAYEMS,US Nonfarm Payrolls,158436.0,BLS,CES0000000001
 2026-03-01,PAYEMS,US Nonfarm Payrolls,158650.0,BLS,CES0000000001
-2026-04-01,PAYEMS,US Nonfarm Payrolls,158829.0,BLS,CES0000000001
-2026-05-01,PAYEMS,US Nonfarm Payrolls,159001.0,BLS,CES0000000001
+2026-04-01,PAYEMS,US Nonfarm Payrolls,158798.0,BLS,CES0000000001
+2026-05-01,PAYEMS,US Nonfarm Payrolls,158927.0,BLS,CES0000000001
+2026-06-01,PAYEMS,US Nonfarm Payrolls,158984.0,BLS,CES0000000001
 2026-01-01,PCEPI,US PCE YoY,2.9,BEA,bea_pce_yoy_page
 2026-02-01,PCEPI,US PCE YoY,2.9,BEA,bea_pce_yoy_page
 2026-03-01,PCEPI,US PCE YoY,3.5,BEA,bea_pce_yoy_page
@@ -19388,3 +19390,4 @@ date,series,label,value,source,provider_series
 2026-03-01,UNRATE,US Unemployment Rate,4.3,BLS,LNS14000000
 2026-04-01,UNRATE,US Unemployment Rate,4.3,BLS,LNS14000000
 2026-05-01,UNRATE,US Unemployment Rate,4.3,BLS,LNS14000000
+2026-06-01,UNRATE,US Unemployment Rate,4.2,BLS,LNS14000000
