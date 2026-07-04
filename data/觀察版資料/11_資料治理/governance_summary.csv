@@ -1,5 +1,5 @@
 dataset,rows,official,pending_short,pending_medium,pending_long,rejected,garbage_rows,duplicate_rows,top_reasons
-watchlist_news,118,118,0,0,0,0,0,0,passed_basic_checks:118
-international_news,34,34,0,0,0,0,0,0,passed_basic_checks:34
+watchlist_news,120,120,0,0,0,0,0,0,passed_basic_checks:120
+international_news,35,35,0,0,0,0,0,0,passed_basic_checks:35
 discovery_news,35,35,0,0,0,0,0,0,passed_basic_checks:35
-tsla_keyword_news,47,47,0,0,0,0,0,0,passed_basic_checks:47
+tsla_keyword_news,48,48,0,0,0,0,0,0,passed_basic_checks:48
