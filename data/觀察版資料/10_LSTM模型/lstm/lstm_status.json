@@ -1,7 +1,7 @@
 {
   "enabled": true,
-  "mode": "train",
-  "status": "已訓練完成，驗證準確率 67.57%，測試準確率 47.37%",
+  "mode": "scaffold",
+  "status": "已接上特徵表",
   "model_version": "lstm-direction-v1",
   "feature_version": "lstm-demo-v1",
   "horizon_days": 20,
@@ -11,6 +11,6 @@
   "last_backtest_at_utc": "2026-07-07T00:09:54+00:00",
   "prediction_rows": 1,
   "backtest_rows": 38,
-  "feature_rows": 247,
-  "updated_at_utc": "2026-07-07T00:09:54+00:00"
+  "feature_rows": 69,
+  "updated_at_utc": "2026-07-07T03:24:20+00:00"
 }
