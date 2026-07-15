@@ -64,6 +64,7 @@ def main() -> None:
     OBS_DIR.mkdir(parents=True, exist_ok=True)
     for folder in sorted({item.folder for item in EXPORTS}):
         (OBS_DIR / folder).mkdir(parents=True, exist_ok=True)
+    (OBS_DIR / "13_專案記憶").mkdir(parents=True, exist_ok=True)
 
     cache_updated_at = _cache_updated_at()
     manifest_rows = []
@@ -199,6 +200,18 @@ def _write_readme(manifest: pd.DataFrame) -> None:
         for row in subset.itertuples(index=False):
             lines.append(f"- {row.資料名稱}：{row.說明}")
         lines.append("")
+    lines.extend(
+        [
+            "### 13_專案記憶",
+            "- 專案長期記憶：長期有效的目標、規則、架構與已確認原則。",
+            "- 討論摘要：重要討論主題、結論與執行狀態。",
+            "- 當前上下文：目前版本重點、已知風險與下一步。",
+            "- 決策登錄：已確認決策的結構化記錄。",
+            "- 記憶更新紀錄：專案記憶何時被更新、為什麼更新。",
+            "- Word 摘要：提供人工檢查用的可讀版本。",
+            "",
+        ]
+    )
     lines.extend(
         [
             "## 使用方式",

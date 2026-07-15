@@ -94,6 +94,25 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
             ]
         )
 try:
+    from src.project_memory import MEMORY_DOCX_FILE, load_memory_bundle
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    from pathlib import Path
+
+    MEMORY_DOCX_FILE = Path("data/觀察版資料/13_專案記憶/專案記憶與討論摘要.docx")
+
+    def load_memory_bundle():
+        class _FallbackMemoryBundle:
+            project_memory = "專案記憶模組同步中。"
+            conversation_log = "討論摘要模組同步中。"
+            active_context = "當前上下文模組同步中。"
+            decision_register = pd.DataFrame()
+            memory_changelog = pd.DataFrame()
+            status_table = pd.DataFrame([{"項目": "專案記憶", "數值": "同步中", "說明": "等待雲端部署完成"}])
+            latest_updates = pd.DataFrame()
+            directory = Path("data/觀察版資料/13_專案記憶")
+
+        return _FallbackMemoryBundle()
+try:
     from src.health import data_health_report, missing_price_symbols
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def data_health_report(*args, **kwargs) -> pd.DataFrame:
@@ -369,6 +388,11 @@ def load_market_event_windows() -> pd.DataFrame:
         if column in data:
             data[column] = pd.to_datetime(data[column], errors="coerce")
     return data
+
+
+@st.cache_data(show_spinner=False, ttl=60 * 10)
+def load_project_memory_data():
+    return load_memory_bundle()
 
 
 @st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
@@ -728,8 +752,10 @@ if show_health:
     else:
         st.success("主要追蹤標的價格資料完整。")
 
-tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_focus, tab_kg, tab_charts, tab_portfolio = st.tabs(
-    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "重點個股追蹤", "金融知識圖譜", "走勢圖", "我的持倉"]
+project_memory = load_project_memory_data()
+
+tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_focus, tab_kg, tab_memory, tab_charts, tab_portfolio = st.tabs(
+    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "重點個股追蹤", "金融知識圖譜", "專案記憶", "走勢圖", "我的持倉"]
 )
 
 with tab_overview:
@@ -1505,6 +1531,72 @@ with tab_kg:
                     "量能比": st.column_config.NumberColumn(format="%.2fx"),
                     "影響排名": st.column_config.NumberColumn(format="%.2f"),
                 },
+            )
+
+with tab_memory:
+    st.subheader("專案記憶 / 討論摘要")
+    st.caption("這一頁用來保存長期有效的專案上下文，避免聊天壓縮後遺失已確認的規則、決策與討論結論。")
+
+    status_left, status_right = st.columns([1, 1.3])
+    with status_left:
+        st.markdown("#### 記憶狀態")
+        st.dataframe(project_memory.status_table, hide_index=True, width="stretch")
+        if MEMORY_DOCX_FILE.exists():
+            st.success("Word 摘要已產生，可直接在資料夾中查看。")
+        else:
+            st.warning("Word 摘要尚未產生或尚未同步。")
+        st.caption(f"記憶資料夾：{project_memory.directory}")
+    with status_right:
+        st.markdown("#### 最近更新")
+        if project_memory.latest_updates.empty:
+            st.info("目前尚未載入更新紀錄。")
+        else:
+            st.dataframe(project_memory.latest_updates, hide_index=True, width="stretch")
+
+    mem_tab1, mem_tab2, mem_tab3, mem_tab4 = st.tabs(["長期記憶", "重要討論", "當前上下文", "決策與變更"])
+    with mem_tab1:
+        st.markdown(project_memory.project_memory or "目前沒有長期記憶內容。")
+    with mem_tab2:
+        st.markdown(project_memory.conversation_log or "目前沒有討論摘要內容。")
+    with mem_tab3:
+        st.markdown(project_memory.active_context or "目前沒有當前上下文內容。")
+    with mem_tab4:
+        st.markdown("#### 決策登錄")
+        if project_memory.decision_register.empty:
+            st.info("目前沒有決策登錄資料。")
+        else:
+            st.dataframe(
+                project_memory.decision_register.rename(
+                    columns={
+                        "decision_id": "編號",
+                        "date": "日期",
+                        "status": "狀態",
+                        "category": "類別",
+                        "title": "標題",
+                        "decision": "決策",
+                        "reason": "原因",
+                        "impact_scope": "影響範圍",
+                        "superseded_by": "被取代",
+                    }
+                ),
+                hide_index=True,
+                width="stretch",
+            )
+        st.markdown("#### 記憶更新紀錄")
+        if project_memory.memory_changelog.empty:
+            st.info("目前沒有記憶更新紀錄。")
+        else:
+            st.dataframe(
+                project_memory.memory_changelog.rename(
+                    columns={
+                        "date": "日期",
+                        "change_summary": "更新內容",
+                        "reason": "原因",
+                        "source": "來源",
+                    }
+                ),
+                hide_index=True,
+                width="stretch",
             )
 
 with tab_charts:
