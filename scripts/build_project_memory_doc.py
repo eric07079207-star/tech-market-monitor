@@ -109,6 +109,17 @@ def add_dataframe_table(doc: Document, title: str, rows) -> None:
 def archive_previous_docx(path: Path) -> None:
     if not path.exists():
         return
+    source_files = [
+        PROJECT_MEMORY_FILE,
+        CONVERSATION_LOG_FILE,
+        ACTIVE_CONTEXT_FILE,
+        DECISION_REGISTER_FILE,
+        MEMORY_CHANGELOG_FILE,
+    ]
+    # Routine checks may rebuild the Word view frequently. Archive only when
+    # the underlying memory content changed, preventing archive-file growth.
+    if not any(source.exists() and source.stat().st_mtime > path.stat().st_mtime for source in source_files):
+        return
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     archive_path = MEMORY_ARCHIVE_DIR / f"專案記憶與討論摘要_{stamp}.docx"
     shutil.copy2(path, archive_path)
