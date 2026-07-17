@@ -12,5 +12,17 @@
   "prediction_rows": 1,
   "backtest_rows": 38,
   "feature_rows": 71,
-  "updated_at_utc": "2026-07-17T08:14:14+00:00"
+  "train_feature_rows": 71,
+  "monitor_feature_rows": 3,
+  "train_rows": 172,
+  "valid_rows": 37,
+  "test_rows": 38,
+  "backtest_accuracy": 0.5789473684210527,
+  "prediction_confidence": 0.06091433763504028,
+  "prediction_confidence_level": "低信心",
+  "prediction_date": "2026-06-15 00:00:00+00:00",
+  "prediction_target_date": "2026-07-15 00:00:00+00:00",
+  "prediction_target_date_type": "estimated",
+  "monitor_updated_at_utc": "2026-07-17T13:59:35+00:00",
+  "updated_at_utc": "2026-07-17T13:59:35+00:00"
 }
