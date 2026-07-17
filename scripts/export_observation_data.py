@@ -48,7 +48,8 @@ EXPORTS = [
     ExportItem("update_modules.csv", "11_資料治理", "更新模組紀錄", "每個更新模組的 success、fallback 或 failed 狀態與原因。"),
     ExportItem("sentiment.parquet", "12_市場情緒", "市場情緒層", "VIX、信用利差、相對強弱與新聞情緒的日度特徵。"),
     ExportItem("market_event_windows.parquet", "12_市場情緒", "大盤事件窗", "VOO/QQQ 在 20 個交易日內波動超過 10% 的歷史事件樣本。"),
-    ExportItem("lstm/lstm_features.parquet", "10_LSTM模型", "LSTM特徵表", "LSTM 訓練與回測使用的序列特徵表。"),
+    ExportItem("lstm/lstm_train_features.parquet", "10_LSTM模型", "LSTM訓練特徵表", "需要未來報酬標籤的 LSTM 訓練與回測序列特徵。"),
+    ExportItem("lstm/lstm_monitor_features.parquet", "10_LSTM模型", "LSTM日常監控特徵表", "不等待未來報酬標籤的每日即時推論特徵。"),
     ExportItem("lstm/lstm_split.parquet", "10_LSTM模型", "LSTM切分表", "LSTM 訓練/驗證/測試切分。"),
     ExportItem("lstm/lstm_predictions.parquet", "10_LSTM模型", "LSTM最新預測", "LSTM 每次更新產生的最新預測結果。"),
     ExportItem("lstm/lstm_backtest.parquet", "10_LSTM模型", "LSTM回測", "LSTM 歷史回測與驗證紀錄。"),
@@ -134,6 +135,7 @@ def main() -> None:
 
     manifest = pd.DataFrame(manifest_rows)
     manifest.to_csv(OBS_DIR / "00_資料說明" / "資料清單.csv", index=False)
+    _write_governance_readable_exports()
     _write_readme(manifest)
     print(f"exported observation data to {OBS_DIR}")
 
@@ -227,6 +229,85 @@ def _write_readme(manifest: pd.DataFrame) -> None:
         ]
     )
     (OBS_DIR / "README.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _write_governance_readable_exports() -> None:
+    governance_dir = OBS_DIR / "11_資料治理"
+    governance_dir.mkdir(parents=True, exist_ok=True)
+
+    governance_path = CACHE_DIR / "governance_summary.parquet"
+    if governance_path.exists():
+        governance = pd.read_parquet(governance_path).rename(
+            columns={
+                "dataset": "資料流",
+                "rows": "總筆數",
+                "official": "正式保留",
+                "pending_short": "短期待確認",
+                "pending_medium": "中期待確認",
+                "pending_long": "長期待確認",
+                "rejected": "拒收",
+                "garbage_rows": "垃圾訊息",
+                "duplicate_rows": "重複資料",
+                "top_reasons": "主要原因",
+            }
+        )
+        governance["資料流"] = governance["資料流"].replace(
+            {
+                "watchlist_news": "標的新聞",
+                "international_news": "國際新聞",
+                "discovery_news": "探索新聞",
+                "tsla_keyword_news": "TSLA 專題新聞",
+            }
+        )
+        governance.to_csv(governance_dir / "資料治理摘要_中文版.csv", index=False, encoding="utf-8-sig")
+        summary_lines = ["資料治理摘要（中文）", ""]
+        for row in governance.to_dict(orient="records"):
+            summary_lines.append(
+                f"{row['資料流']}：總筆數 {row['總筆數']}，正式保留 {row['正式保留']}，短期待確認 {row['短期待確認']}，"
+                f"中期待確認 {row['中期待確認']}，長期待確認 {row['長期待確認']}，拒收 {row['拒收']}，"
+                f"垃圾訊息 {row['垃圾訊息']}，重複資料 {row['重複資料']}，主要原因 {row['主要原因']}"
+            )
+        (governance_dir / "資料治理摘要_中文版.txt").write_text("\n".join(summary_lines), encoding="utf-8")
+
+    update_runs_path = CACHE_DIR / "update_runs.csv"
+    if update_runs_path.exists():
+        update_runs = pd.read_csv(update_runs_path).rename(
+            columns={
+                "run_id": "執行編號",
+                "started_at_utc": "開始時間UTC",
+                "finished_at_utc": "結束時間UTC",
+                "status": "整體狀態",
+                "success_count": "成功模組數",
+                "fallback_count": "保護回退數",
+                "failure_count": "失敗模組數",
+                "failed_modules": "失敗模組",
+            }
+        )
+        update_runs["整體狀態"] = update_runs["整體狀態"].replace(
+            {"success": "成功", "partial": "部分保護", "failed": "失敗"}
+        )
+        update_runs.to_csv(governance_dir / "更新執行紀錄_中文版.csv", index=False, encoding="utf-8-sig")
+
+    update_modules_path = CACHE_DIR / "update_modules.csv"
+    if update_modules_path.exists():
+        update_modules = pd.read_csv(update_modules_path).rename(
+            columns={
+                "run_id": "執行編號",
+                "module_name": "模組名稱",
+                "category": "分類",
+                "status": "狀態",
+                "critical": "是否關鍵",
+                "rows": "筆數",
+                "latest_value": "最新資料值",
+                "message": "訊息",
+                "finished_at_utc": "完成時間UTC",
+            }
+        )
+        update_modules["狀態"] = update_modules["狀態"].replace(
+            {"success": "成功", "fallback": "回退保護", "failed": "失敗"}
+        )
+        update_modules["是否關鍵"] = update_modules["是否關鍵"].replace({True: "是", False: "否"})
+        update_modules.to_csv(governance_dir / "更新模組紀錄_中文版.csv", index=False, encoding="utf-8-sig")
 
 
 if __name__ == "__main__":

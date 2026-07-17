@@ -131,7 +131,7 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
     def summarize_quality_frame(data: pd.DataFrame, score_column: str = "quality_score") -> dict:
         return {"rows": 0, "avg_quality": np.nan, "median_quality": np.nan, "low_quality_rows": 0, "unique_sources": 0, "dup_ratio": np.nan}
 try:
-    from src.lstm import build_lstm_status_from_artifacts, load_lstm_status, summarize_lstm_status
+    from src.lstm import build_lstm_status_from_artifacts, load_lstm_backtest, load_lstm_predictions, load_lstm_status, summarize_lstm_status
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def load_lstm_status(path=None) -> dict:
         return {
@@ -148,7 +148,13 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
             "updated_at_utc": "",
         }
 
-    def build_lstm_status_from_artifacts(predictions: pd.DataFrame | None = None, backtest: pd.DataFrame | None = None) -> dict:
+    def load_lstm_predictions(path=None) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def load_lstm_backtest(path=None) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def build_lstm_status_from_artifacts(*args, **kwargs) -> dict:
         return load_lstm_status()
 
     def summarize_lstm_status(status: dict) -> pd.DataFrame:
@@ -416,6 +422,20 @@ def pct(value: float | int | None) -> str:
     return f"{value:.1%}"
 
 
+def _display_utc(value: object) -> str:
+    if value in {None, "", "n/a"}:
+        return "n/a"
+    parsed = pd.to_datetime(value, errors="coerce", utc=True)
+    return "n/a" if pd.isna(parsed) else parsed.strftime("%m-%d %H:%M UTC")
+
+
+def _display_date(value: object) -> str:
+    if value in {None, "", "n/a"}:
+        return "n/a"
+    parsed = pd.to_datetime(value, errors="coerce")
+    return "n/a" if pd.isna(parsed) else parsed.strftime("%Y-%m-%d")
+
+
 def num(value: float | int | None, digits: int = 2) -> str:
     if value is None or pd.isna(value):
         return "n/a"
@@ -543,6 +563,32 @@ def build_health_report(
     return data_health_report(**{name: health_inputs[name] for name in supported})
 
 
+def pipeline_status_explainer(metadata: dict) -> tuple[str, str]:
+    status = str(metadata.get("pipeline_status", "") or "")
+    success_count = int(metadata.get("pipeline_success_count", 0) or 0)
+    fallback_count = int(metadata.get("pipeline_fallback_count", 0) or 0)
+    failure_count = int(metadata.get("pipeline_failure_count", 0) or 0)
+
+    if status == "success":
+        return (
+            "success",
+            f"本輪更新正常完成，{success_count} 個模組已更新，沒有啟用保護或失敗模組。",
+        )
+    if status == "partial" and fallback_count > 0 and failure_count == 0:
+        return (
+            "info",
+            "本輪有部分來源較慢，但系統已自動保留較新的舊快取，資料沒有倒退，整體仍可正常閱讀。",
+        )
+    if status == "partial":
+        return (
+            "warning",
+            f"本輪更新有部分模組需要留意：成功 {success_count}、保護 {fallback_count}、失敗 {failure_count}。",
+        )
+    if status == "failed":
+        return ("error", "本輪更新失敗，前台目前顯示的是先前快取，建議優先檢查更新流程。")
+    return ("warning", "目前無法完整判讀這輪更新狀態，前台先顯示現有快取資料。")
+
+
 def _news_keywords_path():
     return cache_path("news_keywords.txt")
 
@@ -652,6 +698,8 @@ market_prediction = build_market_prediction(regime, conclusion, snapshot)
 prediction_log = load_prediction_log()
 annual_picks = annual_picks_table(prices)
 lstm_status = build_lstm_status_from_artifacts()
+lstm_predictions = load_lstm_predictions()
+lstm_backtest = load_lstm_backtest()
 active_news_keywords = load_news_keywords()
 keyword_discovery_news = tsla_keyword_news.copy()
 tsla_keyword_summary = summarize_keyword_news(keyword_discovery_news, "TSLA")
@@ -709,6 +757,8 @@ for card_col, card in zip(card_cols, conclusion_cards(regime, conclusion, market
 
 if show_health:
     st.subheader("資料健康檢查")
+    health_level, health_message = pipeline_status_explainer(metadata)
+    getattr(st, health_level)(health_message)
     st.dataframe(
         build_health_report(
             prices,
@@ -1178,6 +1228,32 @@ with tab_news:
 with tab_prediction:
     st.subheader("市場預測驗證")
     st.caption(f"LSTM 狀態：{lstm_status.get('status', 'n/a')}｜模式：{lstm_status.get('mode', 'n/a')}｜模型版本：{lstm_status.get('model_version', 'n/a')}")
+    st.markdown("#### LSTM 即時方向預測")
+    lstm_cols = st.columns(6)
+    lstm_cols[0].metric("模型訓練時間", _display_utc(lstm_status.get("last_train_at_utc")))
+    lstm_cols[1].metric("預測生成時間", _display_utc(lstm_status.get("last_predict_at_utc")))
+    lstm_cols[2].metric("預測目標日", _display_date(lstm_status.get("prediction_target_date")))
+    lstm_cols[3].metric("訓練/驗證/測試", f"{lstm_status.get('train_rows', 0)}/{lstm_status.get('valid_rows', 0)}/{lstm_status.get('test_rows', 0)}")
+    lstm_cols[4].metric("回測正確率", pct(lstm_status.get("backtest_accuracy")))
+    lstm_cols[5].metric("信心等級", str(lstm_status.get("prediction_confidence_level", "低信心")))
+    if lstm_predictions.empty:
+        st.info("目前沒有即時推論列；下一次模型訓練完成後會產生。")
+    else:
+        current = lstm_predictions.copy()
+        display_columns = [column for column in ["symbol", "prediction_date", "target_date", "target_date_type", "predicted_prob_up", "prediction_direction", "prediction_type"] if column in current]
+        st.dataframe(
+            current[display_columns].rename(
+                columns={
+                    "symbol": "標的", "prediction_date": "預測日", "target_date": "目標日（估計）",
+                    "target_date_type": "目標日類型", "predicted_prob_up": "上漲機率",
+                    "prediction_direction": "方向", "prediction_type": "推論類型",
+                }
+            ),
+            hide_index=True,
+            width="stretch",
+            column_config={"上漲機率": st.column_config.NumberColumn(format="%.2%")},
+        )
+        st.caption("即時推論不等待未來報酬標籤；目標日是依交易日推估，待期滿後才會進入回測驗證。")
     scorecard = prediction_scorecard(prediction_log)
     score_cols = st.columns(5)
     score_cols[0].metric("已驗證樣本", f"{scorecard['validated']}")

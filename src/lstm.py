@@ -15,7 +15,11 @@ from .indicators import add_price_indicators
 
 LSTM_DIR = cache_path("lstm")
 LSTM_STATUS_CACHE = LSTM_DIR / "lstm_status.json"
-LSTM_FEATURE_CACHE = LSTM_DIR / "lstm_features.parquet"
+LSTM_TRAIN_FEATURE_CACHE = LSTM_DIR / "lstm_train_features.parquet"
+LSTM_MONITOR_FEATURE_CACHE = LSTM_DIR / "lstm_monitor_features.parquet"
+LSTM_LEGACY_FEATURE_CACHE = LSTM_DIR / "lstm_features.parquet"
+# Backward-compatible alias for older local tools. Training now writes the explicit train file.
+LSTM_FEATURE_CACHE = LSTM_TRAIN_FEATURE_CACHE
 LSTM_SPLIT_CACHE = LSTM_DIR / "lstm_split.parquet"
 LSTM_PREDICTIONS_CACHE = LSTM_DIR / "lstm_predictions.parquet"
 LSTM_BACKTEST_CACHE = LSTM_DIR / "lstm_backtest.parquet"
@@ -90,13 +94,28 @@ def default_lstm_status() -> dict:
         "prediction_rows": 0,
         "backtest_rows": 0,
         "feature_rows": 0,
+        "train_feature_rows": 0,
+        "monitor_feature_rows": 0,
+        "train_rows": 0,
+        "valid_rows": 0,
+        "test_rows": 0,
+        "backtest_accuracy": None,
+        "prediction_confidence": None,
+        "prediction_confidence_level": "低信心",
+        "prediction_date": "",
+        "prediction_target_date": "",
+        "prediction_target_date_type": "estimated",
+        "monitor_updated_at_utc": "",
         "updated_at_utc": now,
     }
 
 
 def load_lstm_artifacts() -> dict[str, pd.DataFrame | dict]:
+    train_features = _load_train_features()
     return {
-        "features": _read_dataframe(LSTM_FEATURE_CACHE),
+        "features": train_features,
+        "train_features": train_features,
+        "monitor_features": _read_dataframe(LSTM_MONITOR_FEATURE_CACHE),
         "split": _read_dataframe(LSTM_SPLIT_CACHE),
         "predictions": _read_dataframe(LSTM_PREDICTIONS_CACHE),
         "backtest": _read_dataframe(LSTM_BACKTEST_CACHE),
@@ -184,6 +203,59 @@ def build_lstm_feature_table(
     return features.sort_values(["symbol", "date"]).reset_index(drop=True)
 
 
+def build_lstm_monitor_feature_table(
+    prices: pd.DataFrame | None = None,
+    symbols: list[str] | None = None,
+    target_horizon_days: int = LSTM_TARGET_HORIZON_DAYS,
+    sequence_length: int = LSTM_SEQUENCE_LENGTH,
+) -> pd.DataFrame:
+    """Build current inference rows without requiring a known future return."""
+    prices = prices.copy() if prices is not None else _load_prices()
+    if prices.empty:
+        return _empty_monitor_feature_table()
+    symbols = symbols or LSTM_DEFAULT_SYMBOLS
+    source = prices[prices["symbol"].astype(str).isin(symbols)].copy()
+    if source.empty:
+        return _empty_monitor_feature_table()
+    indicators = add_price_indicators(source)
+    if indicators.empty:
+        return _empty_monitor_feature_table()
+    indicators["date"] = pd.to_datetime(indicators["date"], errors="coerce")
+    indicators = indicators.dropna(subset=["date"]).sort_values(["symbol", "date"]).reset_index(drop=True)
+    wide = indicators.pivot_table(index="date", columns="symbol", values="close", aggfunc="last").sort_index().ffill()
+    wide.columns = [str(col) for col in wide.columns]
+    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    rows = []
+    for symbol, group in indicators.groupby("symbol", sort=False):
+        data = group.sort_values("date").reset_index(drop=True)
+        if len(data) < sequence_length:
+            continue
+        window = data.iloc[-sequence_length:]
+        if window[BASE_FEATURE_COLUMNS].isna().all(axis=None):
+            continue
+        seq = _sequence_features(window, wide, str(symbol))
+        current = data.iloc[-1]
+        current_date = pd.to_datetime(current["date"], utc=True)
+        if seq is None or pd.isna(current.get("close")):
+            continue
+        target_date = current_date + pd.offsets.BDay(target_horizon_days)
+        rows.append(
+            {
+                "symbol": str(symbol),
+                "prediction_date": current_date,
+                "target_date": target_date,
+                "target_date_type": "estimated",
+                "horizon_days": int(target_horizon_days),
+                "sequence_length": int(sequence_length),
+                "current_close": float(current["close"]),
+                "feature_version": LSTM_FEATURE_VERSION,
+                "created_at_utc": created_at,
+                "sequence_json": json.dumps(seq, ensure_ascii=False),
+            }
+        )
+    return pd.DataFrame(rows) if rows else _empty_monitor_feature_table()
+
+
 def save_lstm_feature_table(features: pd.DataFrame, path: Path | None = None) -> Path:
     path = path or LSTM_FEATURE_CACHE
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -220,22 +292,41 @@ def build_lstm_status_from_artifacts(
     predictions: pd.DataFrame | None = None,
     backtest: pd.DataFrame | None = None,
     features: pd.DataFrame | None = None,
+    monitor_features: pd.DataFrame | None = None,
 ) -> dict:
     predictions = predictions if predictions is not None else _read_dataframe(LSTM_PREDICTIONS_CACHE)
     backtest = backtest if backtest is not None else _read_dataframe(LSTM_BACKTEST_CACHE)
-    features = features if features is not None else _read_dataframe(LSTM_FEATURE_CACHE)
-    status = default_lstm_status()
+    features = features if features is not None else _load_train_features()
+    monitor_features = monitor_features if monitor_features is not None else _read_dataframe(LSTM_MONITOR_FEATURE_CACHE)
+    status = load_lstm_status()
+    metadata = _read_json(LSTM_MODEL_METADATA_CACHE)
+    test_acc = metadata.get("test_acc")
+    latest_prediction = predictions.sort_values("prediction_date").tail(1) if not predictions.empty and "prediction_date" in predictions else pd.DataFrame()
+    probability = _numeric(latest_prediction.iloc[0].get("predicted_prob_up")) if not latest_prediction.empty else np.nan
+    confidence, confidence_level = prediction_confidence(probability, int(metadata.get("test_rows", len(backtest))))
     status.update(
         {
             "prediction_rows": int(len(predictions)),
             "backtest_rows": int(len(backtest)),
             "feature_rows": int(len(features)),
+            "train_feature_rows": int(len(features)),
+            "monitor_feature_rows": int(len(monitor_features)),
+            "train_rows": int(metadata.get("train_rows", 0)),
+            "valid_rows": int(metadata.get("valid_rows", 0)),
+            "test_rows": int(metadata.get("test_rows", 0)),
+            "backtest_accuracy": float(test_acc) if test_acc is not None else None,
+            "prediction_confidence": confidence,
+            "prediction_confidence_level": confidence_level,
+            "prediction_date": _safe_str(latest_prediction.iloc[0].get("prediction_date")) if not latest_prediction.empty else "",
+            "prediction_target_date": _safe_str(latest_prediction.iloc[0].get("target_date")) if not latest_prediction.empty else "",
+            "prediction_target_date_type": _safe_str(latest_prediction.iloc[0].get("target_date_type")) or "estimated" if not latest_prediction.empty else "estimated",
+            "monitor_updated_at_utc": _latest_timestamp(monitor_features, "created_at_utc"),
             "last_predict_at_utc": _latest_timestamp(predictions, "created_at_utc"),
             "last_backtest_at_utc": _latest_timestamp(backtest, "validated_at_utc"),
             "last_train_at_utc": _metadata_timestamp(LSTM_MODEL_METADATA_CACHE, "trained_at_utc"),
             "model_version": _safe_str(predictions["model_version"].iloc[-1]) if not predictions.empty and "model_version" in predictions else "n/a",
             "feature_version": _safe_str(features["feature_version"].iloc[-1]) if not features.empty and "feature_version" in features else LSTM_FEATURE_VERSION,
-            "status": "已接上特徵表" if len(features) else "尚未接上特徵表",
+            "status": status.get("status") or ("已接上訓練特徵與監控特徵" if len(features) or len(monitor_features) else "尚未接上特徵表"),
             "enabled": bool(len(features)),
         }
     )
@@ -250,6 +341,12 @@ def summarize_lstm_status(status: dict) -> pd.DataFrame:
         ("模型版本", payload.get("model_version", "n/a")),
         ("特徵版本", payload.get("feature_version", "n/a")),
         ("特徵數", payload.get("feature_rows", 0)),
+        ("訓練特徵數", payload.get("train_feature_rows", 0)),
+        ("日常監控特徵數", payload.get("monitor_feature_rows", 0)),
+        ("訓練/驗證/測試樣本", f"{payload.get('train_rows', 0)} / {payload.get('valid_rows', 0)} / {payload.get('test_rows', 0)}"),
+        ("回測正確率", _format_percent(payload.get("backtest_accuracy"))),
+        ("預測信心", f"{payload.get('prediction_confidence_level', '低信心')} ({_format_percent(payload.get('prediction_confidence'))})"),
+        ("預測目標日", payload.get("prediction_target_date", "")),
         ("預測筆數", payload.get("prediction_rows", 0)),
         ("回測筆數", payload.get("backtest_rows", 0)),
         ("最後預測 UTC", payload.get("last_predict_at_utc", "")),
@@ -324,6 +421,13 @@ def _load_prices() -> pd.DataFrame:
     return prices
 
 
+def _load_train_features() -> pd.DataFrame:
+    data = _read_dataframe(LSTM_TRAIN_FEATURE_CACHE)
+    if not data.empty:
+        return data
+    return _read_dataframe(LSTM_LEGACY_FEATURE_CACHE)
+
+
 def _read_dataframe(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
@@ -361,6 +465,46 @@ def _empty_feature_table() -> pd.DataFrame:
             "sequence_json",
         ]
     )
+
+
+def _empty_monitor_feature_table() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=[
+            "symbol", "prediction_date", "target_date", "target_date_type", "horizon_days",
+            "sequence_length", "current_close", "feature_version", "created_at_utc", "sequence_json",
+        ]
+    )
+
+
+def prediction_confidence(probability: float, sample_count: int) -> tuple[float | None, str]:
+    if not np.isfinite(probability):
+        return None, "低信心"
+    distance = abs(float(probability) - 0.5) * 2
+    if sample_count < 50 or distance < 0.16:
+        level = "低信心"
+    elif sample_count < 100 or distance < 0.30:
+        level = "中信心"
+    else:
+        level = "高信心"
+    return float(distance), level
+
+
+def _format_percent(value: object) -> str:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "n/a"
+    return "n/a" if not np.isfinite(number) else f"{number:.1%}"
+
+
+def _read_json(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def _latest_timestamp(data: pd.DataFrame, column: str) -> str:

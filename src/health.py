@@ -46,12 +46,15 @@ def data_health_report(
         _data_hygiene_row(governance, cache_updated),
         _row("市場情緒層", "情緒", "sentiment.parquet", sentiment, "date", "VIX、信用、相對強弱與新聞情緒特徵", cache_updated, 72),
         _sentiment_signal_row(sentiment, cache_updated),
-        _row("大盤事件窗", "情緒", "market_event_windows.parquet", market_event_windows, "end_date", "VOO/QQQ 20 交易日絕對波動超過 10% 的事件樣本", cache_updated, 168),
+        _event_window_row(market_event_windows, prices, cache_updated),
         _row("知識圖譜事實層", "知識圖譜", "kg/fact_events.parquet", kg_fact_events, "timestamp_utc", "客觀事件與來源", cache_updated, 72),
         _row("知識圖譜敘事層", "知識圖譜", "kg/narrative_features.parquet", kg_narratives, "timestamp_utc", "量化敘事與情緒", cache_updated, 72),
         _row("知識圖譜反應層", "知識圖譜", "kg/market_reactions.parquet", kg_reactions, "validated_at_utc", "事件後市場反應", cache_updated, 72),
     ]
-    return pd.DataFrame(rows)
+    report = pd.DataFrame(rows)
+    if "最近抓取 UTC" in report.columns:
+        report["最新掃描 UTC"] = report["最近抓取 UTC"]
+    return report
 
 
 def missing_price_symbols(prices: pd.DataFrame, symbols: list[str]) -> list[str]:
@@ -96,6 +99,11 @@ def _status_row(name: str, category: str, filename: str, status: dict | None, ca
     enabled = bool(payload.get("enabled"))
     updated_at = str(payload.get("updated_at_utc") or cache_updated or "n/a")
     summary = str(payload.get("status") or "尚未建立")
+    sample_detail = (
+        f"訓練/驗證/測試 {payload.get('train_rows', 0)}/{payload.get('valid_rows', 0)}/{payload.get('test_rows', 0)}；"
+        f"回測正確率 {_format_percent(payload.get('backtest_accuracy'))}；"
+        f"信心 {payload.get('prediction_confidence_level', '低信心')}"
+    )
     return {
         "狀態": "🟢 正常" if enabled else "🟡 未啟用",
         "資料分類": category,
@@ -106,7 +114,39 @@ def _status_row(name: str, category: str, filename: str, status: dict | None, ca
         "檔案大小": file_size,
         "自動更新": "是",
         "Streamlit使用": "是",
-        "說明": summary,
+        "說明": f"{summary}；{sample_detail}；監控特徵 {payload.get('monitor_feature_rows', 0)} 筆",
+    }
+
+
+def _event_window_row(
+    event_windows: pd.DataFrame | None,
+    prices: pd.DataFrame | None,
+    cache_updated: str,
+) -> dict:
+    count = 0 if event_windows is None else len(event_windows)
+    latest_event = _max_date(event_windows, "end_date")
+    fetched_at = cache_updated
+    event_parts = []
+    for symbol in ["VOO", "QQQ"]:
+        value = _latest_window_return(prices, symbol, 20)
+        event_parts.append(f"{symbol} 20D {_format_percent(value)}")
+    if count == 0:
+        scan_result = "基準資料不足或尚無符合 ±10% 事件"
+        status = "🟡 注意"
+    else:
+        scan_result = "已掃描，事件窗資料可用"
+        status, _ = _health_status(count, fetched_at, 168)
+    return {
+        "狀態": status,
+        "資料分類": "情緒",
+        "資料項目": "大盤事件窗",
+        "筆數": int(count),
+        "最新資料日期": _format_dateish(latest_event),
+        "最近抓取 UTC": _format_datetimeish(fetched_at),
+        "檔案大小": _file_size(cache_path("market_event_windows.parquet")),
+        "自動更新": "是",
+        "Streamlit使用": "是",
+        "說明": "VOO/QQQ 20 交易日絕對波動超過 10% 的事件樣本；" + "；".join(event_parts) + f"；掃描結果：{scan_result}",
     }
 
 
@@ -219,10 +259,11 @@ def _pipeline_row(metadata: dict, cache_updated: str | None = None) -> dict:
     fallback_count = int(metadata.get("pipeline_fallback_count", 0) or 0)
     failure_count = int(metadata.get("pipeline_failure_count", 0) or 0)
     failed_modules = metadata.get("pipeline_failed_modules", []) or []
+    used_protection = fallback_count > 0 and failure_count == 0
     if status_value == "success":
         status = "🟢 正常"
     elif status_value == "partial":
-        status = "🟡 注意"
+        status = "🟢 正常" if used_protection else "🟡 注意"
     elif status_value == "failed":
         status = "🔴 過期"
     else:
@@ -230,6 +271,10 @@ def _pipeline_row(metadata: dict, cache_updated: str | None = None) -> dict:
     detail = f"成功 {success_count}；fallback {fallback_count}；失敗 {failure_count}"
     if failed_modules:
         detail += "；失敗模組：" + "、".join(map(str, failed_modules))
+    if status_value == "partial" and used_protection:
+        detail += "；已啟用自動保護，資料未倒退"
+    elif status_value == "partial" and failure_count > 0:
+        detail += "；部分模組需要留意"
     return {
         "狀態": status,
         "資料分類": "治理",
@@ -240,7 +285,7 @@ def _pipeline_row(metadata: dict, cache_updated: str | None = None) -> dict:
         "檔案大小": _file_size(cache_path("metadata.json")),
         "自動更新": "是",
         "Streamlit使用": "是",
-        "說明": f"模組化更新與 fallback 保護；{detail}",
+        "說明": f"模組化更新與自動保護；{detail}",
     }
 
 
@@ -372,6 +417,22 @@ def _format_datetimeish(value) -> str:
     if pd.isna(dt):
         return str(value)
     return dt.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _format_percent(value: object) -> str:
+    number = pd.to_numeric(value, errors="coerce")
+    return "n/a" if pd.isna(number) else f"{float(number):.2%}"
+
+
+def _latest_window_return(prices: pd.DataFrame | None, symbol: str, window: int) -> float:
+    if prices is None or prices.empty or not {"symbol", "date", "close"}.issubset(prices.columns):
+        return float("nan")
+    data = prices[prices["symbol"].astype(str).eq(symbol)].copy().sort_values("date")
+    data["close"] = pd.to_numeric(data["close"], errors="coerce")
+    data = data.dropna(subset=["close"])
+    if len(data) <= window:
+        return float("nan")
+    return float(data.iloc[-1]["close"] / data.iloc[-window - 1]["close"] - 1)
 
 
 def _numeric_value(value, default: float = 0.0) -> float:

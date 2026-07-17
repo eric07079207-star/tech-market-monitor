@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,10 +30,14 @@ from src.kg import (
     build_knowledge_graph,
 )
 from src.lstm import (
-    LSTM_FEATURE_CACHE,
+    LSTM_MONITOR_FEATURE_CACHE,
+    LSTM_TRAIN_FEATURE_CACHE,
+    LSTM_LEGACY_FEATURE_CACHE,
     LSTM_STATUS_CACHE,
-    build_lstm_feature_table,
+    LSTM_DEFAULT_SYMBOLS,
+    build_lstm_monitor_feature_table,
     build_lstm_status_from_artifacts,
+    load_lstm_status,
     save_lstm_status,
 )
 from src.news import DEFAULT_TSLA_KEYWORDS, fetch_international_news, fetch_news_batch, fetch_symbol_keyword_news
@@ -507,31 +512,38 @@ def main() -> None:
             latest_columns=["prediction_date", "validated_at"],
         )
 
-    # LSTM lightweight artifacts
+    # LSTM daily monitoring artifacts. Training features are intentionally untouched here.
     try:
-        lstm_features = build_lstm_feature_table(prices=prices)
-        if lstm_features.empty:
-            lstm_status = build_lstm_status_from_artifacts(features=lstm_features)
-        else:
-            lstm_status = build_lstm_status_from_artifacts(features=lstm_features)
+        if not LSTM_TRAIN_FEATURE_CACHE.exists() and LSTM_LEGACY_FEATURE_CACHE.exists():
+            LSTM_TRAIN_FEATURE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(LSTM_LEGACY_FEATURE_CACHE, LSTM_TRAIN_FEATURE_CACHE)
+        lstm_monitor_features = build_lstm_monitor_feature_table(prices=prices, symbols=LSTM_DEFAULT_SYMBOLS)
     except Exception as exc:
-        _record(module_records, "lstm_features", "模型", "fallback" if not load_cached_frame("lstm/lstm_features.parquet").empty else "failed", f"exception: {exc}", False)
+        _record(module_records, "lstm_monitor_features", "模型", "fallback" if not load_cached_frame("lstm/lstm_monitor_features.parquet").empty else "failed", f"exception: {exc}", False)
     else:
-        if not lstm_features.empty:
+        if not lstm_monitor_features.empty:
             _write_frame_module(
                 module_records,
-                module_name="lstm_features",
+                module_name="lstm_monitor_features",
                 category="模型",
-                filename=str(LSTM_FEATURE_CACHE.relative_to(LSTM_FEATURE_CACHE.parents[1])),
-                frame=lstm_features,
-                validation=FrameValidation(required_columns=("symbol", "date", "target_date", "label"), allow_empty=True),
+                filename=str(LSTM_MONITOR_FEATURE_CACHE.relative_to(LSTM_MONITOR_FEATURE_CACHE.parents[1])),
+                frame=lstm_monitor_features,
+                validation=FrameValidation(required_columns=("symbol", "prediction_date", "target_date", "sequence_json"), allow_empty=True),
                 critical=False,
-                latest_columns=["date", "created_at_utc"],
+                latest_columns=["prediction_date", "created_at_utc"],
             )
         status_name = str(LSTM_STATUS_CACHE.relative_to(LSTM_STATUS_CACHE.parents[1]))
         try:
+            lstm_status = build_lstm_status_from_artifacts(monitor_features=lstm_monitor_features)
+            lstm_status.update(
+                {
+                    "monitor_feature_rows": int(len(lstm_monitor_features)),
+                    "monitor_updated_at_utc": now_utc(),
+                    "updated_at_utc": now_utc(),
+                }
+            )
             save_lstm_status(lstm_status, LSTM_STATUS_CACHE)
-            _record(module_records, "lstm_status", "模型", "success", "updated lstm status", False, int(lstm_status.get("feature_rows", 0)), lstm_status.get("updated_at_utc", ""))
+            _record(module_records, "lstm_status", "模型", "success", "updated daily monitor features without overwriting train artifacts", False, int(len(lstm_monitor_features)), lstm_status.get("updated_at_utc", ""))
         except Exception as exc:
             _record(module_records, "lstm_status", "模型", "failed", f"exception: {exc}", False)
 

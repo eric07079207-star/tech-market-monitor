@@ -16,7 +16,8 @@ sys.path.insert(0, str(ROOT))
 from src.lstm import (
     LSTM_BACKTEST_CACHE,
     LSTM_DIR,
-    LSTM_FEATURE_CACHE,
+    LSTM_TRAIN_FEATURE_CACHE,
+    LSTM_MONITOR_FEATURE_CACHE,
     LSTM_MODEL_CACHE,
     LSTM_MODEL_METADATA_CACHE,
     LSTM_PREDICTIONS_CACHE,
@@ -26,6 +27,7 @@ from src.lstm import (
     LSTM_TARGET_HORIZON_DAYS,
     LSTM_SEQUENCE_LENGTH,
     build_lstm_feature_table,
+    build_lstm_monitor_feature_table,
     build_lstm_status_from_artifacts,
     feature_columns,
     save_lstm_status,
@@ -102,7 +104,7 @@ def main() -> None:
         lookback_years=args.lookback_years,
         sample_step=args.sample_step,
     )
-    features.to_parquet(LSTM_FEATURE_CACHE, index=False)
+    features.to_parquet(LSTM_TRAIN_FEATURE_CACHE, index=False)
 
     if features.empty:
         raise RuntimeError("No LSTM features available for training.")
@@ -170,7 +172,14 @@ def main() -> None:
     backtest = _build_backtest_frame(split_data.test_meta, test_prob, test_pred)
     backtest.to_parquet(LSTM_BACKTEST_CACHE, index=False)
 
-    latest_predictions = _build_latest_predictions(model, features, split_data.feature_mean, split_data.feature_std, split_data.test_meta)
+    monitor_features = build_lstm_monitor_feature_table(
+        prices=prices,
+        symbols=args.symbols,
+        target_horizon_days=LSTM_TARGET_HORIZON_DAYS,
+        sequence_length=LSTM_SEQUENCE_LENGTH,
+    )
+    monitor_features.to_parquet(LSTM_MONITOR_FEATURE_CACHE, index=False)
+    latest_predictions = _build_monitor_predictions(model, monitor_features, split_data.feature_mean, split_data.feature_std)
     latest_predictions.to_parquet(LSTM_PREDICTIONS_CACHE, index=False)
 
     metadata = {
@@ -196,7 +205,7 @@ def main() -> None:
     }
     LSTM_MODEL_METADATA_CACHE.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    status = build_lstm_status_from_artifacts(latest_predictions, backtest, features)
+    status = build_lstm_status_from_artifacts(latest_predictions, backtest, features, monitor_features)
     status.update(
         {
             "enabled": True,
@@ -210,6 +219,16 @@ def main() -> None:
             "prediction_rows": int(len(latest_predictions)),
             "backtest_rows": int(len(backtest)),
             "feature_rows": int(len(features)),
+            "train_feature_rows": int(len(features)),
+            "monitor_feature_rows": int(len(monitor_features)),
+            "train_rows": int(len(split_data.y_train)),
+            "valid_rows": int(len(split_data.y_valid)),
+            "test_rows": int(len(split_data.y_test)),
+            "backtest_accuracy": test_acc,
+            "prediction_date": str(latest_predictions.iloc[-1]["prediction_date"]) if not latest_predictions.empty else "",
+            "prediction_target_date": str(latest_predictions.iloc[-1]["target_date"]) if not latest_predictions.empty else "",
+            "prediction_target_date_type": "estimated",
+            "monitor_updated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
     )
     save_lstm_status(status)
@@ -285,19 +304,18 @@ def _build_backtest_frame(meta: pd.DataFrame, prob: np.ndarray, pred: np.ndarray
     return frame
 
 
-def _build_latest_predictions(
+def _build_monitor_predictions(
     model: torch.nn.Module,
-    features: pd.DataFrame,
+    monitor_features: pd.DataFrame,
     mean: pd.Series,
     std: pd.Series,
-    test_meta: pd.DataFrame,
 ) -> pd.DataFrame:
-    if features.empty:
+    if monitor_features.empty:
         return pd.DataFrame()
 
     latest_rows = []
-    for symbol, group in features.groupby("symbol", sort=False):
-        latest = group.sort_values("date").iloc[-1]
+    for symbol, group in monitor_features.groupby("symbol", sort=False):
+        latest = group.sort_values("prediction_date").iloc[-1]
         seq = np.asarray(json.loads(latest.sequence_json), dtype=np.float32)
         normalized = (seq - mean.to_numpy()) / std.to_numpy()
         normalized = np.nan_to_num(normalized, nan=0.0, posinf=0.0, neginf=0.0)
@@ -307,8 +325,9 @@ def _build_latest_predictions(
         latest_rows.append(
             {
                 "symbol": symbol,
-                "prediction_date": pd.to_datetime(latest.date, utc=True),
+                "prediction_date": pd.to_datetime(latest.prediction_date, utc=True),
                 "target_date": pd.to_datetime(latest.target_date, utc=True),
+                "target_date_type": str(latest.get("target_date_type", "estimated")),
                 "horizon_days": int(latest.horizon_days),
                 "model_version": MODEL_VERSION,
                 "feature_version": str(latest.feature_version),
@@ -316,6 +335,7 @@ def _build_latest_predictions(
                 "predicted_label": int(prob >= 0.5),
                 "prediction_direction": "看漲" if prob >= 0.5 else "看跌",
                 "created_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "prediction_type": "real_time_inference",
             }
         )
     return pd.DataFrame(latest_rows)

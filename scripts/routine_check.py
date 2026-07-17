@@ -39,6 +39,12 @@ REMOTE_CORE_CACHE_FILES = [
     "data/cache/kg/market_reactions.parquet",
     "data/cache/kg/kg_metadata.json",
     "data/cache/lstm/lstm_status.json",
+    "data/cache/lstm/lstm_train_features.parquet",
+    "data/cache/lstm/lstm_monitor_features.parquet",
+    "data/cache/lstm/lstm_predictions.parquet",
+    "data/cache/lstm/lstm_backtest.parquet",
+    "data/cache/lstm/lstm_model.json",
+    "data/cache/lstm/lstm_scaler.json",
 ]
 
 
