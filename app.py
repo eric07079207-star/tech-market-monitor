@@ -126,7 +126,7 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
     SENTIMENT_CACHE = cache_path("sentiment.parquet")
     EVENT_WINDOWS_CACHE = cache_path("market_event_windows.parquet")
 try:
-    from src.emotion import emotion_alerts, emotion_components, emotion_divergence, emotion_trend, latest_emotion
+    from src.emotion import emotion_alerts, emotion_components, emotion_divergence, emotion_trend, fear_greed_analysis, latest_emotion
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def latest_emotion(sentiment: pd.DataFrame) -> dict:
         return {}
@@ -142,6 +142,9 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 
     def emotion_alerts(row: dict) -> list[dict]:
         return []
+
+    def fear_greed_analysis(row: dict) -> dict:
+        return {"score": np.nan, "label": "資料不足", "confidence": 0.0, "components": pd.DataFrame()}
 try:
     from src.edge import summarize_quality_frame
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
@@ -697,6 +700,7 @@ governance = load_governance_summary()
 sentiment = load_sentiment_layer()
 market_event_windows = load_market_event_windows()
 emotion_row = latest_emotion(sentiment)
+fear_greed = fear_greed_analysis(emotion_row)
 emotion_components_table = emotion_components(emotion_row)
 emotion_trend_table = emotion_trend(sentiment)
 emotion_divergence_table = emotion_divergence(prices, sentiment)
@@ -1550,6 +1554,22 @@ with tab_emotion:
         emotion_cols[1].metric("恐慌壓力", num(risk_pressure, 1), "0-100，越高壓力越大")
         emotion_cols[2].metric("5日情緒變化", num(mood_change, 1), "分數變化")
         emotion_cols[3].metric("新聞信心", num(emotion_row.get("news_sentiment_confidence"), 1), "來源與覆蓋品質")
+
+        st.markdown("#### 恐懼貪婪指數")
+        fg_cols = st.columns(4)
+        fg_cols[0].metric("內部指數", num(fear_greed.get("score"), 1), fear_greed.get("label", "資料不足"))
+        fg_cols[1].metric("模型信心", num(fear_greed.get("confidence"), 0), "資料覆蓋度")
+        fg_cols[2].metric("資料來源", fear_greed.get("source", "內部規則模型"), "可離線運作")
+        fg_cols[3].metric("外部指數", "未連接", "不影響內部模型")
+        st.caption("恐懼貪婪指數是本系統的可重現內部模型，不直接複製任何外部網站指數；網路中斷時仍可用最近一次成功更新的資料計算。")
+        fear_greed_components = fear_greed.get("components", pd.DataFrame())
+        if not fear_greed_components.empty:
+            st.dataframe(
+                fear_greed_components,
+                hide_index=True,
+                width="stretch",
+                column_config={"分數": st.column_config.NumberColumn(format="%.1f")},
+            )
 
         st.markdown("#### 今日情緒結論")
         if pd.notna(mood_score):

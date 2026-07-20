@@ -41,6 +41,41 @@ def emotion_components(row: dict) -> pd.DataFrame:
     return frame
 
 
+def fear_greed_analysis(row: dict) -> dict:
+    """Calculate a reproducible internal fear-greed index from existing features."""
+    if not row:
+        return {"score": np.nan, "label": "資料不足", "confidence": 0.0, "components": pd.DataFrame()}
+    components = [
+        ("波動情緒", _inverse_percentile(row.get("vix_percentile_252d")), 0.25, "VIX 越低，市場越偏向貪婪"),
+        ("相對強弱", _relative_signal(row.get("qqq_spy_rel_63d")), 0.20, "QQQ 相對 SPY 越強，風險偏好越高"),
+        ("信用風險偏好", _relative_signal(row.get("hyg_tlt_rel_20d")), 0.20, "HYG 相對 TLT 越強，信用市場越偏風險"),
+        ("市場情緒基準", _scale_score(row.get("market_mood_score")), 0.20, "既有市場情緒分數作為穩定基準"),
+        ("新聞敘事", _news_signal(row), 0.15, "新聞炒作高於恐慌時，分數偏向貪婪"),
+    ]
+    available = [item for item in components if np.isfinite(item[1])]
+    if not available:
+        return {"score": np.nan, "label": "資料不足", "confidence": 0.0, "components": pd.DataFrame()}
+    weight_total = sum(item[2] for item in available)
+    score = sum(item[1] * item[2] for item in available) / weight_total
+    confidence = 100 * weight_total
+    table = pd.DataFrame(
+        [
+            {"指標": name, "分數": value, "權重": weight, "狀態": _component_label(value), "解讀": note}
+            for name, value, weight, note in components
+        ]
+    )
+    table["分數"] = pd.to_numeric(table["分數"], errors="coerce").round(1)
+    table["權重"] = table["權重"].map(lambda value: f"{value:.0%}")
+    return {
+        "score": float(score),
+        "label": _fear_greed_label(score),
+        "confidence": float(confidence),
+        "components": table,
+        "source": "內部規則模型",
+        "external_reference": "未連接；不影響內部指數",
+    }
+
+
 def emotion_trend(sentiment: pd.DataFrame, days: int = 120) -> pd.DataFrame:
     if sentiment is None or sentiment.empty:
         return pd.DataFrame()
@@ -169,3 +204,56 @@ def _confidence_label(value: object) -> str:
     if score < 60:
         return "中信心"
     return "高信心"
+
+
+def _inverse_percentile(value: object) -> float:
+    number = _numeric(value)
+    return float((1 - number) * 100) if np.isfinite(number) else np.nan
+
+
+def _relative_signal(value: object) -> float:
+    number = _numeric(value)
+    return float(np.clip(50 + number * 300, 0, 100)) if np.isfinite(number) else np.nan
+
+
+def _scale_score(value: object) -> float:
+    number = _numeric(value)
+    return float(np.clip(number, 0, 100)) if np.isfinite(number) else np.nan
+
+
+def _news_signal(row: dict) -> float:
+    fear = _numeric(row.get("news_fear_percentile_252d"))
+    hype = _numeric(row.get("news_hype_percentile_252d"))
+    if not np.isfinite(fear) or not np.isfinite(hype):
+        return np.nan
+    return float(np.clip(50 + (hype - fear) * 50, 0, 100))
+
+
+def _component_label(value: object) -> str:
+    score = _numeric(value)
+    if not np.isfinite(score):
+        return "資料不足"
+    if score >= 70:
+        return "偏貪婪"
+    if score >= 55:
+        return "偏樂觀"
+    if score >= 45:
+        return "中性"
+    if score >= 30:
+        return "偏恐懼"
+    return "恐懼"
+
+
+def _fear_greed_label(value: object) -> str:
+    score = _numeric(value)
+    if not np.isfinite(score):
+        return "資料不足"
+    if score >= 80:
+        return "極度貪婪"
+    if score >= 60:
+        return "貪婪"
+    if score >= 40:
+        return "中性"
+    if score >= 20:
+        return "恐懼"
+    return "極度恐懼"
