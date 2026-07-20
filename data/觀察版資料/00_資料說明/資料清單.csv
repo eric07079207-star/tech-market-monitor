@@ -1,34 +1,34 @@
 分類,資料名稱,來源快取,說明,已匯出,自動更新,Streamlit使用,筆數,最新日期或時間,最近抓取 UTC,來源檔案大小,觀察版檔案
-01_市場價格,市場價格,data/cache/prices.parquet,股票、ETF、年度十大與市場壓力標的的日線價格與量能。,是,是,是,121173,2026-07-19T00:00:00+00:00,2026-07-20T03:50:09+00:00,4.7 MB,data/觀察版資料/01_市場價格/prices.parquet；data/觀察版資料/01_市場價格/prices.csv
-02_總經與市場壓力,總經市場壓力,data/cache/macro.parquet,FRED 總經、利率、信用利差與市場壓力資料。,是,是,是,19393,2026-06-20T00:00:00+00:00,2026-07-20T03:50:09+00:00,118.3 KB,data/觀察版資料/02_總經與市場壓力/macro.parquet；data/觀察版資料/02_總經與市場壓力/macro.csv
-03_標的新聞,標的新聞,data/cache/news.parquet,科技股、ETF 與 watchlist 相關新聞。,是,是,是,120,2026-07-20T02:17:28+00:00,2026-07-20T03:44:43+00:00,62.2 KB,data/觀察版資料/03_標的新聞/news.parquet；data/觀察版資料/03_標的新聞/news.csv
-04_國際新聞,國際新聞,data/cache/international_news.parquet,國際重大新聞、戰爭、貿易、央行與能源消息。,是,是,是,36,2026-07-20T01:53:51+00:00,2026-07-20T03:44:43+00:00,34.3 KB,data/觀察版資料/04_國際新聞/international_news.parquet；data/觀察版資料/04_國際新聞/international_news.csv
-04_國際新聞,TSLA專題新聞,data/cache/tsla_keyword_news.parquet,TSLA 專用關鍵字追蹤新聞與分類結果。,是,是,是,52,2026-07-19T15:03:00+00:00,2026-07-20T03:44:43+00:00,45.7 KB,data/觀察版資料/04_國際新聞/tsla_keyword_news.parquet；data/觀察版資料/04_國際新聞/tsla_keyword_news.csv
-05_潛力股探索,探索新聞,data/cache/discovery_news.parquet,隨機市場主題新聞，用來尋找潛在個股。,是,是,是,33,2026-07-18T13:50:24+00:00,2026-07-20T03:44:43+00:00,31.9 KB,data/觀察版資料/05_潛力股探索/discovery_news.parquet；data/觀察版資料/05_潛力股探索/discovery_news.csv
-05_潛力股探索,探索股票提及,data/cache/discovery_mentions.parquet,從探索新聞中擷取出的股票代號與新聞來源。,是,是,是,6,2026-07-16T17:50:00+00:00,2026-07-20T03:44:43+00:00,10.9 KB,data/觀察版資料/05_潛力股探索/discovery_mentions.parquet；data/觀察版資料/05_潛力股探索/discovery_mentions.csv
-06_候選股追蹤,每日候選股,data/cache/discovery_candidates.parquet,每日量化後的候選觀察股名單。,是,是,是,5,,2026-07-20T03:44:43+00:00,17.9 KB,data/觀察版資料/06_候選股追蹤/discovery_candidates.parquet；data/觀察版資料/06_候選股追蹤/discovery_candidates.csv
-06_候選股追蹤,候選股歷史,data/cache/discovery_history.parquet,每日 Top 15 候選觀察股歷史紀錄。,是,是,是,434,2026-07-20T00:00:00+00:00,2026-07-20T03:44:43+00:00,128.8 KB,data/觀察版資料/06_候選股追蹤/discovery_history.parquet；data/觀察版資料/06_候選股追蹤/discovery_history.csv
-06_候選股追蹤,候選股表現驗證,data/cache/discovery_performance.parquet,候選股入榜後的後續表現驗證資料。,是,是,是,1221,2026-07-17T00:00:00+00:00,2026-07-20T03:50:09+00:00,47.0 KB,data/觀察版資料/06_候選股追蹤/discovery_performance.parquet；data/觀察版資料/06_候選股追蹤/discovery_performance.csv
-07_預測驗證,市場預測紀錄,data/cache/prediction_log.csv,市場判斷與後續 5D/20D/60D 驗證紀錄。,是,是,是,129,2026-07-17T00:00:00+00:00,2026-07-20T03:50:09+00:00,30.6 KB,data/觀察版資料/07_預測驗證/prediction_log.csv
+01_市場價格,市場價格,data/cache/prices.parquet,股票、ETF、年度十大與市場壓力標的的日線價格與量能。,是,是,是,121174,2026-07-20T00:00:00+00:00,2026-07-20T09:01:29+00:00,4.7 MB,data/觀察版資料/01_市場價格/prices.parquet；data/觀察版資料/01_市場價格/prices.csv
+02_總經與市場壓力,總經市場壓力,data/cache/macro.parquet,FRED 總經、利率、信用利差與市場壓力資料。,是,是,是,19393,2026-06-20T00:00:00+00:00,2026-07-20T09:01:29+00:00,118.3 KB,data/觀察版資料/02_總經與市場壓力/macro.parquet；data/觀察版資料/02_總經與市場壓力/macro.csv
+03_標的新聞,標的新聞,data/cache/news.parquet,科技股、ETF 與 watchlist 相關新聞。,是,是,是,120,2026-07-20T02:49:00+00:00,2026-07-20T08:56:48+00:00,62.4 KB,data/觀察版資料/03_標的新聞/news.parquet；data/觀察版資料/03_標的新聞/news.csv
+04_國際新聞,國際新聞,data/cache/international_news.parquet,國際重大新聞、戰爭、貿易、央行與能源消息。,是,是,是,35,2026-07-20T06:53:00+00:00,2026-07-20T08:56:48+00:00,32.8 KB,data/觀察版資料/04_國際新聞/international_news.parquet；data/觀察版資料/04_國際新聞/international_news.csv
+04_國際新聞,TSLA專題新聞,data/cache/tsla_keyword_news.parquet,TSLA 專用關鍵字追蹤新聞與分類結果。,是,是,是,53,2026-07-19T20:05:00+00:00,2026-07-20T08:56:48+00:00,45.9 KB,data/觀察版資料/04_國際新聞/tsla_keyword_news.parquet；data/觀察版資料/04_國際新聞/tsla_keyword_news.csv
+05_潛力股探索,探索新聞,data/cache/discovery_news.parquet,隨機市場主題新聞，用來尋找潛在個股。,是,是,是,33,2026-07-18T13:50:24+00:00,2026-07-20T08:56:48+00:00,32.6 KB,data/觀察版資料/05_潛力股探索/discovery_news.parquet；data/觀察版資料/05_潛力股探索/discovery_news.csv
+05_潛力股探索,探索股票提及,data/cache/discovery_mentions.parquet,從探索新聞中擷取出的股票代號與新聞來源。,是,是,是,8,2026-07-16T17:50:00+00:00,2026-07-20T08:56:48+00:00,11.3 KB,data/觀察版資料/05_潛力股探索/discovery_mentions.parquet；data/觀察版資料/05_潛力股探索/discovery_mentions.csv
+06_候選股追蹤,每日候選股,data/cache/discovery_candidates.parquet,每日量化後的候選觀察股名單。,是,是,是,7,,2026-07-20T08:56:48+00:00,18.4 KB,data/觀察版資料/06_候選股追蹤/discovery_candidates.parquet；data/觀察版資料/06_候選股追蹤/discovery_candidates.csv
+06_候選股追蹤,候選股歷史,data/cache/discovery_history.parquet,每日 Top 15 候選觀察股歷史紀錄。,是,是,是,436,2026-07-20T00:00:00+00:00,2026-07-20T08:56:48+00:00,129.3 KB,data/觀察版資料/06_候選股追蹤/discovery_history.parquet；data/觀察版資料/06_候選股追蹤/discovery_history.csv
+06_候選股追蹤,候選股表現驗證,data/cache/discovery_performance.parquet,候選股入榜後的後續表現驗證資料。,是,是,是,1221,2026-07-17T00:00:00+00:00,2026-07-20T09:01:29+00:00,47.0 KB,data/觀察版資料/06_候選股追蹤/discovery_performance.parquet；data/觀察版資料/06_候選股追蹤/discovery_performance.csv
+07_預測驗證,市場預測紀錄,data/cache/prediction_log.csv,市場判斷與後續 5D/20D/60D 驗證紀錄。,是,是,是,129,2026-07-17T00:00:00+00:00,2026-07-20T09:01:29+00:00,30.6 KB,data/觀察版資料/07_預測驗證/prediction_log.csv
 08_AI摘要,AI市場摘要,data/cache/ai_summary.json,每日 AI 或規則摘要結果。,是,是,是,1,2026-07-19T23:59:00+00:00,2026-07-19T23:59:00+00:00,4.4 KB,data/觀察版資料/08_AI摘要/ai_summary.json
-08_AI摘要,AI摘要歷史,data/cache/ai_summary_history.parquet,每日 AI 或規則摘要歷史，用於回看與後續準確率驗證。,是,是,是,52,2026-07-19T23:59:00+00:00,2026-07-20T03:50:09+00:00,92.1 KB,data/觀察版資料/08_AI摘要/ai_summary_history.parquet；data/觀察版資料/08_AI摘要/ai_summary_history.csv
-09_金融知識圖譜,事實層,data/cache/kg/fact_events.parquet,客觀事件與來源資料。,是,是,是,154,,2026-07-20T03:50:09+00:00,86.3 KB,data/觀察版資料/09_金融知識圖譜/kg/fact_events.parquet；data/觀察版資料/09_金融知識圖譜/fact_events.csv
-09_金融知識圖譜,敘事層,data/cache/kg/narrative_features.parquet,量化敘事與情緒特徵。,是,是,是,154,,2026-07-20T03:50:09+00:00,23.0 KB,data/觀察版資料/09_金融知識圖譜/kg/narrative_features.parquet；data/觀察版資料/09_金融知識圖譜/narrative_features.csv
-09_金融知識圖譜,反應層,data/cache/kg/market_reactions.parquet,事件後市場反應與驗證結果。,是,是,是,500,,2026-07-20T03:50:09+00:00,21.1 KB,data/觀察版資料/09_金融知識圖譜/kg/market_reactions.parquet；data/觀察版資料/09_金融知識圖譜/market_reactions.csv
-09_金融知識圖譜,事件連結,data/cache/kg/event_links.parquet,事件與標的關聯關係。,是,是,是,263,,2026-07-20T03:50:09+00:00,13.9 KB,data/觀察版資料/09_金融知識圖譜/kg/event_links.parquet；data/觀察版資料/09_金融知識圖譜/event_links.csv
-09_金融知識圖譜,知識圖譜資訊,data/cache/kg/kg_metadata.json,金融知識圖譜更新時間與筆數。,是,是,是,1,2026-07-20T03:44:43+00:00,2026-07-20T03:44:43+00:00,140 B,data/觀察版資料/09_金融知識圖譜/kg/kg_metadata.json
-11_資料治理,資料治理摘要,data/cache/governance_summary.parquet,新聞資料流 official、pending 與 rejected 分層統計。,是,是,是,4,,2026-07-20T03:50:09+00:00,6.5 KB,data/觀察版資料/11_資料治理/governance_summary.parquet；data/觀察版資料/11_資料治理/governance_summary.csv
-11_資料治理,更新執行紀錄,data/cache/update_runs.csv,每次更新流程的整體結果與成功/失敗統計。,是,是,是,243,,2026-07-20T03:50:09+00:00,21.2 KB,data/觀察版資料/11_資料治理/update_runs.csv
-11_資料治理,更新模組紀錄,data/cache/update_modules.csv,每個更新模組的 success、fallback 或 failed 狀態與原因。,是,是,是,5021,,2026-07-20T03:50:09+00:00,713.1 KB,data/觀察版資料/11_資料治理/update_modules.csv
-12_市場情緒,市場情緒層,data/cache/sentiment.parquet,VIX、信用利差、相對強弱與新聞情緒的日度特徵。,是,是,是,5036,2026-07-19T00:00:00+00:00,2026-07-20T03:50:09+00:00,317.4 KB,data/觀察版資料/12_市場情緒/sentiment.parquet；data/觀察版資料/12_市場情緒/sentiment.csv
-12_市場情緒,大盤事件窗,data/cache/market_event_windows.parquet,VOO/QQQ 在 20 個交易日內波動超過 10% 的歷史事件樣本。,是,是,是,77,,2026-07-20T03:50:09+00:00,15.4 KB,data/觀察版資料/12_市場情緒/market_event_windows.parquet；data/觀察版資料/12_市場情緒/market_event_windows.csv
-10_LSTM模型,LSTM訓練特徵表,data/cache/lstm/lstm_train_features.parquet,需要未來報酬標籤的 LSTM 訓練與回測序列特徵。,是,是,是,247,2026-06-15T00:00:00+00:00,2026-07-20T03:50:09+00:00,1.5 MB,data/觀察版資料/10_LSTM模型/lstm/lstm_train_features.parquet；data/觀察版資料/10_LSTM模型/lstm_train_features.csv
-10_LSTM模型,LSTM日常監控特徵表,data/cache/lstm/lstm_monitor_features.parquet,不等待未來報酬標籤的每日即時推論特徵。,是,是,是,3,2026-07-17T00:00:00+00:00,2026-07-20T03:50:09+00:00,52.0 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_monitor_features.parquet；data/觀察版資料/10_LSTM模型/lstm_monitor_features.csv
-10_LSTM模型,LSTM切分表,data/cache/lstm/lstm_split.parquet,LSTM 訓練/驗證/測試切分。,是,是,是,248,2026-04-24T00:00:00+00:00,2026-07-20T03:50:09+00:00,1.5 MB,data/觀察版資料/10_LSTM模型/lstm/lstm_split.parquet；data/觀察版資料/10_LSTM模型/lstm_split.csv
-10_LSTM模型,LSTM最新預測,data/cache/lstm/lstm_predictions.parquet,LSTM 每次更新產生的最新預測結果。,是,是,是,1,2026-07-17T00:00:00+00:00,2026-07-20T03:50:09+00:00,7.9 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_predictions.parquet；data/觀察版資料/10_LSTM模型/lstm_predictions.csv
-10_LSTM模型,LSTM回測,data/cache/lstm/lstm_backtest.parquet,LSTM 歷史回測與驗證紀錄。,是,是,是,38,2026-06-15T00:00:00+00:00,2026-07-20T03:50:09+00:00,9.7 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_backtest.parquet；data/觀察版資料/10_LSTM模型/lstm_backtest.csv
-10_LSTM模型,LSTM模型權重,data/cache/lstm/lstm_model.pt,LSTM 訓練後輸出的模型權重。,是,是,是,,,2026-07-20T03:50:09+00:00,60.7 KB,
-10_LSTM模型,LSTM模型資訊,data/cache/lstm/lstm_model.json,LSTM 模型版本、訓練指標與 metadata。,是,是,是,1,,2026-07-20T03:50:09+00:00,1.2 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_model.json
-10_LSTM模型,LSTM標準化器,data/cache/lstm/lstm_scaler.json,LSTM 特徵標準化參數。,是,是,是,1,,2026-07-20T03:50:09+00:00,1.4 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_scaler.json
-10_LSTM模型,LSTM流程狀態,data/cache/lstm/lstm_status.json,LSTM 更新狀態、最後訓練時間與工件統計。,是,是,是,1,2026-07-20T03:50:09+00:00,2026-07-20T03:50:09+00:00,990 B,data/觀察版資料/10_LSTM模型/lstm/lstm_status.json
-00_資料說明,快取更新資訊,data/cache/metadata.json,目前快取更新時間、資料起始日與資料筆數。,是,是,是,1,2026-07-20T03:50:09+00:00,2026-07-20T03:50:09+00:00,1.2 KB,data/觀察版資料/00_資料說明/metadata.json
+08_AI摘要,AI摘要歷史,data/cache/ai_summary_history.parquet,每日 AI 或規則摘要歷史，用於回看與後續準確率驗證。,是,是,是,52,2026-07-19T23:59:00+00:00,2026-07-20T09:01:29+00:00,92.1 KB,data/觀察版資料/08_AI摘要/ai_summary_history.parquet；data/觀察版資料/08_AI摘要/ai_summary_history.csv
+09_金融知識圖譜,事實層,data/cache/kg/fact_events.parquet,客觀事件與來源資料。,是,是,是,154,,2026-07-20T09:01:29+00:00,85.8 KB,data/觀察版資料/09_金融知識圖譜/kg/fact_events.parquet；data/觀察版資料/09_金融知識圖譜/fact_events.csv
+09_金融知識圖譜,敘事層,data/cache/kg/narrative_features.parquet,量化敘事與情緒特徵。,是,是,是,154,,2026-07-20T09:01:29+00:00,23.0 KB,data/觀察版資料/09_金融知識圖譜/kg/narrative_features.parquet；data/觀察版資料/09_金融知識圖譜/narrative_features.csv
+09_金融知識圖譜,反應層,data/cache/kg/market_reactions.parquet,事件後市場反應與驗證結果。,是,是,是,512,,2026-07-20T09:01:29+00:00,20.8 KB,data/觀察版資料/09_金融知識圖譜/kg/market_reactions.parquet；data/觀察版資料/09_金融知識圖譜/market_reactions.csv
+09_金融知識圖譜,事件連結,data/cache/kg/event_links.parquet,事件與標的關聯關係。,是,是,是,251,,2026-07-20T09:01:29+00:00,13.7 KB,data/觀察版資料/09_金融知識圖譜/kg/event_links.parquet；data/觀察版資料/09_金融知識圖譜/event_links.csv
+09_金融知識圖譜,知識圖譜資訊,data/cache/kg/kg_metadata.json,金融知識圖譜更新時間與筆數。,是,是,是,1,2026-07-20T08:56:48+00:00,2026-07-20T08:56:48+00:00,140 B,data/觀察版資料/09_金融知識圖譜/kg/kg_metadata.json
+11_資料治理,資料治理摘要,data/cache/governance_summary.parquet,新聞資料流 official、pending 與 rejected 分層統計。,是,是,是,4,,2026-07-20T09:01:29+00:00,6.5 KB,data/觀察版資料/11_資料治理/governance_summary.parquet；data/觀察版資料/11_資料治理/governance_summary.csv
+11_資料治理,更新執行紀錄,data/cache/update_runs.csv,每次更新流程的整體結果與成功/失敗統計。,是,是,是,244,,2026-07-20T09:01:29+00:00,21.3 KB,data/觀察版資料/11_資料治理/update_runs.csv
+11_資料治理,更新模組紀錄,data/cache/update_modules.csv,每個更新模組的 success、fallback 或 failed 狀態與原因。,是,是,是,5042,,2026-07-20T09:01:29+00:00,716.2 KB,data/觀察版資料/11_資料治理/update_modules.csv
+12_市場情緒,市場情緒層,data/cache/sentiment.parquet,VIX、信用利差、相對強弱與新聞情緒的日度特徵。,是,是,是,5036,2026-07-20T00:00:00+00:00,2026-07-20T09:01:29+00:00,317.4 KB,data/觀察版資料/12_市場情緒/sentiment.parquet；data/觀察版資料/12_市場情緒/sentiment.csv
+12_市場情緒,大盤事件窗,data/cache/market_event_windows.parquet,VOO/QQQ 在 20 個交易日內波動超過 10% 的歷史事件樣本。,是,是,是,77,,2026-07-20T09:01:29+00:00,15.4 KB,data/觀察版資料/12_市場情緒/market_event_windows.parquet；data/觀察版資料/12_市場情緒/market_event_windows.csv
+10_LSTM模型,LSTM訓練特徵表,data/cache/lstm/lstm_train_features.parquet,需要未來報酬標籤的 LSTM 訓練與回測序列特徵。,是,是,是,247,2026-06-15T00:00:00+00:00,2026-07-20T09:01:29+00:00,1.5 MB,data/觀察版資料/10_LSTM模型/lstm/lstm_train_features.parquet；data/觀察版資料/10_LSTM模型/lstm_train_features.csv
+10_LSTM模型,LSTM日常監控特徵表,data/cache/lstm/lstm_monitor_features.parquet,不等待未來報酬標籤的每日即時推論特徵。,是,是,是,3,2026-07-17T00:00:00+00:00,2026-07-20T09:01:29+00:00,52.0 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_monitor_features.parquet；data/觀察版資料/10_LSTM模型/lstm_monitor_features.csv
+10_LSTM模型,LSTM切分表,data/cache/lstm/lstm_split.parquet,LSTM 訓練/驗證/測試切分。,是,是,是,248,2026-04-24T00:00:00+00:00,2026-07-20T09:01:29+00:00,1.5 MB,data/觀察版資料/10_LSTM模型/lstm/lstm_split.parquet；data/觀察版資料/10_LSTM模型/lstm_split.csv
+10_LSTM模型,LSTM最新預測,data/cache/lstm/lstm_predictions.parquet,LSTM 每次更新產生的最新預測結果。,是,是,是,1,2026-07-17T00:00:00+00:00,2026-07-20T09:01:29+00:00,7.9 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_predictions.parquet；data/觀察版資料/10_LSTM模型/lstm_predictions.csv
+10_LSTM模型,LSTM回測,data/cache/lstm/lstm_backtest.parquet,LSTM 歷史回測與驗證紀錄。,是,是,是,38,2026-06-15T00:00:00+00:00,2026-07-20T09:01:29+00:00,9.7 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_backtest.parquet；data/觀察版資料/10_LSTM模型/lstm_backtest.csv
+10_LSTM模型,LSTM模型權重,data/cache/lstm/lstm_model.pt,LSTM 訓練後輸出的模型權重。,是,是,是,,,2026-07-20T09:01:29+00:00,60.7 KB,
+10_LSTM模型,LSTM模型資訊,data/cache/lstm/lstm_model.json,LSTM 模型版本、訓練指標與 metadata。,是,是,是,1,,2026-07-20T09:01:29+00:00,1.2 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_model.json
+10_LSTM模型,LSTM標準化器,data/cache/lstm/lstm_scaler.json,LSTM 特徵標準化參數。,是,是,是,1,,2026-07-20T09:01:29+00:00,1.4 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_scaler.json
+10_LSTM模型,LSTM流程狀態,data/cache/lstm/lstm_status.json,LSTM 更新狀態、最後訓練時間與工件統計。,是,是,是,1,2026-07-20T09:01:29+00:00,2026-07-20T09:01:29+00:00,990 B,data/觀察版資料/10_LSTM模型/lstm/lstm_status.json
+00_資料說明,快取更新資訊,data/cache/metadata.json,目前快取更新時間、資料起始日與資料筆數。,是,是,是,1,2026-07-20T09:01:29+00:00,2026-07-20T09:01:29+00:00,1.2 KB,data/觀察版資料/00_資料說明/metadata.json
