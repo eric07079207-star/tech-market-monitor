@@ -126,6 +126,23 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
     SENTIMENT_CACHE = cache_path("sentiment.parquet")
     EVENT_WINDOWS_CACHE = cache_path("market_event_windows.parquet")
 try:
+    from src.emotion import emotion_alerts, emotion_components, emotion_divergence, emotion_trend, latest_emotion
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def latest_emotion(sentiment: pd.DataFrame) -> dict:
+        return {}
+
+    def emotion_components(row: dict) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def emotion_trend(sentiment: pd.DataFrame, days: int = 120) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def emotion_divergence(prices: pd.DataFrame, sentiment: pd.DataFrame, symbols: list[str] | None = None) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def emotion_alerts(row: dict) -> list[dict]:
+        return []
+try:
     from src.edge import summarize_quality_frame
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def summarize_quality_frame(data: pd.DataFrame, score_column: str = "quality_score") -> dict:
@@ -679,6 +696,11 @@ tsla_keyword_news = load_tsla_keyword_news()
 governance = load_governance_summary()
 sentiment = load_sentiment_layer()
 market_event_windows = load_market_event_windows()
+emotion_row = latest_emotion(sentiment)
+emotion_components_table = emotion_components(emotion_row)
+emotion_trend_table = emotion_trend(sentiment)
+emotion_divergence_table = emotion_divergence(prices, sentiment)
+emotion_alert_table = pd.DataFrame(emotion_alerts(emotion_row))
 discovery_performance = load_discovery_perf()
 kg_payload = load_knowledge_graph()
 kg_health = kg_summary(kg_payload)
@@ -804,8 +826,8 @@ if show_health:
 
 project_memory = load_project_memory_data()
 
-tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_focus, tab_kg, tab_memory, tab_charts, tab_portfolio = st.tabs(
-    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "重點個股追蹤", "金融知識圖譜", "專案記憶", "走勢圖", "我的持倉"]
+tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_focus, tab_emotion, tab_kg, tab_memory, tab_charts, tab_portfolio = st.tabs(
+    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "重點個股追蹤", "市場情緒", "金融知識圖譜", "專案記憶", "走勢圖", "我的持倉"]
 )
 
 with tab_overview:
@@ -1512,6 +1534,101 @@ with tab_focus:
             published = row.published.strftime("%Y-%m-%d %H:%M") if pd.notna(row.published) else ""
             tickers_text = f"｜tickers: `{row.tickers}`" if getattr(row, "tickers", "") else ""
             st.markdown(f"**{row.topic}** · `{row.tags}` · {row.source} · {published} {tickers_text}  \n[{row.title}]({row.link})")
+
+with tab_emotion:
+    st.subheader("市場情緒分析")
+    st.caption("本頁使用既有價格、總經、新聞與事件窗資料，另行計算展示，不會修改原始資料或市場預測模型。")
+    if not emotion_row:
+        st.warning("目前沒有可用的市場情緒資料，等待下一次資料更新。")
+    else:
+        mood_score = emotion_row.get("market_mood_score")
+        mood_label = emotion_row.get("market_mood_label", "資料不足")
+        mood_change = emotion_row.get("mood_5d_change")
+        risk_pressure = emotion_row.get("fear_pressure")
+        emotion_cols = st.columns(4)
+        emotion_cols[0].metric("市場情緒總分", num(mood_score, 1), f"{mood_label}")
+        emotion_cols[1].metric("恐慌壓力", num(risk_pressure, 1), "0-100，越高壓力越大")
+        emotion_cols[2].metric("5日情緒變化", num(mood_change, 1), "分數變化")
+        emotion_cols[3].metric("新聞信心", num(emotion_row.get("news_sentiment_confidence"), 1), "來源與覆蓋品質")
+
+        st.markdown("#### 今日情緒結論")
+        if pd.notna(mood_score):
+            if mood_score < 25:
+                emotion_sentence = "市場情緒偏防守，恐慌或信用壓力已達需要降低追價的區間。"
+            elif mood_score < 40:
+                emotion_sentence = "市場情緒正在升溫，尚未等同全面轉空，但需要觀察壓力是否擴散。"
+            elif mood_score < 60:
+                emotion_sentence = "市場情緒中性，方向仍需搭配價格趨勢與資金反應判斷。"
+            elif mood_score < 75:
+                emotion_sentence = "市場情緒偏樂觀，風險尚可控，但不宜只依新聞熱度追價。"
+            else:
+                emotion_sentence = "市場情緒偏熱，若價格與情緒出現背離，應留意高檔降溫。"
+            st.info(emotion_sentence)
+
+        alert_cols = st.columns(max(len(emotion_alert_table), 1))
+        for column, alert in zip(alert_cols, emotion_alert_table.to_dict("records")):
+            tone = "error" if alert.get("燈號") == "🔴" else "warning" if alert.get("燈號") == "🟡" else "success"
+            getattr(column, tone)(f"{alert.get('燈號', '')} {alert.get('項目', '')}\n\n{alert.get('說明', '')}")
+
+        st.markdown("#### 情緒來源拆解")
+        if emotion_components_table.empty:
+            st.caption("目前沒有可拆解的情緒來源。")
+        else:
+            st.dataframe(
+                emotion_components_table,
+                hide_index=True,
+                width="stretch",
+                column_config={"數值": st.column_config.NumberColumn(format="%.1f")},
+            )
+
+        st.markdown("#### 情緒趨勢")
+        if emotion_trend_table.empty:
+            st.caption("目前沒有足夠的情緒歷史資料。")
+        else:
+            trend_chart = px.line(
+                emotion_trend_table,
+                x="date",
+                y=["市場情緒", "恐慌壓力"],
+                labels={"date": "日期", "value": "分數", "variable": "指標"},
+                color_discrete_map={"市場情緒": "#1f77b4", "恐慌壓力": "#d62728"},
+            )
+            trend_chart.update_yaxes(range=[0, 100])
+            st.plotly_chart(trend_chart, width="stretch")
+
+        st.markdown("#### 情緒與價格背離")
+        if emotion_divergence_table.empty:
+            st.caption("目前沒有足夠價格資料可計算背離。")
+        else:
+            st.dataframe(
+                emotion_divergence_table,
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "20日報酬": st.column_config.NumberColumn(format="%.2%"),
+                    "情緒20日變化": st.column_config.NumberColumn(format="%.1f"),
+                },
+            )
+            st.caption("價格上漲但情緒下降，代表上漲信心減弱；價格下跌但情緒改善，代表可能進入修復觀察期。這是研究訊號，不是單獨交易指令。")
+
+        st.markdown("#### 歷史情緒事件")
+        if market_event_windows.empty:
+            st.caption("目前沒有大盤 ±10% 事件窗。")
+        else:
+            event_view = market_event_windows.sort_values("end_date", ascending=False).head(12).copy()
+            event_columns = [column for column in ["symbol", "direction", "start_date", "end_date", "window_return", "vix_level", "market_mood_score", "market_mood_label", "historical_window"] if column in event_view]
+            st.dataframe(
+                event_view[event_columns].rename(
+                    columns={
+                        "symbol": "標的", "direction": "方向", "start_date": "起始日", "end_date": "結束日",
+                        "window_return": "20日報酬", "vix_level": "VIX", "market_mood_score": "情緒分數",
+                        "market_mood_label": "情緒標籤", "historical_window": "歷史情境",
+                    }
+                ),
+                hide_index=True,
+                width="stretch",
+                column_config={"20日報酬": st.column_config.NumberColumn(format="%.2%"), "情緒分數": st.column_config.NumberColumn(format="%.1f")},
+            )
+        st.caption(f"資料日期：{pd.to_datetime(emotion_row.get('date'), errors='coerce').date()}｜情緒資料來源：既有 sentiment.parquet；情緒層目前為規則化重建資料。")
 
 with tab_kg:
     st.subheader("金融知識圖譜")
