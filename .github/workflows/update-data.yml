@@ -51,6 +51,10 @@ jobs:
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
         run: python scripts/generate_ai_summary_if_needed.py
 
+      - name: Evaluate prediction quality
+        if: always()
+        run: python scripts/evaluate_prediction_quality.py
+
       - name: Export observation data
         if: always()
         run: python scripts/export_observation_data.py

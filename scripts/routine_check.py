@@ -45,6 +45,7 @@ REMOTE_CORE_CACHE_FILES = [
     "data/cache/lstm/lstm_backtest.parquet",
     "data/cache/lstm/lstm_model.json",
     "data/cache/lstm/lstm_scaler.json",
+    "data/cache/lstm/lstm_evaluation.json",
 ]
 
 

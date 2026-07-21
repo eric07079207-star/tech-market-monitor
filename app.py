@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 
 import numpy as np
 import pandas as pd
@@ -436,6 +437,18 @@ def load_portfolio_news(tickers: tuple[str, ...], days: int) -> pd.DataFrame:
     return fetch_news_batch(symbols=list(tickers), days=days, limit_per_symbol=8)
 
 
+@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+def load_lstm_evaluation() -> dict:
+    path = cache_path("lstm/lstm_evaluation.json")
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def pct(value: float | int | None) -> str:
     if value is None or pd.isna(value):
         return "n/a"
@@ -726,6 +739,7 @@ annual_picks = annual_picks_table(prices)
 lstm_status = build_lstm_status_from_artifacts()
 lstm_predictions = load_lstm_predictions()
 lstm_backtest = load_lstm_backtest()
+lstm_evaluation = load_lstm_evaluation()
 active_news_keywords = load_news_keywords()
 keyword_discovery_news = tsla_keyword_news.copy()
 tsla_keyword_summary = summarize_keyword_news(keyword_discovery_news, "TSLA")
@@ -1280,6 +1294,35 @@ with tab_prediction:
             column_config={"上漲機率": st.column_config.NumberColumn(format="%.2%")},
         )
         st.caption("即時推論不等待未來報酬標籤；目標日是依交易日推估，待期滿後才會進入回測驗證。")
+    evaluation = lstm_evaluation.get("lstm", {}) if isinstance(lstm_evaluation, dict) else {}
+    if evaluation:
+        st.markdown("#### 預測品質評估")
+        eval_cols = st.columns(5)
+        eval_cols[0].metric("LSTM 測試準確率", pct(evaluation.get("accuracy")))
+        eval_cols[1].metric("多數基準", pct(evaluation.get("baseline_accuracy")))
+        eval_cols[2].metric("超越基準", pct(evaluation.get("accuracy_edge_vs_baseline")))
+        eval_cols[3].metric("Balanced Accuracy", pct(evaluation.get("balanced_accuracy")))
+        eval_cols[4].metric("F1（上漲）", pct(evaluation.get("f1_up")))
+        st.caption(
+            f"測試樣本 {evaluation.get('rows', 0)} 筆｜Walk-forward 多數基準 {pct(evaluation.get('walk_forward_majority_accuracy'))}｜"
+            f"平均未來報酬 {pct(evaluation.get('avg_future_return'))}｜評估警示：{evaluation.get('confidence_warning', 'n/a')}"
+        )
+        audit = lstm_evaluation.get("leakage_audit", {})
+        if audit.get("issues"):
+            st.error("資料洩漏檢查：" + "；".join(audit["issues"]))
+        else:
+            st.success("資料洩漏檢查：目前沒有偵測到即時預測日早於目標日的異常。")
+        rule_eval = lstm_evaluation.get("rule_predictions", {})
+        by_horizon = rule_eval.get("by_horizon", []) if isinstance(rule_eval, dict) else []
+        if by_horizon:
+            st.dataframe(
+                pd.DataFrame(by_horizon).rename(
+                    columns={"horizon": "週期", "rows": "總筆數", "validated_rows": "已驗證筆數", "accuracy": "成功率", "avg_return": "平均實際報酬"}
+                ),
+                hide_index=True,
+                width="stretch",
+                column_config={"成功率": st.column_config.NumberColumn(format="%.2%"), "平均實際報酬": st.column_config.NumberColumn(format="%.2%")},
+            )
     scorecard = prediction_scorecard(prediction_log)
     score_cols = st.columns(5)
     score_cols[0].metric("已驗證樣本", f"{scorecard['validated']}")
