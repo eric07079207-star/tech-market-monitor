@@ -919,8 +919,8 @@ if show_health:
 
 project_memory = load_project_memory_data()
 
-tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_focus, tab_emotion, tab_kg, tab_memory, tab_charts, tab_portfolio = st.tabs(
-    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "重點個股追蹤", "市場情緒", "金融知識圖譜", "專案記憶", "走勢圖", "我的持倉"]
+tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, tab_focus, tab_emotion, tab_kg, tab_memory, tab_charts, tab_portfolio, tab_quant = st.tabs(
+    ["總覽", "異常雷達", "歷史相似情境", "新聞與摘要", "預測驗證", "新聞探索", "重點個股追蹤", "市場情緒", "金融知識圖譜", "專案記憶", "走勢圖", "我的持倉", "量化數據中心"]
 )
 
 with tab_overview:
@@ -1174,30 +1174,7 @@ with tab_analog:
             """
         )
 
-        analog_display = analogs.copy()
-        analog_display["date"] = pd.to_datetime(analog_display["date"]).dt.date
-        st.dataframe(
-            analog_display.rename(
-                columns={
-                    "date": "日期",
-                    "similarity": "相似度",
-                    "regime_snapshot": "當時狀態",
-                    "1M": "後1M",
-                    "3M": "後3M",
-                    "6M": "後6M",
-                    "12M": "後12M",
-                }
-            )[["日期", "相似度", "當時狀態", "後1M", "後3M", "後6M", "後12M"]],
-            hide_index=True,
-            width="stretch",
-            column_config={
-                "相似度": st.column_config.NumberColumn(format="%.2f"),
-                "後1M": st.column_config.NumberColumn(format="%.2%"),
-                "後3M": st.column_config.NumberColumn(format="%.2%"),
-                "後6M": st.column_config.NumberColumn(format="%.2%"),
-                "後12M": st.column_config.NumberColumn(format="%.2%"),
-            },
-        )
+        st.caption("逐筆歷史樣本、統計欄位與所有可查核數字已集中到「量化數據中心」。")
 
 with tab_news:
     from src.news import rule_based_news_summary
@@ -2229,3 +2206,120 @@ VOO,,,500
                 else:
                     for alert in portfolio_alerts.itertuples():
                         st.error(f"{alert.ticker}：{alert.alerts}")
+
+with tab_quant:
+    st.subheader("量化數據中心")
+    st.caption("集中查核各模組的原始數字與可回測欄位；文字結論、圖表與研究解讀保留在原本功能頁面。")
+    quant_market, quant_analogs, quant_emotion, quant_model, quant_kg, quant_portfolio = st.tabs(
+        ["市場數據", "歷史相似", "情緒數據", "預測數據", "知識圖譜數據", "持倉數據"]
+    )
+
+    with quant_market:
+        st.markdown("#### 市場與技術指標")
+        quant_watch = snapshot[snapshot["symbol"].isin(ETF_TICKERS + STOCK_TICKERS)].copy()
+        market_columns = [
+            "symbol", "name", "group", "close", "ret_1d", "ret_20d", "ret_50d", "dist_ma_50",
+            "dist_ma_200", "drawdown_52w", "volume_ratio_20d", "realized_vol_20d",
+        ]
+        quant_watch = quant_watch[[column for column in market_columns if column in quant_watch]].rename(
+            columns={
+                "symbol": "代號", "name": "名稱", "group": "類別", "close": "收盤價", "ret_1d": "1日報酬",
+                "ret_20d": "20日報酬", "ret_50d": "50日報酬", "dist_ma_50": "距50DMA",
+                "dist_ma_200": "距200DMA", "drawdown_52w": "距52週高點", "volume_ratio_20d": "量/20日均量",
+                "realized_vol_20d": "20日年化波動",
+            }
+        )
+        st.dataframe(
+            quant_watch,
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "收盤價": st.column_config.NumberColumn(format="$%.2f"),
+                "1日報酬": st.column_config.NumberColumn(format="%.2%"),
+                "20日報酬": st.column_config.NumberColumn(format="%.2%"),
+                "50日報酬": st.column_config.NumberColumn(format="%.2%"),
+                "距50DMA": st.column_config.NumberColumn(format="%.2%"),
+                "距200DMA": st.column_config.NumberColumn(format="%.2%"),
+                "距52週高點": st.column_config.NumberColumn(format="%.2%"),
+                "量/20日均量": st.column_config.NumberColumn(format="%.2fx"),
+                "20日年化波動": st.column_config.NumberColumn(format="%.2%"),
+            },
+        )
+        st.markdown("#### 市場廣度數據")
+        st.dataframe(
+            breadth_table(snapshot).rename(
+                columns={"group": "類別", "count": "數量", "above_50dma": "高於50DMA", "above_200dma": "高於200DMA", "avg_1m_return": "平均1M", "avg_drawdown_52w": "平均距52週高點"}
+            ),
+            hide_index=True,
+            width="stretch",
+            column_config={"平均1M": st.column_config.NumberColumn(format="%.2%"), "平均距52週高點": st.column_config.NumberColumn(format="%.2%")},
+        )
+
+    with quant_analogs:
+        st.markdown("#### QQQ 歷史相似樣本")
+        quant_sample = st.segmented_control("樣本層級", options=["核心 50 筆", "參考 100 筆"], default="核心 50 筆", key="quant_analog_sample")
+        quant_analog_rows = historical_analogs(indicators, target="QQQ", top_n=50 if quant_sample == "核心 50 筆" else 100)
+        if quant_analog_rows.empty:
+            st.info("資料量不足，暫時無法顯示歷史相似樣本。")
+        else:
+            quant_stats = analog_stats(quant_analog_rows).rename(
+                columns={"horizon": "後續週期", "sample": "樣本數", "avg_return": "平均報酬", "median_return": "中位數報酬", "win_rate": "原始勝率", "win_rate_conservative": "保守勝率", "worst_decile_avg": "最差10%均值", "confidence": "信心"}
+            )
+            st.dataframe(
+                quant_stats,
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "平均報酬": st.column_config.NumberColumn(format="%.2%"), "中位數報酬": st.column_config.NumberColumn(format="%.2%"),
+                    "原始勝率": st.column_config.NumberColumn(format="%.2%"), "保守勝率": st.column_config.NumberColumn(format="%.2%"), "最差10%均值": st.column_config.NumberColumn(format="%.2%"),
+                },
+            )
+            quant_analog_rows = quant_analog_rows.copy()
+            quant_analog_rows["date"] = pd.to_datetime(quant_analog_rows["date"]).dt.date
+            st.dataframe(
+                quant_analog_rows.rename(columns={"date": "日期", "similarity": "相似度", "regime_snapshot": "當時狀態", "1M": "後1M", "3M": "後3M", "6M": "後6M", "12M": "後12M"})[["日期", "相似度", "當時狀態", "後1M", "後3M", "後6M", "後12M"]],
+                hide_index=True,
+                width="stretch",
+                column_config={"相似度": st.column_config.NumberColumn(format="%.2f"), "後1M": st.column_config.NumberColumn(format="%.2%"), "後3M": st.column_config.NumberColumn(format="%.2%"), "後6M": st.column_config.NumberColumn(format="%.2%"), "後12M": st.column_config.NumberColumn(format="%.2%")},
+            )
+
+    with quant_emotion:
+        st.markdown("#### 情緒、恐懼貪婪與市場事件數據")
+        if not emotion_components_table.empty:
+            st.dataframe(emotion_components_table, hide_index=True, width="stretch", column_config={"數值": st.column_config.NumberColumn(format="%.1f")})
+        if not emotion_divergence_table.empty:
+            st.markdown("#### 情緒與價格背離")
+            st.dataframe(emotion_divergence_table, hide_index=True, width="stretch", column_config={"20日報酬": st.column_config.NumberColumn(format="%.2%"), "情緒20日變化": st.column_config.NumberColumn(format="%.1f")})
+        if not market_event_windows.empty:
+            st.markdown("#### 大盤事件窗")
+            st.dataframe(market_event_windows.sort_values("end_date", ascending=False), hide_index=True, width="stretch")
+
+    with quant_model:
+        st.markdown("#### LSTM 即時推論與回測")
+        if not lstm_predictions.empty:
+            st.dataframe(lstm_predictions, hide_index=True, width="stretch", column_config={"predicted_prob_up": st.column_config.NumberColumn(format="%.2%")})
+        if not lstm_backtest.empty:
+            st.markdown("#### LSTM 回測紀錄")
+            st.dataframe(lstm_backtest, hide_index=True, width="stretch")
+        if not prediction_log.empty:
+            st.markdown("#### 規則預測驗證紀錄")
+            st.dataframe(prediction_log.sort_values("prediction_date", ascending=False), hide_index=True, width="stretch")
+
+    with quant_kg:
+        st.markdown("#### 事實事件")
+        if kg_payload.facts.empty:
+            st.info("目前尚未建立可查核的 KG 事實事件。")
+        else:
+            st.dataframe(kg_payload.facts, hide_index=True, width="stretch")
+        st.markdown("#### 事件後市場反應")
+        if kg_payload.reactions.empty:
+            st.info("反應層資料仍在累積。")
+        else:
+            st.dataframe(kg_payload.reactions, hide_index=True, width="stretch", column_config={"return": st.column_config.NumberColumn(format="%.2%"), "relative_return": st.column_config.NumberColumn(format="%.2%")})
+
+    with quant_portfolio:
+        if "portfolio_view" not in globals() or portfolio_view.empty:
+            st.info("持倉為私人資料；請先在「我的持倉」解鎖後，此處會顯示可查核的數值明細。")
+        else:
+            st.markdown("#### 持倉原始數據")
+            st.dataframe(portfolio_view, hide_index=True, width="stretch")
