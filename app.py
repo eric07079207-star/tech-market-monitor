@@ -515,7 +515,7 @@ def _display_utc(value: object) -> str:
     if value in {None, "", "n/a"}:
         return "n/a"
     parsed = pd.to_datetime(value, errors="coerce", utc=True)
-    return "n/a" if pd.isna(parsed) else parsed.strftime("%m-%d %H:%M UTC")
+    return "n/a" if pd.isna(parsed) else parsed.strftime("%Y-%m-%d %H:%M UTC")
 
 
 def _display_date(value: object) -> str:
@@ -1223,13 +1223,18 @@ with tab_prediction:
     st.subheader("市場預測驗證")
     st.caption(f"LSTM 狀態：{lstm_status.get('status', 'n/a')}｜模式：{lstm_status.get('mode', 'n/a')}｜模型版本：{lstm_status.get('model_version', 'n/a')}")
     st.markdown("#### LSTM 即時方向預測")
-    lstm_cols = st.columns(6)
-    lstm_cols[0].metric("模型訓練時間", _display_utc(lstm_status.get("last_train_at_utc")))
-    lstm_cols[1].metric("預測生成時間", _display_utc(lstm_status.get("last_predict_at_utc")))
-    lstm_cols[2].metric("預測目標日", _display_date(lstm_status.get("prediction_target_date")))
-    lstm_cols[3].metric("訓練/驗證/測試", f"{lstm_status.get('train_rows', 0)}/{lstm_status.get('valid_rows', 0)}/{lstm_status.get('test_rows', 0)}")
-    lstm_cols[4].metric("回測正確率", pct(lstm_status.get("backtest_accuracy")))
-    lstm_cols[5].metric("信心等級", str(lstm_status.get("prediction_confidence_level", "低信心")))
+    lstm_time_cols = st.columns(3)
+    lstm_time_cols[0].metric("模型訓練日", _display_date(lstm_status.get("last_train_at_utc")))
+    lstm_time_cols[1].metric("預測生成日", _display_date(lstm_status.get("last_predict_at_utc")))
+    lstm_time_cols[2].metric("預測目標日", _display_date(lstm_status.get("prediction_target_date")))
+    st.caption(
+        f"完整時間：訓練 {_display_utc(lstm_status.get('last_train_at_utc'))}｜"
+        f"預測 {_display_utc(lstm_status.get('last_predict_at_utc'))}"
+    )
+    lstm_quality_cols = st.columns(3)
+    lstm_quality_cols[0].metric("訓練/驗證/測試", f"{lstm_status.get('train_rows', 0)}/{lstm_status.get('valid_rows', 0)}/{lstm_status.get('test_rows', 0)}")
+    lstm_quality_cols[1].metric("回測正確率", pct(lstm_status.get("backtest_accuracy")))
+    lstm_quality_cols[2].metric("信心等級", str(lstm_status.get("prediction_confidence_level", "低信心")))
     if lstm_predictions.empty:
         st.info("目前沒有即時推論列；下一次模型訓練完成後會產生。")
     else:
@@ -1571,7 +1576,7 @@ with tab_emotion:
 
 with tab_kg:
     st.subheader("金融知識圖譜")
-    st.caption("第一階段先把新聞與國際新聞拆成可回測事件，再補上敘事特徵與市場反應。")
+    st.caption("把市場資訊整理成「事件 → 市場敘事 → 實際價格反應」，用來累積日後可驗證的研究證據，而不是直接預測或替你下結論。")
     if "updated_at_utc" in metadata:
         st.caption(
             f"KG 更新 UTC：{metadata.get('updated_at_utc', 'n/a')}｜"
@@ -1582,11 +1587,52 @@ with tab_kg:
     if kg_payload.facts.empty:
         st.info("目前尚未建立知識圖譜事件。等待下一次資料更新後會自動填入。")
     else:
+        facts_view = kg_payload.facts.copy()
+        facts_view["timestamp_utc"] = pd.to_datetime(facts_view["timestamp_utc"], errors="coerce", utc=True)
+        facts_view = facts_view.sort_values("timestamp_utc", ascending=False)
+        narrative_view = kg_payload.narratives.copy()
+        reaction_view = kg_payload.reactions.copy()
+        verified_reactions = reaction_view[reaction_view.get("reaction_available", pd.Series(False, index=reaction_view.index)).fillna(False)].copy()
+
+        themes = (
+            narrative_view.groupby("dominant_theme", dropna=True)
+            .agg(事件數=("event_id", "nunique"), 敘事強度=("narrative_strength", "mean"), 情緒分數=("sentiment_score", "mean"))
+            .sort_values(["事件數", "敘事強度"], ascending=False)
+            if not narrative_view.empty else pd.DataFrame()
+        )
+        top_theme = str(themes.index[0]) if not themes.empty else "尚未形成明確主題"
+        top_theme_count = int(themes.iloc[0]["事件數"]) if not themes.empty else 0
+        affected = facts_view.get("affected_tickers", pd.Series(dtype=str)).fillna("").astype(str)
+        top_affected = affected[affected.ne("")].iloc[0] if not affected[affected.ne("")].empty else "尚未辨識"
+        avg_reaction = pd.to_numeric(verified_reactions.get("return", pd.Series(dtype=float)), errors="coerce").mean()
+
         kg_metrics = st.columns(4)
-        kg_metrics[0].metric("事實事件", f"{len(kg_payload.facts)}")
-        kg_metrics[1].metric("去重後事件", f"{kg_payload.facts['canonical_event_id'].nunique() if 'canonical_event_id' in kg_payload.facts else len(kg_payload.facts)}")
-        kg_metrics[2].metric("平均來源可靠度", num(kg_payload.facts.get("source_reliability_score", pd.Series(dtype=float)).mean(), 2))
-        kg_metrics[3].metric("平均品質", num(kg_payload.facts.get("quality_score", pd.Series(dtype=float)).mean(), 0))
+        kg_metrics[0].metric("近期主題", top_theme, f"{top_theme_count} 個去重事件")
+        kg_metrics[1].metric("最近影響對象", top_affected)
+        kg_metrics[2].metric("已驗證市場反應", f"{len(verified_reactions)} 筆", f"平均 {pct(avg_reaction)}")
+        kg_metrics[3].metric("研究成熟度", "資料累積中" if len(verified_reactions) < 100 else "可開始回測", f"事件 {len(facts_view)} 筆")
+
+        st.markdown("#### 這一頁現在告訴你什麼")
+        st.info(
+            "先看『近期主題』理解市場正集中討論什麼；再看下方傳導鏈確認事件影響哪些標的；"
+            "最後用『已驗證市場反應』判斷系統是否已有足夠結果可回測。完整事件與數字仍在量化數據中心。"
+        )
+
+        st.markdown("#### 最近市場傳導鏈")
+        for event in facts_view.head(3).itertuples():
+            event_id = getattr(event, "event_id", "")
+            narrative_match = narrative_view[narrative_view["event_id"] == event_id] if not narrative_view.empty else pd.DataFrame()
+            reaction_match = verified_reactions[verified_reactions["event_id"] == event_id] if not verified_reactions.empty else pd.DataFrame()
+            theme = narrative_match.iloc[0].get("dominant_theme", "尚未歸類") if not narrative_match.empty else "尚未歸類"
+            if reaction_match.empty:
+                reaction_text = "尚未到可驗證的後續交易日"
+            else:
+                latest_reaction = reaction_match.sort_values("horizon_days", ascending=False).iloc[0]
+                reaction_text = f"{latest_reaction.get('affected_ticker', '市場')} 在 {latest_reaction.get('time_horizon', 'n/a')} 的實際反應 {pct(latest_reaction.get('return'))}"
+            st.markdown(
+                f"**事實：{getattr(event, 'event_title', 'n/a')}**  \\n"
+                f"敘事：{theme} ｜影響對象：{getattr(event, 'affected_tickers', '未辨識')} ｜市場反應：{reaction_text}"
+            )
 
 with tab_memory:
     st.subheader("專案記憶 / 討論摘要")
