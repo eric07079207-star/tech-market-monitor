@@ -77,6 +77,7 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         return pd.DataFrame()
 try:
     from src.kg import kg_summary, load_knowledge_graph
+    from src.kg_predictions import kg_prediction_summary, load_kg_prediction_log
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def load_knowledge_graph():
         from collections import namedtuple
@@ -94,6 +95,12 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
                 {"層級": "連結層", "筆數": 0, "最新時間": "n/a", "說明": "等待模組同步"},
             ]
         )
+
+    def load_kg_prediction_log() -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def kg_prediction_summary(log: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame()
 try:
     from src.project_memory import MEMORY_DOCX_FILE, load_memory_bundle
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
@@ -777,6 +784,7 @@ emotion_alert_table = pd.DataFrame(emotion_alerts(emotion_row))
 discovery_performance = load_discovery_perf()
 kg_payload = load_knowledge_graph()
 kg_health = kg_summary(kg_payload)
+kg_prediction_log = load_kg_prediction_log()
 metadata = load_metadata()
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
@@ -1634,6 +1642,45 @@ with tab_kg:
                 f"敘事：{theme} ｜影響對象：{getattr(event, 'affected_tickers', '未辨識')} ｜市場反應：{reaction_text}"
             )
 
+        st.markdown("#### KG 研究觀察預測")
+        st.caption("實驗性研究紀錄：以近期事件、敘事與來源品質形成 QQQ 方向觀察；不是買賣建議，會在觀察期結束後自動驗證。")
+        if kg_prediction_log.empty:
+            st.info("下一個成功的資料更新會建立第一組每日、每週與每月 KG 研究觀察。")
+        else:
+            latest_date = pd.to_datetime(kg_prediction_log["prediction_date"], errors="coerce").max()
+            latest_predictions = kg_prediction_log[
+                pd.to_datetime(kg_prediction_log["prediction_date"], errors="coerce").eq(latest_date)
+            ].copy()
+            pred_tabs = st.tabs(["每日（1D）", "每週（5D）", "每月（20D）"])
+            for prediction_tab, horizon in zip(pred_tabs, ["每日（1D）", "每週（5D）", "每月（20D）"]):
+                with prediction_tab:
+                    row = latest_predictions[latest_predictions["horizon"] == horizon]
+                    if row.empty:
+                        st.info("此觀察期尚未建立紀錄。")
+                        continue
+                    latest_row = row.iloc[0]
+                    prediction_metrics = st.columns(4)
+                    prediction_metrics[0].metric("研究方向", latest_row.get("prediction_direction", "觀望"))
+                    prediction_metrics[1].metric("信心等級", latest_row.get("confidence", "低"), f"分數 {num(latest_row.get('confidence_score'), 2)}")
+                    prediction_metrics[2].metric("研究訊號", num(latest_row.get("signal_score"), 2))
+                    prediction_metrics[3].metric("預測日", pd.to_datetime(latest_row.get("prediction_date"), errors="coerce").strftime("%Y-%m-%d"))
+                    st.info(str(latest_row.get("reason", "尚無可說明的研究依據。")))
+                    if pd.notna(latest_row.get("success")):
+                        outcome = "命中" if bool(latest_row["success"]) else "未命中"
+                        st.caption(f"已驗證：{outcome}｜實際 QQQ 報酬 {pct(latest_row.get('actual_return'))}")
+                    else:
+                        st.caption(f"尚待 {int(latest_row.get('horizon_days', 0))} 個交易日後驗證。")
+
+            kg_prediction_stats = kg_prediction_summary(kg_prediction_log)
+            if not kg_prediction_stats.empty:
+                st.caption("已完成的歷史驗證")
+                st.dataframe(
+                    kg_prediction_stats.rename(columns={"horizon": "觀察期", "已驗證筆數": "已驗證", "命中率": "命中率", "平均實際報酬": "平均實際報酬"}),
+                    hide_index=True,
+                    width="stretch",
+                    column_config={"命中率": st.column_config.NumberColumn(format="%.1%"), "平均實際報酬": st.column_config.NumberColumn(format="%.2%")},
+                )
+
 with tab_memory:
     st.subheader("專案記憶 / 討論摘要")
     st.caption("這一頁用來保存長期有效的專案上下文，避免聊天壓縮後遺失已確認的規則、決策與討論結論。")
@@ -2069,6 +2116,21 @@ with tab_quant:
     with quant_kg:
         st.markdown("#### 圖譜資料健康")
         st.dataframe(kg_health, hide_index=True, width="stretch")
+        st.markdown("#### KG 研究觀察預測紀錄")
+        if kg_prediction_log.empty:
+            st.info("尚無 KG 研究觀察預測紀錄。")
+        else:
+            st.dataframe(
+                kg_prediction_log.sort_values(["prediction_date", "horizon_days"], ascending=[False, True]),
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "confidence_score": st.column_config.NumberColumn(format="%.2f"),
+                    "signal_score": st.column_config.NumberColumn(format="%.2f"),
+                    "actual_return": st.column_config.NumberColumn(format="%.2%"),
+                    "max_drawdown": st.column_config.NumberColumn(format="%.2%"),
+                },
+            )
         st.markdown("#### 事實事件")
         if kg_payload.facts.empty:
             st.info("目前尚未建立可查核的 KG 事實事件。")

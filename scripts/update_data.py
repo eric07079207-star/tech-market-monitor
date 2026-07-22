@@ -29,6 +29,7 @@ from src.kg import (
     REACTION_CACHE,
     build_knowledge_graph,
 )
+from src.kg_predictions import KG_PREDICTION_CACHE, load_kg_prediction_log, update_kg_prediction_log
 from src.lstm import (
     LSTM_MONITOR_FEATURE_CACHE,
     LSTM_TRAIN_FEATURE_CACHE,
@@ -491,6 +492,26 @@ def main() -> None:
         }
         temp_name = str(KG_METADATA_CACHE.relative_to(KG_METADATA_CACHE.parents[1]))
         _write_json_module(module_records, module_name="kg_metadata", category="知識圖譜", filename=temp_name, payload=kg_metadata, critical=False, latest=fetched_at_utc)
+        try:
+            kg_prediction_log = update_kg_prediction_log(
+                kg.facts,
+                kg.narratives,
+                prices,
+                existing_log=load_kg_prediction_log(),
+                save=False,
+            )
+            _write_frame_module(
+                module_records,
+                module_name="kg_prediction_log",
+                category="知識圖譜",
+                filename=str(KG_PREDICTION_CACHE.relative_to(KG_PREDICTION_CACHE.parents[1])),
+                frame=kg_prediction_log,
+                validation=FrameValidation(required_columns=("prediction_date", "target", "horizon", "prediction_direction"), allow_empty=True),
+                critical=False,
+                latest_columns=["prediction_date", "validated_at"],
+            )
+        except Exception as exc:
+            _record(module_records, "kg_prediction_log", "知識圖譜", "fallback", f"exception: {exc}", False)
 
     # Prediction log
     try:
