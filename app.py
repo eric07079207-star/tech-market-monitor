@@ -300,28 +300,84 @@ st.set_page_config(page_title="Tech Market Monitor", layout="wide")
 st.markdown(
     """
     <style>
-    .block-container {padding-top: 1.4rem; padding-bottom: 2rem;}
-    h1 {font-size: 2.35rem; line-height: 1.15;}
+    :root {
+        --ink: #17212b;
+        --muted: #66788a;
+        --line: #d6e0e8;
+        --canvas: #f3f6f8;
+        --panel: #ffffff;
+        --navy: #142b3c;
+        --blue: #1976b9;
+        --teal: #0c8578;
+        --green: #16803b;
+        --amber: #b76909;
+        --red: #c0284b;
+    }
+    .stApp {background: var(--canvas); color: var(--ink);}
+    .block-container {max-width: 1520px; padding-top: 1.15rem; padding-bottom: 2.5rem;}
+    h1, h2, h3 {color: var(--ink); letter-spacing: 0 !important;}
+    h2 {font-size: 1.45rem; margin-top: 1.75rem; border-bottom: 1px solid var(--line); padding-bottom: 0.55rem;}
+    h3 {font-size: 1.08rem; margin-top: 1.35rem;}
+    [data-testid="stSidebar"] {background: var(--navy); border-right: 1px solid #29465a;}
+    [data-testid="stSidebar"] * {color: #edf5f8;}
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {color: #b9cbd6;}
+    [data-testid="stSidebar"] hr {border-color: #385469;}
+    [data-testid="stSidebar"] button[kind="secondary"] {background: #215571; border-color: #4c829e; color: #ffffff;}
+    [data-testid="stSidebar"] button[kind="secondary"]:hover {background: #2d6c8d; border-color: #88b7cb;}
     div[data-testid="stMetric"] {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 12px 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-top: 4px solid var(--blue);
+        border-radius: 7px;
+        padding: 13px 15px;
+        min-height: 104px;
+        box-shadow: 0 1px 2px rgba(20, 43, 60, 0.05);
     }
-    .small-muted {color: #6b7280; font-size: 0.86rem;}
+    [data-testid="stMetricLabel"] {color: var(--muted); font-size: 0.79rem; font-weight: 700;}
+    [data-testid="stMetricValue"] {color: var(--ink); font-weight: 760;}
+    .terminal-hero {background: var(--navy); border: 1px solid #294b61; border-radius: 8px; padding: 1.35rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 3px 10px rgba(20, 43, 60, 0.16);}
+    .terminal-eyebrow {color: #89cce1; font-size: 0.75rem; font-weight: 750; letter-spacing: 0.08em; margin-bottom: 0.4rem;}
+    .terminal-title {color: #ffffff; font-size: 2rem; font-weight: 780; line-height: 1.15; margin: 0;}
+    .terminal-subtitle {color: #c6d7e0; font-size: 0.9rem; margin: 0.45rem 0 0;}
+    .terminal-badges {display: flex; gap: 0.45rem; flex-wrap: wrap; justify-content: flex-end; align-content: center; height: 100%;}
+    .terminal-badge {background: #21475e; color: #dceef4; border: 1px solid #416b81; border-radius: 999px; font-size: 0.76rem; font-weight: 650; padding: 0.34rem 0.6rem; white-space: nowrap;}
+    .terminal-badge.live {background: #0d5d56; border-color: #32988d; color: #d9fffa;}
+    .small-muted {color: var(--muted); font-size: 0.82rem;}
     .insight-card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--teal);
+        border-radius: 7px;
         padding: 14px 16px;
-        min-height: 116px;
+        min-height: 122px;
+        box-shadow: 0 1px 2px rgba(20, 43, 60, 0.05);
     }
-    .insight-card .label {color: #6b7280; font-size: 0.82rem; margin-bottom: 8px;}
-    .insight-card .value {font-size: 1.12rem; font-weight: 700; line-height: 1.25; color: #111827;}
-    .insight-card .detail {color: #4b5563; font-size: 0.84rem; margin-top: 8px; line-height: 1.35;}
-    .light-green {color: #15803d; font-weight: 700;}
-    .light-yellow {color: #a16207; font-weight: 700;}
-    .light-red {color: #b91c1c; font-weight: 700;}
+    .insight-card .label {color: var(--muted); font-size: 0.76rem; font-weight: 750; margin-bottom: 8px; text-transform: uppercase;}
+    .insight-card .value {font-size: 1.1rem; font-weight: 760; line-height: 1.28; color: var(--ink);}
+    .insight-card .detail {color: #496074; font-size: 0.83rem; margin-top: 8px; line-height: 1.4;}
+    .stTabs [data-baseweb="tab-list"] {gap: 0.2rem; border-bottom: 1px solid var(--line); overflow-x: auto;}
+    .stTabs [data-baseweb="tab"] {height: 2.8rem; padding: 0 0.82rem; color: #536b7b; font-size: 0.86rem; font-weight: 700; white-space: nowrap;}
+    .stTabs [aria-selected="true"] {color: var(--blue);}
+    .stTabs [data-baseweb="tab-highlight"] {background-color: var(--blue); height: 3px;}
+    [data-testid="stDataFrame"] {border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--panel);}
+    [data-testid="stDataFrame"] [role="columnheader"] {background: #eaf1f5; color: #324e62; font-weight: 750;}
+    [data-testid="stExpander"] {background: var(--panel); border: 1px solid var(--line); border-radius: 7px;}
+    [data-testid="stAlert"] {border-radius: 7px;}
+    button[kind="secondary"] {border-radius: 6px; border-color: #b7c8d4; color: #294b61; font-weight: 700;}
+    button[kind="secondary"]:hover {border-color: var(--blue); color: var(--blue);}
+    .light-green {color: var(--green); font-weight: 700;}
+    .light-yellow {color: var(--amber); font-weight: 700;}
+    .light-red {color: var(--red); font-weight: 700;}
+    @media (max-width: 760px) {
+        .block-container {padding: 0.75rem 0.7rem 1.75rem;}
+        .terminal-hero {padding: 1.05rem 1rem;}
+        .terminal-title {font-size: 1.55rem;}
+        .terminal-badges {justify-content: flex-start; margin-top: 0.9rem;}
+        div[data-testid="stMetric"] {min-height: 88px; padding: 10px 11px;}
+        [data-testid="stMetricValue"] {font-size: 1.35rem;}
+        .stTabs [data-baseweb="tab"] {padding: 0 0.62rem; font-size: 0.8rem;}
+        .insight-card {min-height: 105px; padding: 12px 13px;}
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -744,10 +800,29 @@ active_news_keywords = load_news_keywords()
 keyword_discovery_news = tsla_keyword_news.copy()
 tsla_keyword_summary = summarize_keyword_news(keyword_discovery_news, "TSLA")
 
-st.title("科技股量化監控儀表板")
 last_date = pd.to_datetime(snapshot["date"]).max().date() if not snapshot.empty else None
 updated_at = metadata.get("updated_at_utc", "尚未寫入")
-st.markdown(f"<span class='small-muted'>市場資料日期：{last_date}｜快取更新 UTC：{updated_at}</span>", unsafe_allow_html=True)
+pipeline_status = str(metadata.get("pipeline_status", "") or "")
+pipeline_badge = "資料已同步" if pipeline_status == "success" else "快取保護中"
+st.markdown(
+    f"""
+    <div class="terminal-hero">
+      <div style="display:flex; gap:1rem; justify-content:space-between; flex-wrap:wrap;">
+        <div>
+          <div class="terminal-eyebrow">MARKET RESEARCH TERMINAL</div>
+          <div class="terminal-title">科技股量化監控儀表板</div>
+          <div class="terminal-subtitle">以價格、敘事、情緒與資金反應整合市場研究</div>
+        </div>
+        <div class="terminal-badges">
+          <span class="terminal-badge live">{pipeline_badge}</span>
+          <span class="terminal-badge">市場資料 {last_date}</span>
+          <span class="terminal-badge">快取 {updated_at}</span>
+        </div>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 with st.sidebar:
     st.subheader("最後更新")
