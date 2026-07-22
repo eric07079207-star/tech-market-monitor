@@ -926,74 +926,13 @@ tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, 
 with tab_overview:
     left, right = st.columns([1.45, 1])
     with left:
-        watch = snapshot[snapshot["symbol"].isin(ETF_TICKERS + STOCK_TICKERS)].copy()
-        display = watch[
-            [
-                "symbol",
-                "name",
-                "group",
-                "ret_1d",
-                "ret_20d",
-                "ret_50d",
-                "dist_ma_50",
-                "dist_ma_200",
-                "drawdown_52w",
-                "volume_ratio_20d",
-                "realized_vol_20d",
-            ]
-        ].rename(
-            columns={
-                "symbol": "代號",
-                "name": "名稱",
-                "group": "類別",
-                "ret_1d": "1D",
-                "ret_20d": "1M",
-                "ret_50d": "約 10W",
-                "dist_ma_50": "距 50DMA",
-                "dist_ma_200": "距 200DMA",
-                "drawdown_52w": "距 52W 高點",
-                "volume_ratio_20d": "量/20日均量",
-                "realized_vol_20d": "20D 年化波動",
-            }
-        )
-        st.subheader("Watchlist Heatmap")
-        st.dataframe(
-            display,
-            hide_index=True,
-            width="stretch",
-            column_config={
-                "1D": st.column_config.NumberColumn(format="%.2%"),
-                "1M": st.column_config.NumberColumn(format="%.2%"),
-                "約 10W": st.column_config.NumberColumn(format="%.2%"),
-                "距 50DMA": st.column_config.NumberColumn(format="%.2%"),
-                "距 200DMA": st.column_config.NumberColumn(format="%.2%"),
-                "距 52W 高點": st.column_config.NumberColumn(format="%.2%"),
-                "量/20日均量": st.column_config.NumberColumn(format="%.2fx"),
-                "20D 年化波動": st.column_config.NumberColumn(format="%.2%"),
-            },
-        )
+        st.subheader("市場研究地圖")
+        st.info("個別標的的報酬、均線、成交量與波動度已集中到「量化數據中心 → 市場數據」。")
 
     with right:
         st.subheader("市場廣度")
         breadth = breadth_table(snapshot)
-        st.dataframe(
-            breadth.rename(
-                columns={
-                    "group": "類別",
-                    "count": "數量",
-                    "above_50dma": "高於50DMA",
-                    "above_200dma": "高於200DMA",
-                    "avg_1m_return": "平均1M",
-                    "avg_drawdown_52w": "平均距52W高點",
-                }
-            ),
-            hide_index=True,
-            width="stretch",
-            column_config={
-                "平均1M": st.column_config.NumberColumn(format="%.2%"),
-                "平均距52W高點": st.column_config.NumberColumn(format="%.2%"),
-            },
-        )
+        st.caption("完整市場廣度數字已集中到「量化數據中心 → 市場數據」。")
 
         chart_df = snapshot[snapshot["symbol"].isin(ETF_TICKERS + STOCK_TICKERS)].copy()
         fig = px.scatter(
@@ -1014,25 +953,7 @@ with tab_overview:
         if validation.empty:
             st.caption("預測紀錄已建立；等 5D / 20D / 60D 週期走完後，這裡會開始顯示成功率。")
         else:
-            st.dataframe(
-                validation.rename(
-                    columns={
-                        "horizon": "驗證週期",
-                        "prediction_direction": "預測方向",
-                        "sample": "樣本數",
-                        "success_rate": "成功率",
-                        "avg_return": "平均實際報酬",
-                        "avg_max_drawdown": "平均最大回撤",
-                    }
-                ),
-                hide_index=True,
-                width="stretch",
-                column_config={
-                    "成功率": st.column_config.NumberColumn(format="%.2%"),
-                    "平均實際報酬": st.column_config.NumberColumn(format="%.2%"),
-                    "平均最大回撤": st.column_config.NumberColumn(format="%.2%"),
-                },
-            )
+            st.caption("預測驗證的逐筆數字與各週期統計已集中到「量化數據中心 → 預測數據」。")
 
         with st.expander("名詞說明"):
             st.markdown(
@@ -1412,29 +1333,7 @@ with tab_prediction:
     if recent_predictions.empty:
         st.caption("尚無預測紀錄。")
     else:
-        st.dataframe(
-            recent_predictions.rename(
-                columns={
-                    "prediction_date": "預測日",
-                    "horizon": "週期",
-                    "prediction_direction": "方向",
-                    "confidence": "信心",
-                    "regime_score": "Regime",
-                    "reason": "理由",
-                    "actual_return": "實際報酬",
-                    "max_drawdown": "最大回撤",
-                    "success": "成功",
-                    "validated_at": "驗證日",
-                }
-            )[["預測日", "週期", "方向", "信心", "Regime", "理由", "實際報酬", "最大回撤", "成功", "驗證日"]],
-            hide_index=True,
-            width="stretch",
-            column_config={
-                "Regime": st.column_config.NumberColumn(format="%.0f"),
-                "實際報酬": st.column_config.NumberColumn(format="%.2%"),
-                "最大回撤": st.column_config.NumberColumn(format="%.2%"),
-            },
-        )
+        st.caption("逐筆預測、實際報酬與驗證結果已集中到「量化數據中心 → 預測數據」。")
 
 with tab_discovery:
     st.subheader("新聞探索候選股")
@@ -1659,12 +1558,7 @@ with tab_emotion:
         st.caption("恐懼貪婪指數是本系統的可重現內部模型，不直接複製任何外部網站指數；網路中斷時仍可用最近一次成功更新的資料計算。")
         fear_greed_components = fear_greed.get("components", pd.DataFrame())
         if not fear_greed_components.empty:
-            st.dataframe(
-                fear_greed_components,
-                hide_index=True,
-                width="stretch",
-                column_config={"分數": st.column_config.NumberColumn(format="%.1f")},
-            )
+            st.caption("恐懼貪婪組成數字已集中到「量化數據中心 → 情緒數據」。")
 
         st.markdown("#### 今日情緒結論")
         if pd.notna(mood_score):
@@ -1689,12 +1583,7 @@ with tab_emotion:
         if emotion_components_table.empty:
             st.caption("目前沒有可拆解的情緒來源。")
         else:
-            st.dataframe(
-                emotion_components_table,
-                hide_index=True,
-                width="stretch",
-                column_config={"數值": st.column_config.NumberColumn(format="%.1f")},
-            )
+            st.caption("情緒來源的完整數字已集中到「量化數據中心 → 情緒數據」。")
 
         st.markdown("#### 情緒趨勢")
         if emotion_trend_table.empty:
@@ -1714,41 +1603,19 @@ with tab_emotion:
         if emotion_divergence_table.empty:
             st.caption("目前沒有足夠價格資料可計算背離。")
         else:
-            st.dataframe(
-                emotion_divergence_table,
-                hide_index=True,
-                width="stretch",
-                column_config={
-                    "20日報酬": st.column_config.NumberColumn(format="%.2%"),
-                    "情緒20日變化": st.column_config.NumberColumn(format="%.1f"),
-                },
-            )
             st.caption("價格上漲但情緒下降，代表上漲信心減弱；價格下跌但情緒改善，代表可能進入修復觀察期。這是研究訊號，不是單獨交易指令。")
+            st.caption("逐筆背離資料已集中到「量化數據中心 → 情緒數據」。")
 
         st.markdown("#### 歷史情緒事件")
         if market_event_windows.empty:
             st.caption("目前沒有大盤 ±10% 事件窗。")
         else:
-            event_view = market_event_windows.sort_values("end_date", ascending=False).head(12).copy()
-            event_columns = [column for column in ["symbol", "direction", "start_date", "end_date", "window_return", "vix_level", "market_mood_score", "market_mood_label", "historical_window"] if column in event_view]
-            st.dataframe(
-                event_view[event_columns].rename(
-                    columns={
-                        "symbol": "標的", "direction": "方向", "start_date": "起始日", "end_date": "結束日",
-                        "window_return": "20日報酬", "vix_level": "VIX", "market_mood_score": "情緒分數",
-                        "market_mood_label": "情緒標籤", "historical_window": "歷史情境",
-                    }
-                ),
-                hide_index=True,
-                width="stretch",
-                column_config={"20日報酬": st.column_config.NumberColumn(format="%.2%"), "情緒分數": st.column_config.NumberColumn(format="%.1f")},
-            )
+            st.caption("完整大盤事件窗與相關數字已集中到「量化數據中心 → 情緒數據」。")
         st.caption(f"資料日期：{pd.to_datetime(emotion_row.get('date'), errors='coerce').date()}｜情緒資料來源：既有 sentiment.parquet；情緒層目前為規則化重建資料。")
 
 with tab_kg:
     st.subheader("金融知識圖譜")
     st.caption("第一階段先把新聞與國際新聞拆成可回測事件，再補上敘事特徵與市場反應。")
-    st.dataframe(kg_health.rename(columns={"層級": "層級", "筆數": "筆數", "最新時間": "最新時間", "說明": "說明"}), hide_index=True, width="stretch")
     if "updated_at_utc" in metadata:
         st.caption(
             f"KG 更新 UTC：{metadata.get('updated_at_utc', 'n/a')}｜"
@@ -1765,81 +1632,7 @@ with tab_kg:
         kg_metrics[2].metric("平均來源可靠度", num(kg_payload.facts.get("source_reliability_score", pd.Series(dtype=float)).mean(), 2))
         kg_metrics[3].metric("平均品質", num(kg_payload.facts.get("quality_score", pd.Series(dtype=float)).mean(), 0))
 
-        left_kg, right_kg = st.columns([1, 1.2])
-        with left_kg:
-            st.markdown("#### 事件類型分布")
-            fact_summary = kg_payload.facts.groupby("event_type_primary").size().reset_index(name="事件數").sort_values("事件數", ascending=False)
-            st.dataframe(fact_summary.rename(columns={"event_type_primary": "事件類型", "事件數": "事件數"}), hide_index=True, width="stretch")
-        with right_kg:
-            st.markdown("#### 最近事件")
-            recent_facts = kg_payload.facts.head(15)[[
-                "timestamp_utc",
-                "entity",
-                "event_type_primary",
-                "canonical_event",
-                "event_title",
-                "source_reliability_score",
-                "dedup_group_size",
-                "event_strength",
-                "impact_direction",
-                "confidence",
-            ]]
-            st.dataframe(
-                recent_facts.rename(
-                    columns={
-                        "timestamp_utc": "時間",
-                        "entity": "主體",
-                        "event_type_primary": "事件類型",
-                        "canonical_event": "標準事件",
-                        "event_title": "事件",
-                        "source_reliability_score": "來源可靠度",
-                        "dedup_group_size": "去重群組",
-                        "event_strength": "事件強度",
-                        "impact_direction": "方向",
-                        "confidence": "信心",
-                    }
-                ),
-                hide_index=True,
-                width="stretch",
-                column_config={
-                    "信心": st.column_config.NumberColumn(format="%.2f"),
-                    "來源可靠度": st.column_config.NumberColumn(format="%.2f"),
-                    "去重群組": st.column_config.NumberColumn(format="%.0f"),
-                    "事件強度": st.column_config.NumberColumn(format="%.2f"),
-                },
-            )
-        st.markdown("#### 市場反應摘要")
-        if kg_payload.reactions.empty:
-            st.info("反應層資料還在累積。")
-        else:
-            reaction_view = kg_payload.reactions.copy()
-            if "return" in reaction_view:
-                reaction_view["return"] = pd.to_numeric(reaction_view["return"], errors="coerce")
-            if "relative_return" in reaction_view:
-                reaction_view["relative_return"] = pd.to_numeric(reaction_view["relative_return"], errors="coerce")
-            st.dataframe(
-                reaction_view.head(20).rename(
-                    columns={
-                        "event_id": "事件ID",
-                        "canonical_event_id": "標準事件ID",
-                        "affected_ticker": "影響標的",
-                        "time_horizon": "時間窗",
-                        "return": "事件後報酬",
-                        "relative_return": "相對QQQ",
-                        "volume_ratio": "量能比",
-                        "market_impact_rank": "影響排名",
-                        "reaction_available": "已驗證",
-                    }
-                ),
-                hide_index=True,
-                width="stretch",
-                column_config={
-                    "事件後報酬": st.column_config.NumberColumn(format="%.2%"),
-                    "相對QQQ": st.column_config.NumberColumn(format="%.2%"),
-                    "量能比": st.column_config.NumberColumn(format="%.2fx"),
-                    "影響排名": st.column_config.NumberColumn(format="%.2f"),
-                },
-            )
+        st.info("事件類型、逐筆事實事件與事件後市場反應，已集中到「量化數據中心 → 知識圖譜數據」。")
 
 with tab_memory:
     st.subheader("專案記憶 / 討論摘要")
@@ -2094,49 +1887,13 @@ VOO,,,500
                         "suggestion": "操作建議",
                     }
                 )
-                st.dataframe(
-                    detail,
-                    hide_index=True,
-                    width="stretch",
-                    column_config={
-                        "持股數量": st.column_config.NumberColumn(format="%.4f"),
-                        "平均成本": st.column_config.NumberColumn(format="$%.2f"),
-                        "現價": st.column_config.NumberColumn(format="$%.2f"),
-                        "市值": st.column_config.NumberColumn(format="$%.0f"),
-                        "未實現損益": st.column_config.NumberColumn(format="$%.0f"),
-                        "未實現報酬率": st.column_config.NumberColumn(format="%.2%"),
-                        "持倉占總資產比例": st.column_config.NumberColumn(format="%.2%"),
-                        "市場熱度分數": st.column_config.NumberColumn(format="%.0f"),
-                        "風險分數": st.column_config.NumberColumn(format="%.0f"),
-                    },
-                )
+                st.caption("完整持倉數字、成本與風險欄位已集中到「量化數據中心 → 持倉數據」。")
 
                 st.markdown("#### C. 操作建議")
                 st.markdown("##### 持倉風險分層")
                 bucket = bucket_summary(portfolio_view)
                 if not bucket.empty:
-                    st.dataframe(
-                        bucket.rename(
-                            columns={
-                                "position_bucket": "分層",
-                                "market_value": "市值",
-                                "asset_weight": "資產占比",
-                                "avg_return": "平均報酬",
-                                "avg_risk": "平均風險分",
-                                "max_weight": "最大單檔占比",
-                                "count": "檔數",
-                            }
-                        ),
-                        hide_index=True,
-                        width="stretch",
-                        column_config={
-                            "市值": st.column_config.NumberColumn(format="$%.0f"),
-                            "資產占比": st.column_config.NumberColumn(format="%.2%"),
-                            "平均報酬": st.column_config.NumberColumn(format="%.2%"),
-                            "平均風險分": st.column_config.NumberColumn(format="%.0f"),
-                            "最大單檔占比": st.column_config.NumberColumn(format="%.2%"),
-                        },
-                    )
+                    st.caption("持倉分層數字已集中到「量化數據中心 → 持倉數據」。")
                 with st.expander("分層規則"):
                     st.dataframe(
                         bucket_guidelines().rename(columns={"position_bucket": "分層", "target_role": "角色", "risk_rule": "風險規則"}),
@@ -2184,21 +1941,7 @@ VOO,,,500
                         "negative_keywords": "負面關鍵字",
                     }
                 )
-                st.dataframe(
-                    advice,
-                    hide_index=True,
-                    width="stretch",
-                    column_config={
-                        "加倉價": st.column_config.NumberColumn(format="$%.2f"),
-                        "減碼價": st.column_config.NumberColumn(format="$%.2f"),
-                        "停損價": st.column_config.NumberColumn(format="$%.2f"),
-                        "今日漲跌": st.column_config.NumberColumn(format="%.2%"),
-                        "5日漲跌": st.column_config.NumberColumn(format="%.2%"),
-                        "20日漲跌": st.column_config.NumberColumn(format="%.2%"),
-                        "量/20日均量": st.column_config.NumberColumn(format="%.2fx"),
-                        "新聞情緒分數": st.column_config.NumberColumn(format="%.2f"),
-                    },
-                )
+                st.caption("建議價位、量價訊號與新聞分數已集中到「量化數據中心 → 持倉數據」。")
 
                 st.markdown("#### D. 風險警示")
                 if portfolio_alerts.empty:
@@ -2285,7 +2028,12 @@ with tab_quant:
 
     with quant_emotion:
         st.markdown("#### 情緒、恐懼貪婪與市場事件數據")
+        fear_greed_components = fear_greed.get("components", pd.DataFrame())
+        if not fear_greed_components.empty:
+            st.markdown("#### 恐懼貪婪組成")
+            st.dataframe(fear_greed_components, hide_index=True, width="stretch", column_config={"分數": st.column_config.NumberColumn(format="%.1f")})
         if not emotion_components_table.empty:
+            st.markdown("#### 情緒來源拆解")
             st.dataframe(emotion_components_table, hide_index=True, width="stretch", column_config={"數值": st.column_config.NumberColumn(format="%.1f")})
         if not emotion_divergence_table.empty:
             st.markdown("#### 情緒與價格背離")
@@ -2306,6 +2054,8 @@ with tab_quant:
             st.dataframe(prediction_log.sort_values("prediction_date", ascending=False), hide_index=True, width="stretch")
 
     with quant_kg:
+        st.markdown("#### 圖譜資料健康")
+        st.dataframe(kg_health, hide_index=True, width="stretch")
         st.markdown("#### 事實事件")
         if kg_payload.facts.empty:
             st.info("目前尚未建立可查核的 KG 事實事件。")
