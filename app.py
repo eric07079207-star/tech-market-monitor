@@ -1654,7 +1654,27 @@ with tab_memory:
         else:
             st.dataframe(project_memory.latest_updates, hide_index=True, width="stretch")
 
-    mem_tab1, mem_tab2, mem_tab3, mem_tab4 = st.tabs(["長期記憶", "重要討論", "當前上下文", "決策與變更"])
+    mem_tab0, mem_tab1, mem_tab2, mem_tab3, mem_tab4 = st.tabs(["Word 網頁版", "長期記憶", "重要討論", "當前上下文", "決策與變更"])
+    with mem_tab0:
+        st.markdown("#### 專案記憶與討論摘要")
+        st.caption("此頁是 Word 摘要的網頁閱讀版，內容會隨專案記憶更新而同步，不需要下載檔案。")
+        st.markdown("##### 長期記憶")
+        st.markdown(project_memory.project_memory or "目前沒有長期記憶內容。")
+        st.markdown("##### 重要討論")
+        st.markdown(project_memory.conversation_log or "目前沒有討論摘要內容。")
+        st.markdown("##### 當前上下文")
+        st.markdown(project_memory.active_context or "目前沒有當前上下文內容。")
+        st.markdown("##### 已確認決策")
+        if project_memory.decision_register.empty:
+            st.caption("目前沒有決策登錄資料。")
+        else:
+            st.dataframe(
+                project_memory.decision_register.rename(
+                    columns={"date": "日期", "status": "狀態", "category": "類別", "title": "標題", "decision": "決策", "reason": "原因", "impact_scope": "影響範圍"}
+                ),
+                hide_index=True,
+                width="stretch",
+            )
     with mem_tab1:
         st.markdown(project_memory.project_memory or "目前沒有長期記憶內容。")
     with mem_tab2:
