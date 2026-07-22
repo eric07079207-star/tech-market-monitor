@@ -924,48 +924,31 @@ tab_overview, tab_anomaly, tab_analog, tab_news, tab_prediction, tab_discovery, 
 )
 
 with tab_overview:
-    left, right = st.columns([1.45, 1])
-    with left:
-        st.subheader("市場研究地圖")
-        st.info("個別標的的報酬、均線、成交量與波動度已集中到「量化數據中心 → 市場數據」。")
+    chart_df = snapshot[snapshot["symbol"].isin(ETF_TICKERS + STOCK_TICKERS)].copy()
+    fig = px.scatter(
+        chart_df,
+        x="ret_20d",
+        y="drawdown_52w",
+        size="volume_ratio_20d",
+        color="group",
+        hover_name="symbol",
+        labels={"ret_20d": "1M return", "drawdown_52w": "Drawdown from 52W high"},
+        height=360,
+    )
+    fig.update_layout(margin=dict(l=10, r=10, t=25, b=10), legend_title_text="")
+    st.plotly_chart(fig, width="stretch")
 
-    with right:
-        st.subheader("市場廣度")
-        breadth = breadth_table(snapshot)
-        st.caption("完整市場廣度數字已集中到「量化數據中心 → 市場數據」。")
-
-        chart_df = snapshot[snapshot["symbol"].isin(ETF_TICKERS + STOCK_TICKERS)].copy()
-        fig = px.scatter(
-            chart_df,
-            x="ret_20d",
-            y="drawdown_52w",
-            size="volume_ratio_20d",
-            color="group",
-            hover_name="symbol",
-            labels={"ret_20d": "1M return", "drawdown_52w": "Drawdown from 52W high"},
-            height=360,
+    with st.expander("名詞說明"):
+        st.markdown(
+            """
+            - **50DMA**：50 日移動平均線，常用來看中短期趨勢。
+            - **200DMA**：200 日移動平均線，常用來看長期多空分界。
+            - **VIX**：市場預期波動率，越高通常代表避險情緒越強。
+            - **HYG / 高收益債利差**：信用市場風險溫度計，走弱或利差擴大通常代表風險偏好下降。
+            - **相對強弱**：例如 QQQ 相對 SPY，代表科技股是否比大盤更強。
+            - **最差 10% 均值**：歷史相似樣本中最差那一批結果的平均，用來估計壞情境。
+            """
         )
-        fig.update_layout(margin=dict(l=10, r=10, t=25, b=10), legend_title_text="")
-        st.plotly_chart(fig, width="stretch")
-
-        st.subheader("預測追蹤")
-        validation = prediction_validation_summary(prediction_log)
-        if validation.empty:
-            st.caption("預測紀錄已建立；等 5D / 20D / 60D 週期走完後，這裡會開始顯示成功率。")
-        else:
-            st.caption("預測驗證的逐筆數字與各週期統計已集中到「量化數據中心 → 預測數據」。")
-
-        with st.expander("名詞說明"):
-            st.markdown(
-                """
-                - **50DMA**：50 日移動平均線，常用來看中短期趨勢。
-                - **200DMA**：200 日移動平均線，常用來看長期多空分界。
-                - **VIX**：市場預期波動率，越高通常代表避險情緒越強。
-                - **HYG / 高收益債利差**：信用市場風險溫度計，走弱或利差擴大通常代表風險偏好下降。
-                - **相對強弱**：例如 QQQ 相對 SPY，代表科技股是否比大盤更強。
-                - **最差 10% 均值**：歷史相似樣本中最差那一批結果的平均，用來估計壞情境。
-                """
-            )
 
     st.subheader("Codex 年度十大高成長觀察股")
     st.caption("獨立研究名單，不影響 QQQ 市場預測或你的持倉建議。選入日以 2026-05-18 作為追蹤基準。")
@@ -1094,8 +1077,6 @@ with tab_analog:
             最差 10% 均值用來看壞情境。若樣本數少、分布很分散或平均與中位數互相矛盾，信心等級會下降。
             """
         )
-
-        st.caption("逐筆歷史樣本、統計欄位與所有可查核數字已集中到「量化數據中心」。")
 
 with tab_news:
     from src.news import rule_based_news_summary
@@ -1328,13 +1309,6 @@ with tab_prediction:
             },
         )
 
-    st.markdown("#### 最近預測紀錄")
-    recent_predictions = recent_prediction_table(prediction_log, limit=45)
-    if recent_predictions.empty:
-        st.caption("尚無預測紀錄。")
-    else:
-        st.caption("逐筆預測、實際報酬與驗證結果已集中到「量化數據中心 → 預測數據」。")
-
 with tab_discovery:
     st.subheader("新聞探索候選股")
     st.caption("每天用日期作為隨機種子抽取市場主題，從新聞中找 ticker，再用量價規則評分；系統每日記錄 Top 15，這是觀察清單，不是買入建議。")
@@ -1557,8 +1531,6 @@ with tab_emotion:
         fg_cols[3].metric("外部指數", "未連接", "不影響內部模型")
         st.caption("恐懼貪婪指數是本系統的可重現內部模型，不直接複製任何外部網站指數；網路中斷時仍可用最近一次成功更新的資料計算。")
         fear_greed_components = fear_greed.get("components", pd.DataFrame())
-        if not fear_greed_components.empty:
-            st.caption("恐懼貪婪組成數字已集中到「量化數據中心 → 情緒數據」。")
 
         st.markdown("#### 今日情緒結論")
         if pd.notna(mood_score):
@@ -1579,12 +1551,6 @@ with tab_emotion:
             tone = "error" if alert.get("燈號") == "🔴" else "warning" if alert.get("燈號") == "🟡" else "success"
             getattr(column, tone)(f"{alert.get('燈號', '')} {alert.get('項目', '')}\n\n{alert.get('說明', '')}")
 
-        st.markdown("#### 情緒來源拆解")
-        if emotion_components_table.empty:
-            st.caption("目前沒有可拆解的情緒來源。")
-        else:
-            st.caption("情緒來源的完整數字已集中到「量化數據中心 → 情緒數據」。")
-
         st.markdown("#### 情緒趨勢")
         if emotion_trend_table.empty:
             st.caption("目前沒有足夠的情緒歷史資料。")
@@ -1599,18 +1565,8 @@ with tab_emotion:
             trend_chart.update_yaxes(range=[0, 100])
             st.plotly_chart(trend_chart, width="stretch")
 
-        st.markdown("#### 情緒與價格背離")
-        if emotion_divergence_table.empty:
-            st.caption("目前沒有足夠價格資料可計算背離。")
-        else:
+        if not emotion_divergence_table.empty:
             st.caption("價格上漲但情緒下降，代表上漲信心減弱；價格下跌但情緒改善，代表可能進入修復觀察期。這是研究訊號，不是單獨交易指令。")
-            st.caption("逐筆背離資料已集中到「量化數據中心 → 情緒數據」。")
-
-        st.markdown("#### 歷史情緒事件")
-        if market_event_windows.empty:
-            st.caption("目前沒有大盤 ±10% 事件窗。")
-        else:
-            st.caption("完整大盤事件窗與相關數字已集中到「量化數據中心 → 情緒數據」。")
         st.caption(f"資料日期：{pd.to_datetime(emotion_row.get('date'), errors='coerce').date()}｜情緒資料來源：既有 sentiment.parquet；情緒層目前為規則化重建資料。")
 
 with tab_kg:
@@ -1631,8 +1587,6 @@ with tab_kg:
         kg_metrics[1].metric("去重後事件", f"{kg_payload.facts['canonical_event_id'].nunique() if 'canonical_event_id' in kg_payload.facts else len(kg_payload.facts)}")
         kg_metrics[2].metric("平均來源可靠度", num(kg_payload.facts.get("source_reliability_score", pd.Series(dtype=float)).mean(), 2))
         kg_metrics[3].metric("平均品質", num(kg_payload.facts.get("quality_score", pd.Series(dtype=float)).mean(), 0))
-
-        st.info("事件類型、逐筆事實事件與事件後市場反應，已集中到「量化數據中心 → 知識圖譜數據」。")
 
 with tab_memory:
     st.subheader("專案記憶 / 討論摘要")
@@ -1850,7 +1804,6 @@ VOO,,,500
                         },
                     )
 
-                st.markdown("#### B. 持倉明細表")
                 detail_columns = [
                     "ticker",
                     "position_bucket",
@@ -1887,13 +1840,9 @@ VOO,,,500
                         "suggestion": "操作建議",
                     }
                 )
-                st.caption("完整持倉數字、成本與風險欄位已集中到「量化數據中心 → 持倉數據」。")
-
                 st.markdown("#### C. 操作建議")
                 st.markdown("##### 持倉風險分層")
                 bucket = bucket_summary(portfolio_view)
-                if not bucket.empty:
-                    st.caption("持倉分層數字已集中到「量化數據中心 → 持倉數據」。")
                 with st.expander("分層規則"):
                     st.dataframe(
                         bucket_guidelines().rename(columns={"position_bucket": "分層", "target_role": "角色", "risk_rule": "風險規則"}),
@@ -1941,8 +1890,6 @@ VOO,,,500
                         "negative_keywords": "負面關鍵字",
                     }
                 )
-                st.caption("建議價位、量價訊號與新聞分數已集中到「量化數據中心 → 持倉數據」。")
-
                 st.markdown("#### D. 風險警示")
                 if portfolio_alerts.empty:
                     st.success("目前沒有觸發主要持倉警示。")
