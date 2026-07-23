@@ -2,23 +2,23 @@
   "lstm": {
     "status": "可用",
     "rows": 38,
-    "positive_rate": 0.42105263157894735,
-    "predicted_positive_rate": 1.0,
-    "accuracy": 0.42105263157894735,
-    "baseline_accuracy": 0.5789473684210527,
-    "accuracy_edge_vs_baseline": -0.1578947368421053,
+    "positive_rate": 0.39473684210526316,
+    "predicted_positive_rate": 0.631578947368421,
+    "accuracy": 0.4473684210526316,
+    "baseline_accuracy": 0.6052631578947368,
+    "accuracy_edge_vs_baseline": -0.15789473684210525,
     "walk_forward_majority_accuracy": 0.5555555555555556,
-    "balanced_accuracy": 0.5,
-    "precision_up": 0.42105263157894735,
-    "recall_up": 1.0,
-    "f1_up": 0.5925925925925926,
-    "brier_score": 0.2520935046935345,
-    "avg_future_return": -0.004301674348289702,
+    "balanced_accuracy": 0.47391304347826085,
+    "precision_up": 0.375,
+    "recall_up": 0.6,
+    "f1_up": 0.4615384615384615,
+    "brier_score": 0.25158193018677927,
+    "avg_future_return": -0.005577015967095901,
     "median_future_return": -0.025943889387653907,
     "worst_future_return": -0.11971579732897453,
     "best_future_return": 0.2275397366926486,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-07-22T19:22:29+00:00",
+    "evaluated_at_utc": "2026-07-23T00:05:13+00:00",
     "model_beats_majority_baseline": false,
     "confidence_warning": "樣本少，低信心"
   },
@@ -48,7 +48,7 @@
         "avg_return": null
       }
     ],
-    "evaluated_at_utc": "2026-07-22T19:22:29+00:00"
+    "evaluated_at_utc": "2026-07-23T00:05:13+00:00"
   },
   "leakage_audit": {
     "status": "可用",
