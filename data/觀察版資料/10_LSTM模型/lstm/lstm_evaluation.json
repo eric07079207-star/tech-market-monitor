@@ -18,7 +18,7 @@
     "worst_future_return": -0.11971579732897453,
     "best_future_return": 0.2275397366926486,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-07-23T02:45:13+00:00",
+    "evaluated_at_utc": "2026-07-23T08:34:20+00:00",
     "model_beats_majority_baseline": false,
     "confidence_warning": "樣本少，低信心"
   },
@@ -48,7 +48,7 @@
         "avg_return": null
       }
     ],
-    "evaluated_at_utc": "2026-07-23T02:45:13+00:00"
+    "evaluated_at_utc": "2026-07-23T08:34:20+00:00"
   },
   "leakage_audit": {
     "status": "可用",
