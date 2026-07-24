@@ -43,6 +43,7 @@ EXPORTS = [
     ExportItem("kg/market_reactions.parquet", "09_金融知識圖譜", "反應層", "事件後市場反應與驗證結果。"),
     ExportItem("kg/event_links.parquet", "09_金融知識圖譜", "事件連結", "事件與標的關聯關係。"),
     ExportItem("kg/kg_prediction_log.parquet", "09_金融知識圖譜", "KG研究觀察預測", "每日以知識圖譜事件與敘事建立的 QQQ 1D/5D/20D 研究觀察及後續驗證。"),
+    ExportItem("kg/kg_prediction_v2_log.parquet", "09_金融知識圖譜", "KG研究觀察預測V2", "多因子趨勢預測、實際報酬、回撤、基準訊號與信心校準紀錄。"),
     ExportItem("kg/kg_metadata.json", "09_金融知識圖譜", "知識圖譜資訊", "金融知識圖譜更新時間與筆數。"),
     ExportItem("governance_summary.parquet", "11_資料治理", "資料治理摘要", "新聞資料流 official、pending 與 rejected 分層統計。"),
     ExportItem("update_runs.csv", "11_資料治理", "更新執行紀錄", "每次更新流程的整體結果與成功/失敗統計。"),

@@ -78,6 +78,7 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 try:
     from src.kg import kg_summary, load_knowledge_graph
     from src.kg_predictions import kg_prediction_summary, load_kg_prediction_log
+    from src.kg_predictions_v2 import kg_prediction_v2_summary, load_kg_prediction_v2_log
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def load_knowledge_graph():
         from collections import namedtuple
@@ -100,6 +101,12 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         return pd.DataFrame()
 
     def kg_prediction_summary(log: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def load_kg_prediction_v2_log() -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def kg_prediction_v2_summary(log: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 try:
     from src.project_memory import MEMORY_DOCX_FILE, load_memory_bundle
@@ -785,6 +792,7 @@ discovery_performance = load_discovery_perf()
 kg_payload = load_knowledge_graph()
 kg_health = kg_summary(kg_payload)
 kg_prediction_log = load_kg_prediction_log()
+kg_prediction_v2_log = load_kg_prediction_v2_log()
 metadata = load_metadata()
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
@@ -1642,14 +1650,14 @@ with tab_kg:
                 f"敘事：{theme} ｜影響對象：{getattr(event, 'affected_tickers', '未辨識')} ｜市場反應：{reaction_text}"
             )
 
-        st.markdown("#### KG 研究觀察預測")
-        st.caption("實驗性研究紀錄：以近期事件、敘事與來源品質形成 QQQ 方向觀察；不是買賣建議，會在觀察期結束後自動驗證。")
-        if kg_prediction_log.empty:
-            st.info("下一個成功的資料更新會建立第一組每日、每週與每月 KG 研究觀察。")
+        st.markdown("#### KG 多因子趨勢觀察 V2")
+        st.caption("實驗性研究紀錄：以事實、敘事、技術趨勢、市場壓力與跨來源確認形成 QQQ 趨勢觀察；保存實際報酬與回撤，不以成功／失敗二分。")
+        if kg_prediction_v2_log.empty:
+            st.info("下一個成功的資料更新會建立第一組 V2 每日、每週與每月趨勢觀察。V1 歷史紀錄已保留，不會被覆寫。")
         else:
-            latest_date = pd.to_datetime(kg_prediction_log["prediction_date"], errors="coerce").max()
-            latest_predictions = kg_prediction_log[
-                pd.to_datetime(kg_prediction_log["prediction_date"], errors="coerce").eq(latest_date)
+            latest_date = pd.to_datetime(kg_prediction_v2_log["prediction_date"], errors="coerce").max()
+            latest_predictions = kg_prediction_v2_log[
+                pd.to_datetime(kg_prediction_v2_log["prediction_date"], errors="coerce").eq(latest_date)
             ].copy()
             pred_tabs = st.tabs(["每日（1D）", "每週（5D）", "每月（20D）"])
             for prediction_tab, horizon in zip(pred_tabs, ["每日（1D）", "每週（5D）", "每月（20D）"]):
@@ -1659,26 +1667,43 @@ with tab_kg:
                         st.info("此觀察期尚未建立紀錄。")
                         continue
                     latest_row = row.iloc[0]
-                    prediction_metrics = st.columns(4)
-                    prediction_metrics[0].metric("研究方向", latest_row.get("prediction_direction", "觀望"))
+                    prediction_metrics = st.columns(5)
+                    prediction_metrics[0].metric("預測趨勢", latest_row.get("prediction_direction", "觀望／分歧"))
                     prediction_metrics[1].metric("信心等級", latest_row.get("confidence", "低"), f"分數 {num(latest_row.get('confidence_score'), 2)}")
-                    prediction_metrics[2].metric("研究訊號", num(latest_row.get("signal_score"), 2))
+                    prediction_metrics[2].metric("趨勢分數", num(latest_row.get("trend_score"), 2))
                     prediction_metrics[3].metric("預測日", pd.to_datetime(latest_row.get("prediction_date"), errors="coerce").strftime("%Y-%m-%d"))
+                    actual_return = latest_row.get("actual_return")
+                    prediction_metrics[4].metric("實際 QQQ 報酬", pct(actual_return) if pd.notna(actual_return) else "尚待驗證")
                     st.info(str(latest_row.get("reason", "尚無可說明的研究依據。")))
-                    if pd.notna(latest_row.get("success")):
-                        outcome = "命中" if bool(latest_row["success"]) else "未命中"
-                        st.caption(f"已驗證：{outcome}｜實際 QQQ 報酬 {pct(latest_row.get('actual_return'))}")
+                    factor_rows = pd.DataFrame(
+                        [
+                            ("事實事件方向", latest_row.get("factor_fact_direction"), latest_row.get("factor_fact_score")),
+                            ("敘事情緒", latest_row.get("factor_narrative_direction"), latest_row.get("factor_narrative_score")),
+                            ("技術趨勢", latest_row.get("factor_technical_direction"), latest_row.get("factor_technical_score")),
+                            ("市場壓力", latest_row.get("factor_pressure_direction"), latest_row.get("factor_pressure_score")),
+                            ("跨來源確認", latest_row.get("factor_source_direction"), latest_row.get("factor_source_score")),
+                        ],
+                        columns=["因子", "方向", "分數"],
+                    )
+                    st.dataframe(factor_rows, hide_index=True, width="stretch", column_config={"分數": st.column_config.NumberColumn(format="%.2f")})
+                    baseline_text = (
+                        f"基準：持續偏多／50DMA {latest_row.get('baseline_50dma_direction', 'n/a')}／"
+                        f"20日動能 {latest_row.get('baseline_momentum_direction', 'n/a')}。"
+                    )
+                    st.caption(f"{baseline_text}｜信心校準：{latest_row.get('calibration_state', '樣本不足')}（樣本 {int(latest_row.get('calibration_sample', 0) or 0)}）。")
+                    if pd.notna(actual_return):
+                        st.caption(f"已產生實際數值：報酬 {pct(actual_return)}｜期間最大回撤 {pct(latest_row.get('max_drawdown'))}。")
                     else:
                         st.caption(f"尚待 {int(latest_row.get('horizon_days', 0))} 個交易日後驗證。")
 
-            kg_prediction_stats = kg_prediction_summary(kg_prediction_log)
+            kg_prediction_stats = kg_prediction_v2_summary(kg_prediction_v2_log)
             if not kg_prediction_stats.empty:
-                st.caption("已完成的歷史驗證")
+                st.caption("已完成的數值回測")
                 st.dataframe(
-                    kg_prediction_stats.rename(columns={"horizon": "觀察期", "已驗證筆數": "已驗證", "命中率": "命中率", "平均實際報酬": "平均實際報酬"}),
+                    kg_prediction_stats.rename(columns={"horizon": "觀察期", "prediction_direction": "預測趨勢", "confidence": "信心", "樣本數": "樣本數", "平均實際報酬": "平均實際報酬", "中位數報酬": "中位數報酬", "平均最大回撤": "平均最大回撤"}),
                     hide_index=True,
                     width="stretch",
-                    column_config={"命中率": st.column_config.NumberColumn(format="%.1%"), "平均實際報酬": st.column_config.NumberColumn(format="%.2%")},
+                    column_config={"平均實際報酬": st.column_config.NumberColumn(format="%.2%"), "中位數報酬": st.column_config.NumberColumn(format="%.2%"), "平均最大回撤": st.column_config.NumberColumn(format="%.2%")},
                 )
 
 with tab_memory:
@@ -2116,21 +2141,22 @@ with tab_quant:
     with quant_kg:
         st.markdown("#### 圖譜資料健康")
         st.dataframe(kg_health, hide_index=True, width="stretch")
-        st.markdown("#### KG 研究觀察預測紀錄")
-        if kg_prediction_log.empty:
-            st.info("尚無 KG 研究觀察預測紀錄。")
+        st.markdown("#### KG 多因子趨勢觀察 V2 紀錄")
+        if kg_prediction_v2_log.empty:
+            st.info("尚無 KG V2 多因子趨勢觀察紀錄。")
         else:
             st.dataframe(
-                kg_prediction_log.sort_values(["prediction_date", "horizon_days"], ascending=[False, True]),
+                kg_prediction_v2_log.sort_values(["prediction_date", "horizon_days"], ascending=[False, True]),
                 hide_index=True,
                 width="stretch",
                 column_config={
                     "confidence_score": st.column_config.NumberColumn(format="%.2f"),
-                    "signal_score": st.column_config.NumberColumn(format="%.2f"),
+                    "trend_score": st.column_config.NumberColumn(format="%.2f"),
                     "actual_return": st.column_config.NumberColumn(format="%.2%"),
                     "max_drawdown": st.column_config.NumberColumn(format="%.2%"),
                 },
             )
+        st.caption("V1 預測紀錄已保留，僅供與 V2 的長期研究比較；V2 不再以命中／失敗標示結果。")
         st.markdown("#### 事實事件")
         if kg_payload.facts.empty:
             st.info("目前尚未建立可查核的 KG 事實事件。")
