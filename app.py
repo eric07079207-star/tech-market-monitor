@@ -117,6 +117,11 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
     def historical_backtest_summary(samples: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 try:
+    from src.fundamentals import load_fundamental_observations
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def load_fundamental_observations() -> pd.DataFrame:
+        return pd.DataFrame()
+try:
     from src.project_memory import MEMORY_DOCX_FILE, load_memory_bundle
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     from pathlib import Path
@@ -802,6 +807,7 @@ kg_health = kg_summary(kg_payload)
 kg_prediction_log = load_kg_prediction_log()
 kg_prediction_v2_log = load_kg_prediction_v2_log()
 historical_market_samples = load_stratified_market_samples()
+fundamental_observations = load_fundamental_observations()
 metadata = load_metadata()
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
@@ -1724,8 +1730,9 @@ with tab_kg:
             sample_metrics[0].metric("分層樣本", f"{len(historical_market_samples)} 個日期")
             sample_metrics[1].metric("市場區間", f"{pd.to_datetime(historical_market_samples['prediction_date']).min():%Y-%m} 至 {pd.to_datetime(historical_market_samples['prediction_date']).max():%Y-%m}")
             sample_metrics[2].metric("完整 KG 可用", f"{int(historical_market_samples.get('eligible_for_full_kg_backtest', pd.Series(dtype=bool)).sum())} 個")
-            sample_metrics[3].metric("基本面 PIT 可用", f"{int(historical_market_samples.get('fundamental_coverage_state', pd.Series(dtype=str)).eq('可用').sum())} 個")
-            st.info("目前樣本只對技術與市場壓力做完整回測；缺少歷史多來源事件或逐時點基本面的日期會明確標示，絕不以今天的資料倒灌回去。")
+            fundamental_ready = historical_market_samples.get("fundamental_coverage_state", pd.Series(dtype=str)).eq("完整（官方）").sum()
+            sample_metrics[3].metric("基本面 PIT 完整", f"{int(fundamental_ready)} 個")
+            st.info("技術與市場壓力可完整回測；基本面採 SEC filing date 回補。缺少歷史多來源事件的日期仍會標示覆蓋缺口，絕不以今天的資料倒灌回去。")
 
 with tab_memory:
     st.subheader("專案記憶 / 討論摘要")
@@ -2209,6 +2216,16 @@ with tab_quant:
                     "future_return_20d": st.column_config.NumberColumn(format="%.2%"),
                     "future_max_drawdown_20d": st.column_config.NumberColumn(format="%.2%"),
                 },
+            )
+        st.markdown("#### SEC Point-in-Time 基本面觀測")
+        if fundamental_observations.empty:
+            st.info("基本面觀測會在下一次資料更新取得。")
+        else:
+            st.dataframe(
+                fundamental_observations.sort_values(["filed_at", "ticker"], ascending=[False, True]),
+                hide_index=True,
+                width="stretch",
+                column_config={"value": st.column_config.NumberColumn(format="%.2f")},
             )
         st.markdown("#### 事實事件")
         if kg_payload.facts.empty:

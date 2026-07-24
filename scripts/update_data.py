@@ -20,6 +20,7 @@ from src.discovery import (
     update_discovery_performance,
 )
 from src.governance import annotate_governance, governance_summary
+from src.fundamentals import FUNDAMENTAL_CACHE, annotate_sample_fundamental_coverage, refresh_sec_fundamentals_if_due
 from src.historical_backtest import HISTORICAL_BACKTEST_CACHE, build_stratified_market_samples
 from src.indicators import add_price_indicators, detect_anomalies, latest_snapshot, regime_summary, today_conclusion
 from src.kg import (
@@ -535,10 +536,28 @@ def main() -> None:
         except Exception as exc:
             _record(module_records, "kg_prediction_v2_log", "知識圖譜", "fallback", f"exception: {exc}", False)
 
+    # Official SEC facts are cached daily. They retain filing dates so historical
+    # samples can use only fundamentals that were public on that date.
+    try:
+        fundamentals = refresh_sec_fundamentals_if_due()
+        _write_frame_module(
+            module_records,
+            module_name="sec_fundamental_observations",
+            category="基本面",
+            filename=str(FUNDAMENTAL_CACHE.relative_to(FUNDAMENTAL_CACHE.parents[1])),
+            frame=fundamentals,
+            validation=FrameValidation(required_columns=("ticker", "metric", "filed_at", "value"), allow_empty=False, min_rows=100),
+            critical=False,
+            latest_columns=["filed_at"],
+        )
+    except Exception as exc:
+        fundamentals = pd.DataFrame()
+        _record(module_records, "sec_fundamental_observations", "基本面", "fallback", f"exception: {exc}", False)
+
     # Reproducible historical market sample. It intentionally labels missing KG/news and
     # point-in-time fundamentals instead of fabricating historical context.
     try:
-        historical_samples = build_stratified_market_samples(prices)
+        historical_samples = annotate_sample_fundamental_coverage(build_stratified_market_samples(prices), fundamentals)
         _write_frame_module(
             module_records,
             module_name="historical_market_samples",
