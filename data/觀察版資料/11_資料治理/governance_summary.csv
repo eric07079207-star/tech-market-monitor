@@ -2,4 +2,4 @@ dataset,rows,official,pending_short,pending_medium,pending_long,rejected,garbage
 watchlist_news,119,119,0,0,0,0,0,0,passed_basic_checks:119
 international_news,38,38,0,0,0,0,0,0,passed_basic_checks:38
 discovery_news,32,32,0,0,0,0,0,0,passed_basic_checks:32
-tsla_keyword_news,55,55,0,0,0,0,0,0,passed_basic_checks:55
+tsla_keyword_news,54,54,0,0,0,0,0,0,passed_basic_checks:54
