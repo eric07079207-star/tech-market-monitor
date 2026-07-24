@@ -153,6 +153,8 @@ def _build_fact_events(
             affected = _affected_entities(getattr(row, "symbol", ""), title)
             canonical_event = _canonical_event_name(title, event_type_primary)
             source = str(getattr(row, "source", "") or "")
+            publisher_url = str(getattr(row, "source_url", "") or "")
+            source_reference = publisher_url or str(getattr(row, "link", "") or source)
             rows.append(
                 {
                     "event_id": _event_id(source_layer, title, timestamp, affected),
@@ -172,12 +174,13 @@ def _build_fact_events(
                     "impact_score": _impact_score(title),
                     "confidence": _confidence_from_text(title),
                     "source": source,
-                    "source_domain": _source_domain(getattr(row, "link", "") or source),
-                    "source_reliability_score": _source_reliability_score(getattr(row, "link", "") or source),
-                    "quality_score": edge_quality_score(title, source=getattr(row, "link", "") or source, tags=getattr(row, "tags", ""), published=timestamp, raw_text=title).quality_score,
+                    "source_domain": str(getattr(row, "source_domain", "") or "") or _source_domain(source_reference),
+                    "source_reliability_score": _source_reliability_score(source_reference),
+                    "quality_score": edge_quality_score(title, source=source_reference, tags=getattr(row, "tags", ""), published=timestamp, raw_text=title).quality_score,
                     "dedup_key": edge_dedup_key(canonical_event, event_type_primary, source_layer, affected),
                     "regime_context": _regime_label(regime_context),
                     "source_url": str(getattr(row, "link", "") or ""),
+                    "publisher_url": publisher_url,
                     "raw_title": title,
                     "raw_tags": str(getattr(row, "tags", "") or ""),
                     "source_layer": source_layer,

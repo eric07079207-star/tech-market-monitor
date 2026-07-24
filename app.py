@@ -109,6 +109,14 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
     def kg_prediction_v2_summary(log: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 try:
+    from src.historical_backtest import historical_backtest_summary, load_stratified_market_samples
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def load_stratified_market_samples() -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def historical_backtest_summary(samples: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame()
+try:
     from src.project_memory import MEMORY_DOCX_FILE, load_memory_bundle
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     from pathlib import Path
@@ -793,6 +801,7 @@ kg_payload = load_knowledge_graph()
 kg_health = kg_summary(kg_payload)
 kg_prediction_log = load_kg_prediction_log()
 kg_prediction_v2_log = load_kg_prediction_v2_log()
+historical_market_samples = load_stratified_market_samples()
 metadata = load_metadata()
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
@@ -1706,6 +1715,18 @@ with tab_kg:
                     column_config={"平均實際報酬": st.column_config.NumberColumn(format="%.2%"), "中位數報酬": st.column_config.NumberColumn(format="%.2%"), "平均最大回撤": st.column_config.NumberColumn(format="%.2%")},
                 )
 
+        st.markdown("#### 歷史回測資料準備度")
+        st.caption("固定分層隨機樣本用於檢查不同市場環境，不會混入日常正式預測。完整 KG 回測必須先補齊當時的多來源新聞與 point-in-time 基本面。")
+        if historical_market_samples.empty:
+            st.info("歷史市場樣本會在下一次資料更新建立。")
+        else:
+            sample_metrics = st.columns(4)
+            sample_metrics[0].metric("分層樣本", f"{len(historical_market_samples)} 個日期")
+            sample_metrics[1].metric("市場區間", f"{pd.to_datetime(historical_market_samples['prediction_date']).min():%Y-%m} 至 {pd.to_datetime(historical_market_samples['prediction_date']).max():%Y-%m}")
+            sample_metrics[2].metric("完整 KG 可用", f"{int(historical_market_samples.get('eligible_for_full_kg_backtest', pd.Series(dtype=bool)).sum())} 個")
+            sample_metrics[3].metric("基本面 PIT 可用", f"{int(historical_market_samples.get('fundamental_coverage_state', pd.Series(dtype=str)).eq('可用').sum())} 個")
+            st.info("目前樣本只對技術與市場壓力做完整回測；缺少歷史多來源事件或逐時點基本面的日期會明確標示，絕不以今天的資料倒灌回去。")
+
 with tab_memory:
     st.subheader("專案記憶 / 討論摘要")
     st.caption("這一頁用來保存長期有效的專案上下文，避免聊天壓縮後遺失已確認的規則、決策與討論結論。")
@@ -2157,6 +2178,38 @@ with tab_quant:
                 },
             )
         st.caption("V1 預測紀錄已保留，僅供與 V2 的長期研究比較；V2 不再以命中／失敗標示結果。")
+        st.markdown("#### 分層歷史市場樣本")
+        if historical_market_samples.empty:
+            st.info("尚無分層歷史市場樣本。")
+        else:
+            historical_summary = historical_backtest_summary(historical_market_samples)
+            if not historical_summary.empty:
+                st.dataframe(
+                    historical_summary.rename(columns={"regime_bucket": "市場狀態"}),
+                    hide_index=True,
+                    width="stretch",
+                    column_config={
+                        "平均1日報酬": st.column_config.NumberColumn(format="%.2%"),
+                        "平均5日報酬": st.column_config.NumberColumn(format="%.2%"),
+                        "平均20日報酬": st.column_config.NumberColumn(format="%.2%"),
+                        "平均20日回撤": st.column_config.NumberColumn(format="%.2%"),
+                    },
+                )
+            st.dataframe(
+                historical_market_samples.sort_values("prediction_date", ascending=False),
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "qqq_ret_1d": st.column_config.NumberColumn(format="%.2%"),
+                    "qqq_ret_20d": st.column_config.NumberColumn(format="%.2%"),
+                    "qqq_dist_ma_50": st.column_config.NumberColumn(format="%.2%"),
+                    "qqq_dist_ma_200": st.column_config.NumberColumn(format="%.2%"),
+                    "future_return_1d": st.column_config.NumberColumn(format="%.2%"),
+                    "future_return_5d": st.column_config.NumberColumn(format="%.2%"),
+                    "future_return_20d": st.column_config.NumberColumn(format="%.2%"),
+                    "future_max_drawdown_20d": st.column_config.NumberColumn(format="%.2%"),
+                },
+            )
         st.markdown("#### 事實事件")
         if kg_payload.facts.empty:
             st.info("目前尚未建立可查核的 KG 事實事件。")

@@ -36,6 +36,7 @@ EXPORTS = [
     ExportItem("discovery_history.parquet", "06_候選股追蹤", "候選股歷史", "每日 Top 15 候選觀察股歷史紀錄。"),
     ExportItem("discovery_performance.parquet", "06_候選股追蹤", "候選股表現驗證", "候選股入榜後的後續表現驗證資料。"),
     ExportItem("prediction_log.csv", "07_預測驗證", "市場預測紀錄", "市場判斷與後續 5D/20D/60D 驗證紀錄。"),
+    ExportItem("backtest/stratified_market_samples.parquet", "07_預測驗證", "分層歷史市場樣本", "固定 seed 的分層隨機歷史市場樣本；標示技術/市場可用性與 KG、基本面歷史覆蓋缺口。"),
     ExportItem("ai_summary.json", "08_AI摘要", "AI市場摘要", "每日 AI 或規則摘要結果。"),
     ExportItem("ai_summary_history.parquet", "08_AI摘要", "AI摘要歷史", "每日 AI 或規則摘要歷史，用於回看與後續準確率驗證。"),
     ExportItem("kg/fact_events.parquet", "09_金融知識圖譜", "事實層", "客觀事件與來源資料。"),

@@ -20,6 +20,7 @@ from src.discovery import (
     update_discovery_performance,
 )
 from src.governance import annotate_governance, governance_summary
+from src.historical_backtest import HISTORICAL_BACKTEST_CACHE, build_stratified_market_samples
 from src.indicators import add_price_indicators, detect_anomalies, latest_snapshot, regime_summary, today_conclusion
 from src.kg import (
     FACT_CACHE,
@@ -533,6 +534,23 @@ def main() -> None:
             )
         except Exception as exc:
             _record(module_records, "kg_prediction_v2_log", "知識圖譜", "fallback", f"exception: {exc}", False)
+
+    # Reproducible historical market sample. It intentionally labels missing KG/news and
+    # point-in-time fundamentals instead of fabricating historical context.
+    try:
+        historical_samples = build_stratified_market_samples(prices)
+        _write_frame_module(
+            module_records,
+            module_name="historical_market_samples",
+            category="回測",
+            filename=str(HISTORICAL_BACKTEST_CACHE.relative_to(HISTORICAL_BACKTEST_CACHE.parents[1])),
+            frame=historical_samples,
+            validation=FrameValidation(required_columns=("sample_id", "prediction_date", "regime_bucket", "future_return_20d"), allow_empty=False, min_rows=100),
+            critical=False,
+            latest_columns=["prediction_date", "created_at_utc"],
+        )
+    except Exception as exc:
+        _record(module_records, "historical_market_samples", "回測", "fallback", f"exception: {exc}", False)
 
     # Prediction log
     try:

@@ -101,6 +101,7 @@ class NewsItem:
     title: str
     link: str
     source: str
+    source_url: str
     published: datetime | None
     tags: str
 
@@ -125,9 +126,10 @@ def fetch_google_news(symbol: str, query: str, days: int = 7, limit: int = 8) ->
         link = _node_text(item, "link")
         source_node = item.find("source")
         source = source_node.text if source_node is not None and source_node.text else ""
+        source_url = source_node.attrib.get("url", "") if source_node is not None else ""
         published = _parse_pub_date(_node_text(item, "pubDate"))
         tags = classify_tags(title)
-        items.append(NewsItem(symbol=symbol, title=title, link=link, source=source, published=published, tags=tags))
+        items.append(NewsItem(symbol=symbol, title=title, link=link, source=source, source_url=source_url, published=published, tags=tags))
     return items
 
 
@@ -147,16 +149,17 @@ def fetch_news_batch(symbols: list[str] | None = None, days: int = 7, limit_per_
                     "symbol": item.symbol,
                     "title": item.title,
                     "source": item.source,
-                    "source_domain": source_domain(item.link or item.source),
-                    "source_reliability_score": quality_score(item.title, item.source, item.tags, item.published).source_reliability_score,
+                    "source_url": item.source_url,
+                    "source_domain": source_domain(item.source_url or item.source),
+                    "source_reliability_score": quality_score(item.title, item.source_url or item.source, item.tags, item.published).source_reliability_score,
                     "published": item.published,
                     "tags": item.tags,
                     "link": item.link,
-                    "quality_score": quality_score(item.title, item.source, item.tags, item.published).quality_score,
+                    "quality_score": quality_score(item.title, item.source_url or item.source, item.tags, item.published).quality_score,
                 }
             )
     if not rows:
-        return pd.DataFrame(columns=["symbol", "title", "source", "source_domain", "source_reliability_score", "published", "tags", "link", "quality_score"])
+        return pd.DataFrame(columns=["symbol", "title", "source", "source_url", "source_domain", "source_reliability_score", "published", "tags", "link", "quality_score"])
     news = pd.DataFrame(rows)
     news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
     return news.sort_values(["published", "symbol"], ascending=[False, True]).reset_index(drop=True)
@@ -203,14 +206,15 @@ def fetch_symbol_keyword_news(
             seen.add(key)
             matched = matched_keywords(item.title, clean_keywords)
             keyword_group = classify_keyword_group(matched)
-            edge = quality_score(item.title, item.link or item.source, item.tags, item.published)
+            edge = quality_score(item.title, item.source_url or item.source, item.tags, item.published)
             rows.append(
                 {
                     "topic": f"{symbol_upper}關鍵字",
                     "symbol": symbol_upper,
                     "title": item.title,
                     "source": item.source,
-                    "source_domain": edge.source_domain,
+                    "source_url": item.source_url,
+                    "source_domain": source_domain(item.source_url or item.source),
                     "source_reliability_score": edge.source_reliability_score,
                     "published": item.published,
                     "tags": item.tags,
@@ -230,6 +234,7 @@ def fetch_symbol_keyword_news(
                 "symbol",
                 "title",
                 "source",
+                "source_url",
                 "source_domain",
                 "source_reliability_score",
                 "published",
@@ -362,18 +367,19 @@ def fetch_international_news(days: int = 3, limit_per_topic: int = 8) -> pd.Data
                     "symbol": topic,
                     "title": item.title,
                     "source": item.source,
-                    "source_domain": source_domain(item.link or item.source),
-                    "source_reliability_score": quality_score(item.title, item.source, item.tags, item.published).source_reliability_score,
+                    "source_url": item.source_url,
+                    "source_domain": source_domain(item.source_url or item.source),
+                    "source_reliability_score": quality_score(item.title, item.source_url or item.source, item.tags, item.published).source_reliability_score,
                     "published": item.published,
                     "tags": item.tags,
                     "link": item.link,
                     "is_major": is_major_international_news(item.title),
                     "priority": international_news_priority(item.title),
-                    "quality_score": quality_score(item.title, item.source, item.tags, item.published).quality_score,
+                    "quality_score": quality_score(item.title, item.source_url or item.source, item.tags, item.published).quality_score,
                 }
             )
     if not rows:
-        return pd.DataFrame(columns=["symbol", "title", "source", "source_domain", "source_reliability_score", "published", "tags", "link", "is_major", "priority", "quality_score"])
+        return pd.DataFrame(columns=["symbol", "title", "source", "source_url", "source_domain", "source_reliability_score", "published", "tags", "link", "is_major", "priority", "quality_score"])
     news = pd.DataFrame(rows)
     news["published"] = pd.to_datetime(news["published"], utc=True, errors="coerce")
     return news.sort_values(["is_major", "priority", "published"], ascending=[False, False, False]).reset_index(drop=True)
