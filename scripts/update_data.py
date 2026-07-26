@@ -20,8 +20,10 @@ from src.discovery import (
     update_discovery_performance,
 )
 from src.governance import annotate_governance, governance_summary
+from src.factor_effectiveness import FACTOR_EFFECTIVENESS_CACHE, build_factor_effectiveness
 from src.fundamentals import FUNDAMENTAL_CACHE, annotate_sample_fundamental_coverage, refresh_sec_fundamentals_if_due
 from src.historical_backtest import HISTORICAL_BACKTEST_CACHE, build_stratified_market_samples
+from src.kg_backtest import KG_BACKTEST_READINESS_CACHE, build_kg_backtest_readiness
 from src.indicators import add_price_indicators, detect_anomalies, latest_snapshot, regime_summary, today_conclusion
 from src.kg import (
     FACT_CACHE,
@@ -556,6 +558,7 @@ def main() -> None:
 
     # Reproducible historical market sample. It intentionally labels missing KG/news and
     # point-in-time fundamentals instead of fabricating historical context.
+    historical_samples = load_cached_frame(str(HISTORICAL_BACKTEST_CACHE.relative_to(HISTORICAL_BACKTEST_CACHE.parents[1])))
     try:
         historical_samples = annotate_sample_fundamental_coverage(build_stratified_market_samples(prices), fundamentals)
         _write_frame_module(
@@ -570,6 +573,38 @@ def main() -> None:
         )
     except Exception as exc:
         _record(module_records, "historical_market_samples", "回測", "fallback", f"exception: {exc}", False)
+
+    # Keep readiness and factor reports separate from the sample source. This makes
+    # missing historical event evidence visible instead of silently turning it into a signal.
+    try:
+        kg_readiness = build_kg_backtest_readiness(historical_samples)
+        _write_frame_module(
+            module_records,
+            module_name="kg_historical_backtest_readiness",
+            category="回測",
+            filename=str(KG_BACKTEST_READINESS_CACHE.relative_to(KG_BACKTEST_READINESS_CACHE.parents[1])),
+            frame=kg_readiness,
+            validation=FrameValidation(required_columns=("sample_id", "prediction_date", "kg_backtest_state"), allow_empty=True),
+            critical=False,
+            latest_columns=["prediction_date"],
+        )
+    except Exception as exc:
+        _record(module_records, "kg_historical_backtest_readiness", "回測", "fallback", f"exception: {exc}", False)
+
+    try:
+        factor_report = build_factor_effectiveness(historical_samples)
+        _write_frame_module(
+            module_records,
+            module_name="factor_effectiveness",
+            category="回測",
+            filename=str(FACTOR_EFFECTIVENESS_CACHE.relative_to(FACTOR_EFFECTIVENESS_CACHE.parents[1])),
+            frame=factor_report,
+            validation=FrameValidation(required_columns=("factor", "bucket", "sample_count"), allow_empty=True),
+            critical=False,
+            latest_columns=[],
+        )
+    except Exception as exc:
+        _record(module_records, "factor_effectiveness", "回測", "fallback", f"exception: {exc}", False)
 
     # Prediction log
     try:

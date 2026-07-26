@@ -117,10 +117,30 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
     def historical_backtest_summary(samples: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 try:
+    from src.factor_effectiveness import factor_effectiveness_summary, load_factor_effectiveness
+    from src.kg_backtest import kg_backtest_readiness_summary, load_kg_backtest_readiness
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def load_factor_effectiveness() -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def factor_effectiveness_summary(report: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def load_kg_backtest_readiness() -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def kg_backtest_readiness_summary(report: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame()
+try:
     from src.fundamentals import load_fundamental_observations
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def load_fundamental_observations() -> pd.DataFrame:
         return pd.DataFrame()
+try:
+    from src.governance import governance_alerts
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def governance_alerts(summary: pd.DataFrame) -> list[dict[str, str]]:
+        return []
 try:
     from src.project_memory import MEMORY_DOCX_FILE, load_memory_bundle
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
@@ -808,6 +828,8 @@ kg_prediction_log = load_kg_prediction_log()
 kg_prediction_v2_log = load_kg_prediction_v2_log()
 historical_market_samples = load_stratified_market_samples()
 fundamental_observations = load_fundamental_observations()
+factor_effectiveness = load_factor_effectiveness()
+kg_backtest_readiness = load_kg_backtest_readiness()
 metadata = load_metadata()
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
@@ -942,6 +964,9 @@ if show_health:
             }
         )
         st.dataframe(governance_display, hide_index=True, width="stretch")
+        st.markdown("#### 資料治理告警")
+        for alert in governance_alerts(governance):
+            getattr(st, alert.get("level", "info"))(alert.get("message", ""))
     missing = missing_price_symbols(prices, ETF_TICKERS + STOCK_TICKERS + ANNUAL_PICK_TICKERS + ["SPY", "QQQ"])
     if missing:
         st.warning("缺少價格資料：" + ", ".join(missing[:20]))
@@ -1290,13 +1315,19 @@ with tab_prediction:
         eval_cols = st.columns(5)
         eval_cols[0].metric("LSTM 測試準確率", pct(evaluation.get("accuracy")))
         eval_cols[1].metric("多數基準", pct(evaluation.get("baseline_accuracy")))
-        eval_cols[2].metric("超越基準", pct(evaluation.get("accuracy_edge_vs_baseline")))
+        eval_cols[2].metric("持續偏多基準", pct(evaluation.get("always_long_accuracy")))
         eval_cols[3].metric("Balanced Accuracy", pct(evaluation.get("balanced_accuracy")))
         eval_cols[4].metric("F1（上漲）", pct(evaluation.get("f1_up")))
         st.caption(
             f"測試樣本 {evaluation.get('rows', 0)} 筆｜Walk-forward 多數基準 {pct(evaluation.get('walk_forward_majority_accuracy'))}｜"
-            f"平均未來報酬 {pct(evaluation.get('avg_future_return'))}｜評估警示：{evaluation.get('confidence_warning', 'n/a')}"
+            f"相對持續偏多準確率 {pct(evaluation.get('accuracy_edge_vs_always_long'))}｜"
+            f"方向報酬相對持續偏多 {pct(evaluation.get('directional_return_edge_vs_always_long'))}｜"
+            f"評估警示：{evaluation.get('confidence_warning', 'n/a')}"
         )
+        calibration = pd.DataFrame(evaluation.get("probability_calibration", []))
+        if not calibration.empty:
+            st.caption("機率校準：模型說上漲機率較高的區間，實際上漲率是否也相對提高。")
+            st.dataframe(calibration.rename(columns={"bucket": "預測機率區間", "rows": "樣本數", "actual_up_rate": "實際上漲率"}), hide_index=True, width="stretch", column_config={"實際上漲率": st.column_config.NumberColumn(format="%.2%")})
         audit = lstm_evaluation.get("leakage_audit", {})
         if audit.get("issues"):
             st.error("資料洩漏檢查：" + "；".join(audit["issues"]))
@@ -1733,6 +1764,16 @@ with tab_kg:
             fundamental_ready = historical_market_samples.get("fundamental_coverage_state", pd.Series(dtype=str)).eq("完整（官方）").sum()
             sample_metrics[3].metric("基本面 PIT 完整", f"{int(fundamental_ready)} 個")
             st.info("技術與市場壓力可完整回測；基本面採 SEC filing date 回補。缺少歷史多來源事件的日期仍會標示覆蓋缺口，絕不以今天的資料倒灌回去。")
+            readiness_summary = kg_backtest_readiness_summary(kg_backtest_readiness)
+            if not readiness_summary.empty:
+                st.markdown("##### KG 回測資格")
+                st.dataframe(
+                    readiness_summary.rename(columns={"kg_backtest_state": "資格狀態"}),
+                    hide_index=True,
+                    width="stretch",
+                    column_config={"平均20日報酬": st.column_config.NumberColumn(format="%.2%"), "平均20日回撤": st.column_config.NumberColumn(format="%.2%")},
+                )
+                st.caption("只有同時具備當時多來源事件與官方基本面的日期，才會進入完整 KG 回測。其餘樣本僅作市場技術基線。")
 
 with tab_memory:
     st.subheader("專案記憶 / 討論摘要")
@@ -2217,6 +2258,31 @@ with tab_quant:
                     "future_max_drawdown_20d": st.column_config.NumberColumn(format="%.2%"),
                 },
             )
+        st.markdown("#### 因子有效性報告")
+        st.caption("目前先驗證市場技術因子與後續 20 日報酬／回撤的關聯；這是資料驅動的描述，不代表因果或交易承諾。")
+        factor_summary = factor_effectiveness_summary(factor_effectiveness)
+        if factor_summary.empty:
+            st.info("因子有效性報告會在下一次成功資料更新後建立。")
+        else:
+            st.dataframe(
+                factor_summary,
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "與20日報酬相關性": st.column_config.NumberColumn(format="%.2f"),
+                    "最佳分層平均報酬": st.column_config.NumberColumn(format="%.2%"),
+                    "最差分層平均報酬": st.column_config.NumberColumn(format="%.2%"),
+                },
+            )
+            st.dataframe(
+                factor_effectiveness.rename(columns={"factor": "因子", "bucket": "分層", "sample_count": "樣本數", "avg_20d_return": "平均20日報酬", "median_20d_return": "中位數20日報酬", "positive_rate": "正報酬比例", "avg_20d_drawdown": "平均20日回撤", "correlation_20d_return": "與20日報酬相關性", "coverage_note": "資料說明"}),
+                hide_index=True,
+                width="stretch",
+                column_config={"平均20日報酬": st.column_config.NumberColumn(format="%.2%"), "中位數20日報酬": st.column_config.NumberColumn(format="%.2%"), "正報酬比例": st.column_config.NumberColumn(format="%.2%"), "平均20日回撤": st.column_config.NumberColumn(format="%.2%"), "與20日報酬相關性": st.column_config.NumberColumn(format="%.2f")},
+            )
+        if not kg_backtest_readiness.empty:
+            st.markdown("#### KG 歷史回測資格明細")
+            st.dataframe(kg_backtest_readiness.sort_values("prediction_date", ascending=False), hide_index=True, width="stretch")
         st.markdown("#### SEC Point-in-Time 基本面觀測")
         if fundamental_observations.empty:
             st.info("基本面觀測會在下一次資料更新取得。")

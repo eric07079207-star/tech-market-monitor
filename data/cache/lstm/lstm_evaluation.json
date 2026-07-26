@@ -7,48 +7,60 @@
     "accuracy": 0.6052631578947368,
     "baseline_accuracy": 0.6052631578947368,
     "accuracy_edge_vs_baseline": 0.0,
+    "always_long_accuracy": 0.39473684210526316,
+    "accuracy_edge_vs_always_long": 0.21052631578947367,
     "walk_forward_majority_accuracy": 0.5555555555555556,
     "balanced_accuracy": 0.5,
     "precision_up": null,
     "recall_up": 0.0,
     "f1_up": null,
-    "brier_score": 0.24962612320861532,
+    "brier_score": 0.24494418231028317,
     "avg_future_return": -0.005577015967095901,
     "median_future_return": -0.025943889387653907,
     "worst_future_return": -0.11971579732897453,
     "best_future_return": 0.2275397366926486,
+    "always_long_avg_return": -0.005577015967095901,
+    "model_directional_avg_return": 0.005577015967095901,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-07-26T08:29:44+00:00",
+    "evaluated_at_utc": "2026-07-26T09:02:52+00:00",
+    "directional_return_edge_vs_always_long": 0.011154031934191802,
+    "probability_calibration": [
+      {
+        "bucket": "40-50%",
+        "rows": 38,
+        "actual_up_rate": 0.39473684210526316
+      }
+    ],
     "model_beats_majority_baseline": false,
     "confidence_warning": "樣本少，低信心"
   },
   "rule_predictions": {
     "status": "可用",
-    "rows": 144,
+    "rows": 141,
     "by_horizon": [
       {
         "horizon": "20D",
-        "rows": 48,
-        "validated_rows": 28,
-        "accuracy": 0.35714285714285715,
-        "avg_return": -0.00709778344530211
+        "rows": 47,
+        "validated_rows": 27,
+        "accuracy": 0.37037037037037035,
+        "avg_return": -0.005964757123071736
       },
       {
         "horizon": "5D",
-        "rows": 48,
-        "validated_rows": 43,
-        "accuracy": 0.5581395348837209,
-        "avg_return": -0.00014523328048887362
+        "rows": 47,
+        "validated_rows": 42,
+        "accuracy": 0.5476190476190477,
+        "avg_return": 5.504938775666987e-05
       },
       {
         "horizon": "60D",
-        "rows": 48,
+        "rows": 47,
         "validated_rows": 0,
         "accuracy": null,
         "avg_return": null
       }
     ],
-    "evaluated_at_utc": "2026-07-26T08:29:44+00:00"
+    "evaluated_at_utc": "2026-07-26T09:02:52+00:00"
   },
   "leakage_audit": {
     "status": "可用",

@@ -78,6 +78,26 @@ def governance_summary(frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def governance_alerts(summary: pd.DataFrame) -> list[dict[str, str]]:
+    """Return actionable alerts without treating pending research as garbage."""
+    if summary is None or summary.empty:
+        return [{"level": "warning", "message": "資料治理摘要尚未建立。"}]
+    alerts: list[dict[str, str]] = []
+    for row in summary.itertuples(index=False):
+        total = max(int(getattr(row, "rows", 0) or 0), 1)
+        rejected = int(getattr(row, "rejected", 0) or 0)
+        duplicates = int(getattr(row, "duplicate_rows", 0) or 0)
+        pending = sum(int(getattr(row, name, 0) or 0) for name in ("pending_short", "pending_medium", "pending_long"))
+        name = str(getattr(row, "dataset", "資料流"))
+        if rejected / total > 0.15:
+            alerts.append({"level": "error", "message": f"{name} 的拒收比例 {rejected / total:.1%} 偏高，應檢查來源或抓取格式。"})
+        elif duplicates / total > 0.30:
+            alerts.append({"level": "warning", "message": f"{name} 的重複群比例 {duplicates / total:.1%} 偏高，已保留去重觀察。"})
+        elif pending / total > 0.40:
+            alerts.append({"level": "info", "message": f"{name} 有 {pending} 筆待確認資訊，尚未混入正式情緒與 KG 證據。"})
+    return alerts or [{"level": "success", "message": "資料治理未發現需要立即處理的來源品質警示。"}]
+
+
 def _classify_row(row: pd.Series) -> tuple[str, str]:
     title = str(row.get("title", "") or "").strip()
     normalized_title = str(row.get("normalized_title", "") or "").strip()

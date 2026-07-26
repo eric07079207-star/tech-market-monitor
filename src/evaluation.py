@@ -29,6 +29,7 @@ def evaluate_lstm_backtest(backtest: pd.DataFrame) -> dict:
     positive_rate = float(y_true.mean())
     baseline_label = int(positive_rate >= 0.5)
     baseline_accuracy = float((y_true == baseline_label).mean())
+    always_long_accuracy = float((y_true == 1).mean())
     walk_forward = _walk_forward_majority_accuracy(y_true, min_history=20)
     returns = data["future_return"].to_numpy(dtype=float)
     result = {
@@ -39,6 +40,8 @@ def evaluate_lstm_backtest(backtest: pd.DataFrame) -> dict:
         "accuracy": float((y_true == y_pred).mean()),
         "baseline_accuracy": baseline_accuracy,
         "accuracy_edge_vs_baseline": float((y_true == y_pred).mean() - baseline_accuracy),
+        "always_long_accuracy": always_long_accuracy,
+        "accuracy_edge_vs_always_long": float((y_true == y_pred).mean() - always_long_accuracy),
         "walk_forward_majority_accuracy": walk_forward,
         "balanced_accuracy": _balanced_accuracy(y_true, y_pred),
         "precision_up": _precision(y_true, y_pred, 1),
@@ -49,9 +52,13 @@ def evaluate_lstm_backtest(backtest: pd.DataFrame) -> dict:
         "median_future_return": float(np.median(returns)),
         "worst_future_return": float(np.min(returns)),
         "best_future_return": float(np.max(returns)),
+        "always_long_avg_return": float(np.mean(returns)),
+        "model_directional_avg_return": float(np.mean(np.where(y_pred == 1, returns, -returns))),
         "leakage_rows": int((data["date"] >= pd.to_datetime(data.get("target_date"), errors="coerce")).sum()) if "target_date" in data else 0,
         "evaluated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+    result["directional_return_edge_vs_always_long"] = result["model_directional_avg_return"] - result["always_long_avg_return"]
+    result["probability_calibration"] = _probability_calibration(data)
     result["model_beats_majority_baseline"] = bool(result["accuracy_edge_vs_baseline"] > 0)
     result["confidence_warning"] = _confidence_warning(len(data), result["accuracy_edge_vs_baseline"])
     return result
@@ -146,6 +153,21 @@ def _confidence_warning(rows: int, edge: float) -> str:
     if edge <= 0:
         return "未超過多數類別基準"
     return "仍需滾動回測確認"
+
+
+def _probability_calibration(data: pd.DataFrame) -> list[dict]:
+    """Return coarse probability buckets so confidence can be inspected, not assumed."""
+    report = data[["predicted_prob_up", "label"]].copy()
+    try:
+        report["bucket"] = pd.cut(
+            report["predicted_prob_up"],
+            bins=[-0.001, 0.4, 0.5, 0.6, 1.001],
+            labels=["0-40%", "40-50%", "50-60%", "60-100%"],
+        )
+    except ValueError:
+        return []
+    grouped = report.groupby("bucket", observed=True).agg(樣本數=("label", "size"), 實際上漲率=("label", "mean")).reset_index()
+    return [{"bucket": str(row.bucket), "rows": int(row.樣本數), "actual_up_rate": float(row.實際上漲率)} for row in grouped.itertuples(index=False)]
 
 
 def _to_bool(value: object) -> bool | None:
