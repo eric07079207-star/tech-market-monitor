@@ -6216,3 +6216,30 @@ run_id,module_name,category,status,critical,rows,latest_value,message,finished_a
 20260730T022119+0000,prediction_log,模型,success,False,153,2026-07-29T00:00:00+00:00,updated prediction_log.csv,2026-07-30T02:26:26+00:00
 20260730T022119+0000,lstm_monitor_features,模型,success,False,3,2026-07-29T00:00:00+00:00,updated lstm/lstm_monitor_features.parquet,2026-07-30T02:26:27+00:00
 20260730T022119+0000,lstm_status,模型,success,False,3,2026-07-30T02:26:27+00:00,updated daily monitor features without overwriting train artifacts,2026-07-30T02:26:27+00:00
+20260730T082518+0000,market_prices,主資料,success,True,121296,2026-07-30T00:00:00+00:00,updated prices.parquet,2026-07-30T08:29:16+00:00
+20260730T082518+0000,market_macro,主資料,success,True,19396,2026-07-11T00:00:00+00:00,updated macro.parquet,2026-07-30T08:29:16+00:00
+20260730T082518+0000,watchlist_news,新聞,success,True,120,2026-07-30T06:34:26+00:00,updated news.parquet,2026-07-30T08:29:22+00:00
+20260730T082518+0000,international_news,新聞,success,False,37,2026-07-30T08:16:56+00:00,updated international_news.parquet,2026-07-30T08:29:23+00:00
+20260730T082518+0000,discovery_news,探索,success,False,33,2026-07-30T05:15:38+00:00,updated discovery_news.parquet,2026-07-30T08:29:25+00:00
+20260730T082518+0000,tsla_focus_news,專題,success,False,55,2026-07-29T21:48:00+00:00,updated tsla_keyword_news.parquet,2026-07-30T08:29:32+00:00
+20260730T082518+0000,discovery_mentions,探索,success,False,2,2026-07-29T10:39:28+00:00,updated discovery_mentions.parquet,2026-07-30T08:29:55+00:00
+20260730T082518+0000,discovery_candidates,探索,success,False,2,2026-07-30T08:25:18+00:00,updated discovery_candidates.parquet,2026-07-30T08:29:56+00:00
+20260730T082518+0000,discovery_history,探索,success,False,506,2026-07-30T00:00:00+00:00,updated discovery_history.parquet,2026-07-30T08:29:56+00:00
+20260730T082518+0000,discovery_performance,探索,success,False,1506,2026-07-29T00:00:00+00:00,updated discovery_performance.parquet,2026-07-30T08:29:56+00:00
+20260730T082518+0000,governance_summary,治理,success,False,4,,updated governance_summary.parquet,2026-07-30T08:29:56+00:00
+20260730T082518+0000,sentiment_layer,情緒,success,False,5037,2026-07-30T00:00:00+00:00,updated sentiment.parquet,2026-07-30T08:29:59+00:00
+20260730T082518+0000,market_event_windows,情緒,success,False,78,2026-07-29T00:00:00+00:00,updated market_event_windows.parquet,2026-07-30T08:29:59+00:00
+20260730T082518+0000,kg_fact_events,知識圖譜,success,False,155,2026-07-30T08:16:56+00:00,updated kg/fact_events.parquet,2026-07-30T08:30:00+00:00
+20260730T082518+0000,kg_narratives,知識圖譜,success,False,155,2026-07-30T08:16:56+00:00,updated kg/narrative_features.parquet,2026-07-30T08:30:00+00:00
+20260730T082518+0000,kg_reactions,知識圖譜,success,False,516,2026-07-30T00:00:00+00:00,updated kg/market_reactions.parquet,2026-07-30T08:30:00+00:00
+20260730T082518+0000,kg_links,知識圖譜,success,False,257,2026-07-30T08:29:59+00:00,updated kg/event_links.parquet,2026-07-30T08:30:00+00:00
+20260730T082518+0000,kg_metadata,知識圖譜,success,False,1,2026-07-30T08:25:18+00:00,updated kg/kg_metadata.json,2026-07-30T08:30:00+00:00
+20260730T082518+0000,kg_prediction_log,知識圖譜,success,False,21,2026-07-29T00:00:00+00:00,updated kg/kg_prediction_log.parquet,2026-07-30T08:30:00+00:00
+20260730T082518+0000,kg_prediction_v2_log,知識圖譜,success,False,15,2026-07-29T00:00:00+00:00,updated kg/kg_prediction_v2_log.parquet,2026-07-30T08:30:00+00:00
+20260730T082518+0000,sec_fundamental_observations,基本面,success,False,8852,2026-07-23T00:00:00+00:00,updated fundamentals/sec_fundamental_observations.parquet,2026-07-30T08:30:01+00:00
+20260730T082518+0000,historical_market_samples,回測,success,False,500,2026-06-22T00:00:00+00:00,updated backtest/stratified_market_samples.parquet,2026-07-30T08:30:12+00:00
+20260730T082518+0000,kg_historical_backtest_readiness,回測,success,False,500,2026-06-22T00:00:00+00:00,updated kg/historical_backtest_readiness.parquet,2026-07-30T08:30:12+00:00
+20260730T082518+0000,factor_effectiveness,回測,success,False,9,,updated backtest/factor_effectiveness.parquet,2026-07-30T08:30:12+00:00
+20260730T082518+0000,prediction_log,模型,success,False,153,2026-07-29T00:00:00+00:00,updated prediction_log.csv,2026-07-30T08:30:14+00:00
+20260730T082518+0000,lstm_monitor_features,模型,success,False,3,2026-07-29T00:00:00+00:00,updated lstm/lstm_monitor_features.parquet,2026-07-30T08:30:14+00:00
+20260730T082518+0000,lstm_status,模型,success,False,3,2026-07-30T08:30:14+00:00,updated daily monitor features without overwriting train artifacts,2026-07-30T08:30:14+00:00
