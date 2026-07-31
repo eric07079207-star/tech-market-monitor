@@ -37,7 +37,14 @@ REMOTE_CORE_CACHE_FILES = [
     "data/cache/kg/fact_events.parquet",
     "data/cache/kg/narrative_features.parquet",
     "data/cache/kg/market_reactions.parquet",
+    "data/cache/kg/event_links.parquet",
+    "data/cache/kg/kg_prediction_log.parquet",
+    "data/cache/kg/kg_prediction_v2_log.parquet",
+    "data/cache/kg/historical_backtest_readiness.parquet",
     "data/cache/kg/kg_metadata.json",
+    "data/cache/backtest/stratified_market_samples.parquet",
+    "data/cache/backtest/factor_effectiveness.parquet",
+    "data/cache/fundamentals/sec_fundamental_observations.parquet",
     "data/cache/lstm/lstm_status.json",
     "data/cache/lstm/lstm_train_features.parquet",
     "data/cache/lstm/lstm_monitor_features.parquet",
@@ -145,13 +152,16 @@ def _sync_remote_cache_if_newer(local_metadata: dict) -> tuple[bool, str, dict]:
     remote_time = _parse_timestamp(remote_metadata.get("updated_at_utc"))
     if pd.isna(remote_time):
         return False, "remote metadata missing updated_at_utc", remote_metadata
-    if not pd.isna(local_time) and local_time >= remote_time:
+    missing_core_files = [repo_path for repo_path in REMOTE_CORE_CACHE_FILES if not (ROOT / repo_path).exists()]
+    if not missing_core_files and not pd.isna(local_time) and local_time >= remote_time:
         return False, "local cache already up to date", remote_metadata
 
     try:
         _download_and_extract_remote_data("main")
     except Exception as exc:
         return False, f"remote cache sync failed: {exc}", remote_metadata
+    if missing_core_files:
+        return True, f"synced local cache from remote main; restored {len(missing_core_files)} missing core files", remote_metadata
     return True, "synced local cache from remote main", remote_metadata
 
 
