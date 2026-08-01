@@ -6486,3 +6486,30 @@
 20260801T024312+0000,prediction_log,模型,成功,否,159,2026-07-31T00:00:00+00:00,updated prediction_log.csv,2026-08-01T02:48:25+00:00
 20260801T024312+0000,lstm_monitor_features,模型,成功,否,3,2026-07-31T00:00:00+00:00,updated lstm/lstm_monitor_features.parquet,2026-08-01T02:48:26+00:00
 20260801T024312+0000,lstm_status,模型,成功,否,3,2026-08-01T02:48:26+00:00,updated daily monitor features without overwriting train artifacts,2026-08-01T02:48:26+00:00
+20260801T081949+0000,market_prices,主資料,成功,是,121338,2026-07-31T00:00:00+00:00,updated prices.parquet,2026-08-01T08:23:46+00:00
+20260801T081949+0000,market_macro,主資料,成功,是,19398,2026-07-18T00:00:00+00:00,updated macro.parquet,2026-08-01T08:23:46+00:00
+20260801T081949+0000,watchlist_news,新聞,成功,是,120,2026-08-01T03:39:35+00:00,updated news.parquet,2026-08-01T08:23:51+00:00
+20260801T081949+0000,international_news,新聞,成功,否,36,2026-07-31T19:04:00+00:00,updated international_news.parquet,2026-08-01T08:23:53+00:00
+20260801T081949+0000,discovery_news,探索,成功,否,35,2026-07-31T18:22:00+00:00,updated discovery_news.parquet,2026-08-01T08:23:55+00:00
+20260801T081949+0000,tsla_focus_news,專題,成功,否,52,2026-07-31T22:18:05+00:00,updated tsla_keyword_news.parquet,2026-08-01T08:24:02+00:00
+20260801T081949+0000,discovery_mentions,探索,成功,否,13,2026-07-31T13:46:22+00:00,updated discovery_mentions.parquet,2026-08-01T08:24:25+00:00
+20260801T081949+0000,discovery_candidates,探索,成功,否,12,2026-08-01T08:19:49+00:00,updated discovery_candidates.parquet,2026-08-01T08:24:25+00:00
+20260801T081949+0000,discovery_history,探索,成功,否,523,2026-08-01T00:00:00+00:00,updated discovery_history.parquet,2026-08-01T08:24:25+00:00
+20260801T081949+0000,discovery_performance,探索,成功,否,1527,2026-07-31T00:00:00+00:00,updated discovery_performance.parquet,2026-08-01T08:24:25+00:00
+20260801T081949+0000,governance_summary,治理,成功,否,4,,updated governance_summary.parquet,2026-08-01T08:24:25+00:00
+20260801T081949+0000,sentiment_layer,情緒,成功,否,5037,2026-07-31T00:00:00+00:00,updated sentiment.parquet,2026-08-01T08:24:29+00:00
+20260801T081949+0000,market_event_windows,情緒,成功,否,78,2026-07-29T00:00:00+00:00,updated market_event_windows.parquet,2026-08-01T08:24:29+00:00
+20260801T081949+0000,kg_fact_events,知識圖譜,成功,否,154,2026-08-01T03:39:35+00:00,updated kg/fact_events.parquet,2026-08-01T08:24:30+00:00
+20260801T081949+0000,kg_narratives,知識圖譜,成功,否,154,2026-08-01T03:39:35+00:00,updated kg/narrative_features.parquet,2026-08-01T08:24:30+00:00
+20260801T081949+0000,kg_reactions,知識圖譜,成功,否,500,2026-07-31T00:00:00+00:00,updated kg/market_reactions.parquet,2026-08-01T08:24:30+00:00
+20260801T081949+0000,kg_links,知識圖譜,成功,否,250,2026-08-01T08:24:29+00:00,updated kg/event_links.parquet,2026-08-01T08:24:30+00:00
+20260801T081949+0000,kg_metadata,知識圖譜,成功,否,1,2026-08-01T08:19:49+00:00,updated kg/kg_metadata.json,2026-08-01T08:24:30+00:00
+20260801T081949+0000,kg_prediction_log,知識圖譜,成功,否,27,2026-07-31T00:00:00+00:00,updated kg/kg_prediction_log.parquet,2026-08-01T08:24:30+00:00
+20260801T081949+0000,kg_prediction_v2_log,知識圖譜,成功,否,21,2026-07-31T00:00:00+00:00,updated kg/kg_prediction_v2_log.parquet,2026-08-01T08:24:30+00:00
+20260801T081949+0000,sec_fundamental_observations,基本面,成功,否,8852,2026-07-23T00:00:00+00:00,updated fundamentals/sec_fundamental_observations.parquet,2026-08-01T08:24:30+00:00
+20260801T081949+0000,historical_market_samples,回測,成功,否,500,2026-07-02T00:00:00+00:00,updated backtest/stratified_market_samples.parquet,2026-08-01T08:24:44+00:00
+20260801T081949+0000,kg_historical_backtest_readiness,回測,成功,否,500,2026-07-02T00:00:00+00:00,updated kg/historical_backtest_readiness.parquet,2026-08-01T08:24:44+00:00
+20260801T081949+0000,factor_effectiveness,回測,成功,否,9,,updated backtest/factor_effectiveness.parquet,2026-08-01T08:24:44+00:00
+20260801T081949+0000,prediction_log,模型,成功,否,159,2026-07-31T00:00:00+00:00,updated prediction_log.csv,2026-08-01T08:24:46+00:00
+20260801T081949+0000,lstm_monitor_features,模型,成功,否,3,2026-07-31T00:00:00+00:00,updated lstm/lstm_monitor_features.parquet,2026-08-01T08:24:47+00:00
+20260801T081949+0000,lstm_status,模型,成功,否,3,2026-08-01T08:24:47+00:00,updated daily monitor features without overwriting train artifacts,2026-08-01T08:24:47+00:00
