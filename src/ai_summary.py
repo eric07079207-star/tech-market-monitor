@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from hashlib import sha256
 from datetime import datetime, timezone
 from pathlib import Path
 import tomllib
@@ -15,11 +16,12 @@ import requests
 from .data import cache_path
 from .edge import dedup_key, quality_score
 from .news import rule_based_news_summary
+from .research_profile import PERSONAL_RESEARCH_PROFILE, RESEARCH_PROFILE_VERSION
 
 
 AI_SUMMARY_CACHE = cache_path("ai_summary.json")
 AI_SUMMARY_HISTORY_CACHE = cache_path("ai_summary_history.parquet")
-AI_SUMMARY_PROMPT_VERSION = "2026-06-19-v3"
+AI_SUMMARY_PROMPT_VERSION = "2026-08-02-personal-v4"
 TAIPEI = ZoneInfo("Asia/Taipei")
 PRESERVE_AI_SUMMARY_HOURS = 72
 
@@ -35,6 +37,7 @@ def build_openai_summary(
     api_key = _get_secret("OPENAI_API_KEY")
     model = _get_secret("OPENAI_MODEL") or "gpt-4.1-mini"
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    research_plan = _build_personal_research_plan(snapshot, anomalies, news, international_news, discovery_candidates)
     fallback_text = _fallback(
         snapshot,
         anomalies,
@@ -42,6 +45,7 @@ def build_openai_summary(
         international_news=international_news,
         discovery_candidates=discovery_candidates,
         portfolio_impact=portfolio_impact,
+        research_plan=research_plan,
     )
     if not api_key:
         return _summary_payload(
@@ -51,10 +55,11 @@ def build_openai_summary(
             generated_at=generated_at,
             used_ai=False,
             status="尚未設定 OPENAI_API_KEY，已使用規則摘要。",
+            research_plan=research_plan,
         )
 
     try:
-        prompt = _build_summary_prompt(snapshot, anomalies, news, international_news, discovery_candidates, portfolio_impact)
+        prompt = _build_summary_prompt(snapshot, anomalies, news, international_news, discovery_candidates, portfolio_impact, research_plan)
         response = requests.post(
             "https://api.openai.com/v1/responses",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
@@ -76,6 +81,7 @@ def build_openai_summary(
                 generated_at=generated_at,
                 used_ai=True,
                 status="OpenAI AI 摘要已成功產生。",
+                research_plan=research_plan,
             )
         return _summary_payload(
             text=fallback_text,
@@ -84,6 +90,7 @@ def build_openai_summary(
             generated_at=generated_at,
             used_ai=False,
             status="OpenAI 回覆過短或章節不完整，已改用規則摘要。",
+            research_plan=research_plan,
         )
     except Exception as exc:
         return _summary_payload(
@@ -93,6 +100,7 @@ def build_openai_summary(
             generated_at=generated_at,
             used_ai=False,
             status=f"OpenAI 摘要失敗，已改用規則摘要：{_safe_error(exc)}",
+            research_plan=research_plan,
         )
 
 
@@ -182,14 +190,10 @@ def openai_configuration_status() -> dict:
 def ai_summary_quality(payload: dict) -> dict:
     text = str(payload.get("text", "") or "")
     required_sections = [
-        "今日市場結論",
-        "與昨日相比",
-        "量化訊號",
-        "新聞與國際風險",
-        "對持倉影響",
-        "候選觀察股",
-        "明日觀察重點",
-        "一句話行動意義",
+        "今日研究結論",
+        "今日優先焦點",
+        "可能被忽略的訊號",
+        "下一步觀察",
     ]
     present = [section for section in required_sections if section in text]
     word_count = len(text)
@@ -262,7 +266,16 @@ def _get_secret(name: str) -> str | None:
     return None
 
 
-def _summary_payload(text: str, provider: str, model: str, generated_at: str, used_ai: bool, status: str) -> dict:
+def _summary_payload(
+    text: str,
+    provider: str,
+    model: str,
+    generated_at: str,
+    used_ai: bool,
+    status: str,
+    research_plan: dict | None = None,
+) -> dict:
+    plan = research_plan or {}
     return {
         "text": text,
         "provider": provider,
@@ -271,6 +284,10 @@ def _summary_payload(text: str, provider: str, model: str, generated_at: str, us
         "used_ai": used_ai,
         "status": status,
         "prompt_version": AI_SUMMARY_PROMPT_VERSION,
+        "research_profile_version": RESEARCH_PROFILE_VERSION,
+        "research_focus": "；".join(plan.get("topics", [])),
+        "change_state": plan.get("change_state", "資料同步中"),
+        "input_fingerprint": plan.get("input_fingerprint", ""),
     }
 
 
@@ -330,6 +347,10 @@ def _summary_history_row(payload: dict) -> dict:
         "structure_score": edge_quality.get("structure_score"),
         "dedup_key": edge_quality.get("dedup_key"),
         "quality_score_edge": edge_quality.get("quality_score_edge"),
+        "research_profile_version": str(payload.get("research_profile_version", "")),
+        "research_focus": str(payload.get("research_focus", "")),
+        "change_state": str(payload.get("change_state", "")),
+        "input_fingerprint": str(payload.get("input_fingerprint", "")),
         "text": text,
     }
 
@@ -341,6 +362,7 @@ def _fallback(
     international_news: pd.DataFrame | None = None,
     discovery_candidates: pd.DataFrame | None = None,
     portfolio_impact: pd.DataFrame | None = None,
+    research_plan: dict | None = None,
 ) -> str:
     lines: list[str] = []
     market_view, confidence = _fallback_market_view(snapshot, anomalies)
@@ -348,7 +370,7 @@ def _fallback(
     smh_note = _fallback_symbol_note(snapshot, "SMH")
     vix_note = _fallback_symbol_note(snapshot, "^VIX")
 
-    lines.append("## 今日市場結論")
+    lines.append("## 今日研究結論")
     lines.append(f"目前市場判讀偏向{market_view}，信心{confidence}。")
     notes = [note for note in [qqq_note, smh_note, vix_note] if note]
     if notes:
@@ -357,12 +379,12 @@ def _fallback(
         lines.append("今天以量價與均線結構作為主要判讀依據。")
     lines.append("")
 
-    lines.append("## 與昨日相比")
-    for bullet in _fallback_change_lines(snapshot, anomalies, international_news):
-        lines.append(f"- {bullet}")
-    lines.append("")
-
-    lines.append("## 量化訊號")
+    lines.append("## 今日優先焦點")
+    plan = research_plan or {}
+    for topic in plan.get("topics", [])[:4]:
+        lines.append(f"### {topic}")
+    if plan.get("topics"):
+        lines.append("以上焦點依持倉關聯、價格異常、新聞與市場結構自動排序。")
     if not anomalies.empty:
         top = anomalies[["symbol", "flags"]].head(5)
         for row in top.itertuples():
@@ -371,7 +393,7 @@ def _fallback(
         lines.append("- 今日未偵測到重大量價異常。")
     lines.append("")
 
-    lines.append("## 新聞與國際風險")
+    lines.append("## 可能被忽略的訊號")
     news_summary = rule_based_news_summary(news)
     lines.append(news_summary if news_summary else "近期沒有足夠新聞可供整理。")
     intl_lines = _fallback_international_lines(international_news)
@@ -379,22 +401,15 @@ def _fallback(
         lines.extend(intl_lines)
     lines.append("")
 
-    lines.append("## 對持倉影響")
+    lines.append("## 下一步觀察")
     impact_lines = _fallback_portfolio_impact_lines(portfolio_impact)
     lines.extend(impact_lines)
     lines.append("")
 
-    lines.append("## 候選觀察股")
     candidate_lines = _fallback_candidate_lines(discovery_candidates)
-    lines.extend(candidate_lines)
-    lines.append("")
-
-    lines.append("## 明日觀察重點")
+    lines.extend(candidate_lines[:2])
     for bullet in _fallback_watchlist(snapshot, anomalies, international_news):
         lines.append(f"- {bullet}")
-    lines.append("")
-    lines.append("## 一句話行動意義")
-    lines.append(_fallback_action_line(snapshot, anomalies, international_news))
     return "\n".join(lines)
 
 
@@ -565,6 +580,7 @@ def _build_summary_prompt(
     international_news: pd.DataFrame | None,
     discovery_candidates: pd.DataFrame | None,
     portfolio_impact: pd.DataFrame | None,
+    research_plan: dict,
 ) -> str:
     market_cols = ["symbol", "ret_1d", "ret_20d", "dist_ma_50", "dist_ma_200", "volume_ratio_20d", "drawdown_52w"]
     market = snapshot[[col for col in market_cols if col in snapshot]].dropna(how="all").to_dict("records")
@@ -596,10 +612,11 @@ def _build_summary_prompt(
     return f"""
 你是一位謹慎、務實、資訊密度高的市場研究助理。請用繁體中文輸出每日科技股監控摘要，避免保證式預測，避免直接叫使用者買賣。
 
-你的目標不是把新聞重寫一遍，而是回答：
-1. 今天和昨天相比，真正變了什麼？
-2. 哪些變化最值得投資人注意？
-3. 這些變化對持倉、候選股、明日觀察有什麼意義？
+你的目標不是把新聞重寫一遍，而是替這位長期研究科技股、同時持有科技與成長股的投資人做每日研究排序。
+優先關注標的：{PERSONAL_RESEARCH_PROFILE['portfolio_focus']}
+長期研究主題：{PERSONAL_RESEARCH_PROFILE['themes']}
+
+你要回答：今天在使用者真正關心的範圍中，最值得花時間的是什麼；沒有新增證據的主題不要硬寫。
 
 請嚴格遵守以下規則：
 - 不要使用空泛句子，例如「留意利率風險」「市場保持觀望」；除非後面立刻接具體證據。
@@ -607,34 +624,27 @@ def _build_summary_prompt(
 - 如果今天和昨天差異不大，要明說「差異有限」，但仍要指出最值得注意的1到2個新變化。
 - 不要把長期背景重複當成今日重點，除非今天有新的證據。
 - 對持倉影響請優先排序最值得注意的1到3檔，不要平均分配篇幅。
+- 只能根據提供資料說明，不知道就直接寫資料不足，不可補想像中的事件。
+- 不要為了每一天都有相同版型而提及所有持倉、所有市場指標或所有候選股。
 
-輸出格式請固定為：
-## 今日市場結論
-先用 2-3 句話直接說明今日市場最重要的變化、目前偏多/觀望/風險升溫/防守，以及信心等級。
+輸出格式採「動態研究備忘錄」，必須有以下四個區塊，但第二區的子標題須依今天的焦點清單命名：
+## 今日研究結論
+用 2-3 句說明最重要變化、偏多/觀望/風險升溫/防守與信心來源。
 
-## 與昨日相比
-列出 3 點「今天和昨天真正不同」的地方。若差異有限，也要點出最不一樣的1到2項，不要留白。
+## 今日優先焦點
+只挑以下焦點清單的 3-4 項，按重要性排序。每項用 `### 焦點名稱` 作標題，說明新事實、量化證據、與使用者的關聯。不可為未入選主題補一段。
 
-## 量化訊號
-列出 3-5 點，只保留最重要的量化證據。要連結 QQQ、SMH、VIX、均線、成交量或異常雷達，並說明這代表什麼。
+## 可能被忽略的訊號
+只寫 1-2 項真正不同類型的訊號，例如宏觀、國際、信用壓力或候選股；若沒有，明說沒有足夠新增證據。
 
-## 新聞與國際風險
-整理真正有增量的消息面線索，特別留意戰爭、貿易談判、出口管制、利率、財報、增發與指引下修。不要把舊主題重講成新主題。
-
-## 對持倉影響
-只聚焦最值得注意的 1-3 檔持倉。要說明：為什麼是它、是價格/量能/新聞/情緒哪一類風險、目前偏短期噪音還是結構變化。
-
-## 候選觀察股
-只解讀 Top 5 候選觀察股，優先指出今天新冒出來或排序明顯前進的標的，說明值得觀察的理由與主要風險。
-
-## 明日觀察重點
-列出 3 點下一個交易日最該追蹤的指標、價位、事件或新聞驗證點。
-
-## 一句話行動意義
-用 1 句話總結：今天最值得記住的是什麼。不要空泛。
+## 下一步觀察
+列出 2-3 個可驗證的下一步：數字、事件、標的或新聞驗證點。
 
 前一版摘要參考：
 {previous_context}
+
+今日個人研究焦點清單：
+{research_plan}
 
 今日市場變化重點：
 {market_change_rows}
@@ -688,8 +698,132 @@ def _extract_openai_text(data: dict) -> str:
 def _is_complete_summary(text: str) -> bool:
     if len(text.strip()) < 350:
         return False
-    required = ["今日市場結論", "與昨日相比", "量化訊號", "新聞與國際風險", "明日觀察重點", "一句話行動意義"]
+    required = ["今日研究結論", "今日優先焦點", "可能被忽略的訊號", "下一步觀察"]
     return all(section in text for section in required)
+
+
+def _build_personal_research_plan(
+    snapshot: pd.DataFrame,
+    anomalies: pd.DataFrame,
+    news: pd.DataFrame,
+    international_news: pd.DataFrame | None,
+    discovery_candidates: pd.DataFrame | None,
+) -> dict:
+    """Rank a small, changing agenda from the user's actual research interests."""
+    previous_text = _previous_summary_text().lower()
+    holding_rows = _rank_focus_holdings(snapshot, anomalies, news, previous_text)
+    agenda: list[dict[str, object]] = []
+    if holding_rows:
+        symbols = [row["symbol"] for row in holding_rows[:3]]
+        agenda.append({"title": f"持倉焦點：{' / '.join(symbols)}", "why": "持倉相關的價格、異常或新增新聞優先。", "evidence": holding_rows[:3]})
+
+    market_rows = _market_focus_evidence(snapshot, previous_text)
+    if market_rows:
+        agenda.append({"title": "科技市場結構：QQQ / 半導體 / 波動率", "why": "用市場結構確認個股訊號是否有大盤支持。", "evidence": market_rows})
+
+    international_rows = _major_international_evidence(international_news, previous_text)
+    if international_rows:
+        agenda.append({"title": "國際與政策風險", "why": "關稅、出口管制、戰爭與利率會改變科技股估值或供應鏈條件。", "evidence": international_rows})
+
+    candidate_rows = _candidate_evidence(discovery_candidates, previous_text)
+    if candidate_rows:
+        agenda.append({"title": "候選股的新線索", "why": "只保留今日候選排序或新聞理由具變化的標的。", "evidence": candidate_rows})
+
+    # A compact agenda is deliberate: unrelated themes should not appear merely to fill a template.
+    agenda = agenda[:4]
+    topic_names = [str(item["title"]) for item in agenda]
+    evidence_blob = json.dumps(agenda, ensure_ascii=False, default=str, sort_keys=True)
+    fingerprint = sha256(evidence_blob.encode("utf-8")).hexdigest()[:16]
+    prior_fingerprint = _latest_history_value("input_fingerprint")
+    return {
+        "profile_version": RESEARCH_PROFILE_VERSION,
+        "topics": topic_names,
+        "agenda": agenda,
+        "change_state": "低變化日" if prior_fingerprint and prior_fingerprint == fingerprint else "有新增或重新排序的研究焦點",
+        "input_fingerprint": fingerprint,
+    }
+
+
+def _rank_focus_holdings(snapshot: pd.DataFrame, anomalies: pd.DataFrame, news: pd.DataFrame, previous_text: str) -> list[dict[str, object]]:
+    if snapshot is None or snapshot.empty or "symbol" not in snapshot:
+        return []
+    anomaly_symbols = set(anomalies.get("symbol", pd.Series(dtype=str)).astype(str).str.upper()) if anomalies is not None else set()
+    result: list[dict[str, object]] = []
+    for rank, symbol in enumerate(PERSONAL_RESEARCH_PROFILE["portfolio_focus"]):
+        row = snapshot[snapshot["symbol"].astype(str).str.upper().eq(symbol)]
+        if row.empty:
+            continue
+        item = row.iloc[0]
+        news_count = int(news[news.get("symbol", pd.Series(dtype=str)).astype(str).str.upper().eq(symbol)].shape[0]) if news is not None and not news.empty else 0
+        ret_1d = abs(_num(item.get("ret_1d")))
+        ret_20d = abs(_num(item.get("ret_20d")))
+        novel = symbol.lower() not in previous_text
+        score = 3.0 + max(0, 10 - rank) * 0.08 + min(ret_1d * 100, 5) + min(ret_20d * 30, 2) + news_count * 0.45
+        if symbol in anomaly_symbols:
+            score += 2.0
+        if novel:
+            score += 0.8
+        result.append({"symbol": symbol, "score": round(score, 2), "ret_1d_pct": round(_num(item.get("ret_1d")) * 100, 2), "ret_20d_pct": round(_num(item.get("ret_20d")) * 100, 2), "news_count": news_count, "anomaly": symbol in anomaly_symbols})
+    return sorted(result, key=lambda item: float(item["score"]), reverse=True)
+
+
+def _market_focus_evidence(snapshot: pd.DataFrame, previous_text: str) -> list[dict[str, object]]:
+    if snapshot is None or snapshot.empty:
+        return []
+    rows: list[dict[str, object]] = []
+    for symbol in PERSONAL_RESEARCH_PROFILE["market_focus"]:
+        matched = snapshot[snapshot.get("symbol", pd.Series(dtype=str)).astype(str).eq(symbol)]
+        if matched.empty:
+            continue
+        item = matched.iloc[0]
+        magnitude = abs(_num(item.get("ret_1d"))) + abs(_num(item.get("ret_20d"))) * 0.2
+        if magnitude >= 0.012 or symbol.lower() not in previous_text:
+            rows.append({"symbol": symbol, "ret_1d_pct": round(_num(item.get("ret_1d")) * 100, 2), "ret_20d_pct": round(_num(item.get("ret_20d")) * 100, 2), "dist_ma_50_pct": round(_num(item.get("dist_ma_50")) * 100, 2)})
+    return rows[:4]
+
+
+def _major_international_evidence(international_news: pd.DataFrame | None, previous_text: str) -> list[dict[str, object]]:
+    if international_news is None or international_news.empty:
+        return []
+    frame = international_news.copy()
+    if "is_major" in frame:
+        major = frame[frame["is_major"].fillna(False)]
+        if not major.empty:
+            frame = major
+    rows = []
+    for row in frame.head(8).itertuples():
+        title = str(getattr(row, "title", ""))
+        if title and (title.lower() not in previous_text or bool(getattr(row, "is_major", False))):
+            rows.append({"title": title, "source": str(getattr(row, "source", "")), "tags": str(getattr(row, "tags", ""))})
+    return rows[:3]
+
+
+def _candidate_evidence(candidates: pd.DataFrame | None, previous_text: str) -> list[dict[str, object]]:
+    if candidates is None or candidates.empty:
+        return []
+    rows = []
+    for row in candidates.head(8).itertuples():
+        ticker = str(getattr(row, "ticker", ""))
+        if not ticker:
+            continue
+        if ticker.lower() not in previous_text or len(rows) < 2:
+            rows.append({"ticker": ticker, "score": round(_num(getattr(row, "candidate_score", np.nan)), 1), "reason": str(getattr(row, "observation_reason", ""))[:180], "risk": str(getattr(row, "risk_flags", ""))[:120]})
+    return rows[:3]
+
+
+def _latest_history_value(column: str) -> str:
+    history = load_ai_summary_history()
+    if history.empty or column not in history:
+        return ""
+    value = history.sort_values("generated_at_utc").iloc[-1].get(column, "")
+    return str(value or "")
+
+
+def _previous_summary_text() -> str:
+    history = load_ai_summary_history()
+    if history.empty or "text" not in history:
+        return ""
+    return str(history.sort_values("generated_at_utc").iloc[-1].get("text", "") or "")
 
 
 def _previous_summary_context() -> str:

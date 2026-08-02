@@ -1169,6 +1169,10 @@ with tab_news:
             f"來源網域：{ai_summary.get('source_domain', 'n/a')}｜"
             f"去重鍵：{ai_summary.get('dedup_key', 'n/a')}"
         )
+        focus = str(ai_summary.get("research_focus", "") or "")
+        change_state = str(ai_summary.get("change_state", "") or "")
+        if focus:
+            st.info(f"今日個人研究焦點：{focus}｜資料狀態：{change_state or '已排序'}")
         st.markdown(ai_summary.get("text", ""))
         if not ai_history.empty:
             ai_quality_summary = summarize_quality_frame(ai_history, "quality_score")
@@ -1197,6 +1201,9 @@ with tab_news:
                         "structure_score": "結構分",
                         "quality_score_edge": "edge品質分",
                         "prompt_version": "提示版本",
+                        "research_profile_version": "研究設定版本",
+                        "research_focus": "個人研究焦點",
+                        "change_state": "資料變化狀態",
                     }
                 )
                 st.dataframe(
@@ -1215,6 +1222,9 @@ with tab_news:
                         "章節數",
                         "缺漏章節",
                         "提示版本",
+                        "研究設定版本",
+                        "個人研究焦點",
+                        "資料變化狀態",
                     ] if c in history_display.columns]],
                     hide_index=True,
                     width="stretch",
