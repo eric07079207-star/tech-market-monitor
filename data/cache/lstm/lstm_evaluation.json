@@ -3,40 +3,35 @@
     "status": "可用",
     "rows": 38,
     "positive_rate": 0.3684210526315789,
-    "predicted_positive_rate": 0.10526315789473684,
-    "accuracy": 0.6842105263157895,
+    "predicted_positive_rate": 0.0,
+    "accuracy": 0.631578947368421,
     "baseline_accuracy": 0.631578947368421,
-    "accuracy_edge_vs_baseline": 0.052631578947368474,
+    "accuracy_edge_vs_baseline": 0.0,
     "always_long_accuracy": 0.3684210526315789,
-    "accuracy_edge_vs_always_long": 0.31578947368421056,
+    "accuracy_edge_vs_always_long": 0.2631578947368421,
     "walk_forward_majority_accuracy": 0.5555555555555556,
-    "balanced_accuracy": 0.5863095238095238,
-    "precision_up": 0.75,
-    "recall_up": 0.21428571428571427,
-    "f1_up": 0.3333333333333333,
-    "brier_score": 0.24428261187544176,
+    "balanced_accuracy": 0.5,
+    "precision_up": null,
+    "recall_up": 0.0,
+    "f1_up": null,
+    "brier_score": 0.2412101555874553,
     "avg_future_return": -0.01481828551029721,
     "median_future_return": -0.03133751468468926,
     "worst_future_return": -0.29072752497583665,
     "best_future_return": 0.2275397366926486,
     "always_long_avg_return": -0.01481828551029721,
-    "model_directional_avg_return": 0.012683361160111449,
+    "model_directional_avg_return": 0.01481828551029721,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-08-03T19:40:44+00:00",
-    "directional_return_edge_vs_always_long": 0.027501646670408657,
+    "evaluated_at_utc": "2026-08-04T00:11:11+00:00",
+    "directional_return_edge_vs_always_long": 0.02963657102059442,
     "probability_calibration": [
       {
         "bucket": "40-50%",
-        "rows": 34,
-        "actual_up_rate": 0.3235294117647059
-      },
-      {
-        "bucket": "50-60%",
-        "rows": 4,
-        "actual_up_rate": 0.75
+        "rows": 38,
+        "actual_up_rate": 0.3684210526315789
       }
     ],
-    "model_beats_majority_baseline": true,
+    "model_beats_majority_baseline": false,
     "confidence_warning": "樣本少，低信心"
   },
   "rule_predictions": {
@@ -65,7 +60,7 @@
         "avg_return": null
       }
     ],
-    "evaluated_at_utc": "2026-08-03T19:40:44+00:00"
+    "evaluated_at_utc": "2026-08-04T00:11:11+00:00"
   },
   "leakage_audit": {
     "status": "可用",
