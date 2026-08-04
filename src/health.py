@@ -155,14 +155,31 @@ def _governance_row(governance: pd.DataFrame | None, cache_updated: str) -> dict
     file_size = _file_size(cache_path("governance_summary.parquet"))
     pending = 0
     rejected = 0
+    total_rows = 0
     if governance is not None and not governance.empty:
+        total_rows = int(
+            pd.to_numeric(
+                governance.get("rows", pd.Series(0, index=governance.index)),
+                errors="coerce",
+            )
+            .fillna(0)
+            .sum()
+        )
         for column in ["pending_short", "pending_medium", "pending_long"]:
             if column in governance:
                 pending += int(pd.to_numeric(governance[column], errors="coerce").fillna(0).sum())
         if "rejected" in governance:
             rejected = int(pd.to_numeric(governance["rejected"], errors="coerce").fillna(0).sum())
-    status = "🟢 正常" if count > 0 and rejected == 0 else ("🟡 注意" if count > 0 else "🔴 無資料")
-    detail = f"待確認 {pending} 筆；拒收 {rejected} 筆"
+    rejected_ratio = rejected / max(total_rows, 1)
+    if count <= 0:
+        status = "🔴 無資料"
+    elif rejected_ratio <= 0.05:
+        status = "🟢 正常"
+    elif rejected_ratio <= 0.15:
+        status = "🟡 注意"
+    else:
+        status = "🔴 異常"
+    detail = f"待確認 {pending} 筆；拒收 {rejected} 筆（{rejected_ratio:.1%}）"
     return {
         "狀態": status,
         "資料分類": "治理",
