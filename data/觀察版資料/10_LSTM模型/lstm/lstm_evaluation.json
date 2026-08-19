@@ -4,39 +4,39 @@
     "rows": 38,
     "positive_rate": 0.3157894736842105,
     "predicted_positive_rate": 0.07894736842105263,
-    "accuracy": 0.7105263157894737,
+    "accuracy": 0.6578947368421053,
     "baseline_accuracy": 0.6842105263157895,
-    "accuracy_edge_vs_baseline": 0.02631578947368418,
+    "accuracy_edge_vs_baseline": -0.02631578947368418,
     "always_long_accuracy": 0.3157894736842105,
-    "accuracy_edge_vs_always_long": 0.39473684210526316,
+    "accuracy_edge_vs_always_long": 0.3421052631578948,
     "walk_forward_majority_accuracy": 0.5555555555555556,
-    "balanced_accuracy": 0.5641025641025641,
-    "precision_up": 0.6666666666666666,
-    "recall_up": 0.16666666666666666,
-    "f1_up": 0.26666666666666666,
-    "brier_score": 0.2441806047488741,
-    "avg_future_return": -0.02500108528764817,
+    "balanced_accuracy": 0.5032051282051282,
+    "precision_up": 0.3333333333333333,
+    "recall_up": 0.08333333333333333,
+    "f1_up": 0.13333333333333333,
+    "brier_score": 0.2439943123943513,
+    "avg_future_return": -0.02496917983428765,
     "median_future_return": -0.04146178414577889,
     "worst_future_return": -0.29072752497583665,
     "best_future_return": 0.2275397366926486,
-    "always_long_avg_return": -0.02500108528764817,
-    "model_directional_avg_return": 0.02226882248896183,
+    "always_long_avg_return": -0.02496917983428765,
+    "model_directional_avg_return": 0.013412451549418999,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-08-19T18:39:21+00:00",
-    "directional_return_edge_vs_always_long": 0.04726990777661,
+    "evaluated_at_utc": "2026-08-19T23:25:05+00:00",
+    "directional_return_edge_vs_always_long": 0.03838163138370665,
     "probability_calibration": [
       {
         "bucket": "40-50%",
         "rows": 35,
-        "actual_up_rate": 0.2857142857142857
+        "actual_up_rate": 0.3142857142857143
       },
       {
         "bucket": "50-60%",
         "rows": 3,
-        "actual_up_rate": 0.6666666666666666
+        "actual_up_rate": 0.3333333333333333
       }
     ],
-    "model_beats_majority_baseline": true,
+    "model_beats_majority_baseline": false,
     "confidence_warning": "樣本少，低信心"
   },
   "rule_predictions": {
@@ -65,7 +65,7 @@
         "avg_return": 0.022846456026235983
       }
     ],
-    "evaluated_at_utc": "2026-08-19T18:39:21+00:00"
+    "evaluated_at_utc": "2026-08-19T23:25:05+00:00"
   },
   "leakage_audit": {
     "status": "可用",
