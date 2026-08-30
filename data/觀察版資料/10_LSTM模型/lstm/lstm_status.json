@@ -13,7 +13,7 @@
   "backtest_rows": 38,
   "feature_rows": 247,
   "train_feature_rows": 247,
-  "monitor_feature_rows": 1,
+  "monitor_feature_rows": 3,
   "train_rows": 172,
   "valid_rows": 37,
   "test_rows": 38,
@@ -23,6 +23,6 @@
   "prediction_date": "2026-08-28 00:00:00+00:00",
   "prediction_target_date": "2026-09-25 00:00:00+00:00",
   "prediction_target_date_type": "estimated",
-  "monitor_updated_at_utc": "2026-08-30T01:05:27+00:00",
-  "updated_at_utc": "2026-08-30T01:04:36+00:00"
+  "monitor_updated_at_utc": "2026-08-30T03:56:08+00:00",
+  "updated_at_utc": "2026-08-30T03:56:08+00:00"
 }
