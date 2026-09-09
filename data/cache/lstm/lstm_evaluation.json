@@ -3,37 +3,37 @@
     "status": "可用",
     "rows": 38,
     "positive_rate": 0.3684210526315789,
-    "predicted_positive_rate": 0.02631578947368421,
-    "accuracy": 0.6578947368421053,
+    "predicted_positive_rate": 0.13157894736842105,
+    "accuracy": 0.7105263157894737,
     "baseline_accuracy": 0.631578947368421,
-    "accuracy_edge_vs_baseline": 0.026315789473684292,
+    "accuracy_edge_vs_baseline": 0.07894736842105265,
     "always_long_accuracy": 0.3684210526315789,
-    "accuracy_edge_vs_always_long": 0.2894736842105264,
+    "accuracy_edge_vs_always_long": 0.34210526315789475,
     "walk_forward_majority_accuracy": 0.5555555555555556,
-    "balanced_accuracy": 0.5357142857142857,
-    "precision_up": 1.0,
-    "recall_up": 0.07142857142857142,
-    "f1_up": 0.13333333333333333,
-    "brier_score": 0.2414511590624678,
+    "balanced_accuracy": 0.6220238095238095,
+    "precision_up": 0.8,
+    "recall_up": 0.2857142857142857,
+    "f1_up": 0.4210526315789473,
+    "brier_score": 0.2424589403189444,
     "avg_future_return": -0.014132805217814733,
     "median_future_return": -0.03850190887948224,
     "worst_future_return": -0.29072752497583665,
     "best_future_return": 0.2275397366926486,
     "always_long_avg_return": -0.014132805217814733,
-    "model_directional_avg_return": 0.01993693215539967,
+    "model_directional_avg_return": 0.03988401840704194,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-09-08T20:51:02+00:00",
-    "directional_return_edge_vs_always_long": 0.03406973737321441,
+    "evaluated_at_utc": "2026-09-09T01:08:10+00:00",
+    "directional_return_edge_vs_always_long": 0.05401682362485667,
     "probability_calibration": [
       {
         "bucket": "40-50%",
-        "rows": 37,
-        "actual_up_rate": 0.35135135135135137
+        "rows": 33,
+        "actual_up_rate": 0.30303030303030304
       },
       {
         "bucket": "50-60%",
-        "rows": 1,
-        "actual_up_rate": 1.0
+        "rows": 5,
+        "actual_up_rate": 0.8
       }
     ],
     "model_beats_majority_baseline": true,
@@ -65,7 +65,7 @@
         "avg_return": -0.0037441481137592473
       }
     ],
-    "evaluated_at_utc": "2026-09-08T20:51:02+00:00"
+    "evaluated_at_utc": "2026-09-09T01:08:10+00:00"
   },
   "leakage_audit": {
     "status": "可用",
