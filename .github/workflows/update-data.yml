@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: tech-market-monitor-update-data
+  group: tech-market-monitor-cache-writer
   cancel-in-progress: false
 
 permissions:
@@ -70,9 +70,18 @@ jobs:
       - name: Commit updated cache
         if: always()
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/cache data/觀察版資料
           git diff --cached --quiet && exit 0
           git commit -m "Update market data cache"
-          git push
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep $((attempt * 3))
+          done
+          echo "Cache update could not be pushed after 3 attempts."
+          exit 1
