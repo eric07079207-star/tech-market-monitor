@@ -45,9 +45,8 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
-          FORCE_SUMMARY: ${{ github.event.inputs.force || 'false' }}
         run: |
-          if [ "$FORCE_SUMMARY" = "true" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             python scripts/generate_ai_summary_if_needed.py --force
           else
             python scripts/generate_ai_summary_if_needed.py
