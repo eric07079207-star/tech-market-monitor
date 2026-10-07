@@ -58,6 +58,8 @@ jobs:
           git add data/cache/ai_summary.json data/cache/ai_summary_history.parquet data/觀察版資料/08_AI摘要 data/觀察版資料/13_專案記憶
           git diff --cached --quiet && exit 0
           git commit -m "Update AI summary cache"
+          # Generated auxiliary files must not block rebasing the committed cache.
+          git stash push --include-untracked --message "post-summary-cache-commit" || true
           for attempt in 1 2 3; do
             if git pull --rebase origin main && git push origin HEAD:main; then
               exit 0
