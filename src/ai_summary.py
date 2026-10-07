@@ -66,8 +66,6 @@ def build_openai_summary(
             json={
                 "model": model,
                 "input": prompt,
-                # Daily summaries need complete, concise reporting rather than deep reasoning.
-                "reasoning": {"effort": "minimal"},
                 "temperature": 0.25,
                 "max_output_tokens": 1800,
             },
