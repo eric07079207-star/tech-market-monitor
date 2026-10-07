@@ -7,6 +7,12 @@ on:
     - cron: "5 0 * * *"
     - cron: "5 2 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Regenerate the daily summary even when one already exists"
+        required: false
+        type: boolean
+        default: false
   push:
     paths:
       - ".github/workflows/ai-summary.yml"
@@ -39,7 +45,13 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
-        run: python scripts/generate_ai_summary_if_needed.py
+          FORCE_SUMMARY: ${{ inputs.force || 'false' }}
+        run: |
+          if [ "$FORCE_SUMMARY" = "true" ]; then
+            python scripts/generate_ai_summary_if_needed.py --force
+          else
+            python scripts/generate_ai_summary_if_needed.py
+          fi
 
       - name: Export observation data
         run: python scripts/export_observation_data.py
