@@ -85,6 +85,17 @@ def build_openai_summary(
                 status="OpenAI AI 摘要已成功產生。",
                 research_plan=research_plan,
             )
+        hybrid_text = _complete_with_rule_sections(text, fallback_text)
+        if _is_complete_summary(hybrid_text):
+            return _summary_payload(
+                text=hybrid_text,
+                provider="openai",
+                model=model,
+                generated_at=generated_at,
+                used_ai=True,
+                status="OpenAI 摘要已產生；未完成章節已由當日規則資料補足。",
+                research_plan=research_plan,
+            )
         return _summary_payload(
             text=fallback_text,
             provider="rules",
@@ -702,6 +713,37 @@ def _is_complete_summary(text: str) -> bool:
         return False
     required = ["今日研究結論", "今日優先焦點", "可能被忽略的訊號", "下一步觀察"]
     return all(section in text for section in required)
+
+
+def _complete_with_rule_sections(ai_text: str, fallback_text: str) -> str:
+    """Keep usable AI sections while filling only the missing required sections."""
+    required = ["今日研究結論", "今日優先焦點", "可能被忽略的訊號", "下一步觀察"]
+
+    def sections(text: str) -> dict[str, str]:
+        matches = list(re.finditer(r"(?m)^##[ \t]+([^\n]+?)[ \t]*$", text or ""))
+        values: dict[str, str] = {}
+        for index, match in enumerate(matches):
+            heading = match.group(1).strip()
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+            body = text[match.end() : end].strip()
+            if heading in required and body:
+                values[heading] = body
+        return values
+
+    ai_sections = sections(ai_text)
+    fallback_sections = sections(fallback_text)
+    if not ai_sections and len((ai_text or "").strip()) < 80:
+        return fallback_text
+
+    if not ai_sections:
+        ai_sections["今日研究結論"] = f"AI 補充觀察：{ai_text.strip()}"
+
+    output: list[str] = []
+    for heading in required:
+        body = ai_sections.get(heading) or fallback_sections.get(heading)
+        if body:
+            output.extend([f"## {heading}", body])
+    return "\n\n".join(output)
 
 
 def _build_personal_research_plan(
