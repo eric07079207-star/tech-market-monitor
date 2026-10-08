@@ -12876,6 +12876,7 @@ date,series,label,value,source,provider_series
 2026-09-05,ICSA,US Initial Jobless Claims,153097.0,DOL,eta539_c3_aggregate
 2026-09-12,ICSA,US Initial Jobless Claims,164306.0,DOL,eta539_c3_aggregate
 2026-09-19,ICSA,US Initial Jobless Claims,157824.0,DOL,eta539_c3_aggregate
+2026-09-26,ICSA,US Initial Jobless Claims,170732.0,DOL,eta539_c3_aggregate
 2006-06-02,NFCI,Chicago Fed NFCI,-0.568,,
 2006-06-09,NFCI,Chicago Fed NFCI,-0.554,,
 2006-06-16,NFCI,Chicago Fed NFCI,-0.542,,
