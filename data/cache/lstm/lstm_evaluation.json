@@ -14,7 +14,7 @@
     "precision_up": null,
     "recall_up": 0.0,
     "f1_up": null,
-    "brier_score": 0.23334629792935258,
+    "brier_score": 0.23820372476071172,
     "avg_future_return": -0.017565618114412655,
     "median_future_return": -0.03133751468468926,
     "worst_future_return": -0.29072752497583665,
@@ -22,7 +22,7 @@
     "always_long_avg_return": -0.017565618114412655,
     "model_directional_avg_return": 0.017565618114412655,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-10-10T21:18:38+00:00",
+    "evaluated_at_utc": "2026-10-11T01:38:30+00:00",
     "directional_return_edge_vs_always_long": 0.03513123622882531,
     "probability_calibration": [
       {
@@ -60,7 +60,7 @@
         "avg_return": 0.009026994981754691
       }
     ],
-    "evaluated_at_utc": "2026-10-10T21:18:38+00:00"
+    "evaluated_at_utc": "2026-10-11T01:38:30+00:00"
   },
   "leakage_audit": {
     "status": "可用",
