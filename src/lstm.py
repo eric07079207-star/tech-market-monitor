@@ -180,6 +180,11 @@ def build_lstm_feature_table(
     wide.columns = [str(col) for col in wide.columns]
     event_context = _prepare_event_context(fact_events)
     fundamental_context = _prepare_fundamental_context(fundamentals)
+    # Overlapping training windows reuse almost every daily row.  Cache the
+    # point-in-time vector so purged walk-forward samples stay identical while
+    # avoiding thousands of repeated pandas lookups.
+    row_feature_cache: dict[tuple[str, pd.Timestamp], list[float]] = {}
+    market_feature_cache: dict[pd.Timestamp, list[float]] = {}
 
     rows = []
     for symbol, group in indicators.groupby("symbol", sort=False):
@@ -200,7 +205,15 @@ def build_lstm_feature_table(
                 continue
             future_return = future_price / current_close - 1
             label = int(future_return > 0)
-            seq = _sequence_features(window, wide, symbol, event_context, fundamental_context)
+            seq = _sequence_features(
+                window,
+                wide,
+                symbol,
+                event_context,
+                fundamental_context,
+                row_feature_cache=row_feature_cache,
+                market_feature_cache=market_feature_cache,
+            )
             if seq is None:
                 continue
             qqq_future_return = _benchmark_future_return(wide, "QQQ", current["date"], data.iloc[idx + target_horizon_days]["date"])
@@ -261,6 +274,8 @@ def build_lstm_monitor_feature_table(
     wide.columns = [str(col) for col in wide.columns]
     event_context = _prepare_event_context(fact_events)
     fundamental_context = _prepare_fundamental_context(fundamentals)
+    row_feature_cache: dict[tuple[str, pd.Timestamp], list[float]] = {}
+    market_feature_cache: dict[pd.Timestamp, list[float]] = {}
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     rows = []
     for symbol, group in indicators.groupby("symbol", sort=False):
@@ -270,7 +285,15 @@ def build_lstm_monitor_feature_table(
         window = data.iloc[-sequence_length:]
         if window[BASE_FEATURE_COLUMNS].isna().all(axis=None):
             continue
-        seq = _sequence_features(window, wide, str(symbol), event_context, fundamental_context)
+        seq = _sequence_features(
+            window,
+            wide,
+            str(symbol),
+            event_context,
+            fundamental_context,
+            row_feature_cache=row_feature_cache,
+            market_feature_cache=market_feature_cache,
+        )
         current = data.iloc[-1]
         current_date = pd.to_datetime(current["date"], utc=True)
         if seq is None or pd.isna(current.get("close")):
@@ -410,22 +433,37 @@ def _sequence_features(
     symbol: str,
     event_context: dict[str, pd.DataFrame] | None = None,
     fundamental_context: dict[str, pd.DataFrame] | None = None,
+    row_feature_cache: dict[tuple[str, pd.Timestamp], list[float]] | None = None,
+    market_feature_cache: dict[pd.Timestamp, list[float]] | None = None,
 ) -> list[list[float]] | None:
     seq_rows = []
     for _, row in window.iterrows():
         current_date = pd.to_datetime(row.get("date"), errors="coerce")
         if pd.isna(current_date):
             return None
+        cache_date = pd.Timestamp(current_date).tz_localize(None).normalize()
+        cache_key = (str(symbol).upper(), cache_date)
+        cached_row = (row_feature_cache or {}).get(cache_key)
+        if cached_row is not None:
+            seq_rows.append(cached_row)
+            continue
         seq_row = []
         for col in BASE_FEATURE_COLUMNS:
             seq_row.append(_numeric(row.get(col)))
         seq_row.append(_relative_feature(wide_close, symbol, current_date, "QQQ"))
         seq_row.append(_relative_feature(wide_close, symbol, current_date, "SPY"))
         seq_row.append(_relative_feature(wide_close, symbol, current_date, "SMH"))
-        seq_row.extend(_market_context_features(wide_close, current_date))
+        market_values = (market_feature_cache or {}).get(cache_date)
+        if market_values is None:
+            market_values = _market_context_features(wide_close, current_date)
+            if market_feature_cache is not None:
+                market_feature_cache[cache_date] = market_values
+        seq_row.extend(market_values)
         seq_row.extend(_event_context_features(event_context, symbol, current_date))
         seq_row.extend(_fundamental_context_features(fundamental_context, symbol, current_date))
         seq_row.extend(_ticker_identity_features(symbol))
+        if row_feature_cache is not None:
+            row_feature_cache[cache_key] = seq_row
         seq_rows.append(seq_row)
     return seq_rows
 
