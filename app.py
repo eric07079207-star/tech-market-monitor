@@ -552,6 +552,18 @@ def load_lstm_evaluation() -> dict:
     return payload if isinstance(payload, dict) else {}
 
 
+@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+def load_lstm_specialist_status() -> dict:
+    path = cache_path("lstm/tsla_specialist/lstm_status.json")
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def pct(value: float | int | None) -> str:
     if value is None or pd.isna(value):
         return "n/a"
@@ -849,6 +861,7 @@ lstm_status = build_lstm_status_from_artifacts()
 lstm_predictions = load_lstm_predictions()
 lstm_backtest = load_lstm_backtest()
 lstm_evaluation = load_lstm_evaluation()
+lstm_tsla_specialist = load_lstm_specialist_status()
 active_news_keywords = load_news_keywords()
 keyword_discovery_news = tsla_keyword_news.copy()
 tsla_keyword_summary = summarize_keyword_news(keyword_discovery_news, "TSLA")
@@ -1301,6 +1314,13 @@ with tab_prediction:
     lstm_quality_cols[0].metric("訓練/驗證/測試", f"{lstm_status.get('train_rows', 0)}/{lstm_status.get('valid_rows', 0)}/{lstm_status.get('test_rows', 0)}")
     lstm_quality_cols[1].metric("回測正確率", pct(lstm_status.get("backtest_accuracy")))
     lstm_quality_cols[2].metric("信心等級", str(lstm_status.get("prediction_confidence_level", "低信心")))
+    if lstm_tsla_specialist:
+        st.caption(
+            "TSLA 專屬模型："
+            f"{lstm_tsla_specialist.get('status', '同步中')}｜"
+            f"回測 {pct(lstm_tsla_specialist.get('backtest_accuracy'))}｜"
+            f"訓練/驗證/測試 {lstm_tsla_specialist.get('train_rows', 0)}/{lstm_tsla_specialist.get('valid_rows', 0)}/{lstm_tsla_specialist.get('test_rows', 0)}"
+        )
     if lstm_predictions.empty:
         st.info("目前沒有即時推論列；下一次模型訓練完成後會產生。")
     else:
@@ -1338,6 +1358,27 @@ with tab_prediction:
         if not calibration.empty:
             st.caption("機率校準：模型說上漲機率較高的區間，實際上漲率是否也相對提高。")
             st.dataframe(calibration.rename(columns={"bucket": "預測機率區間", "rows": "樣本數", "actual_up_rate": "實際上漲率"}), hide_index=True, width="stretch", column_config={"實際上漲率": st.column_config.NumberColumn(format="%.2%")})
+        abstention = evaluation.get("abstention", {})
+        if abstention:
+            st.caption(
+                f"低信心／不交易區間：上漲機率落在 40%–60% 時不下方向；目前可交易覆蓋率 {pct(abstention.get('coverage'))}，"
+                f"覆蓋樣本 {abstention.get('rows', 0)}，準確率 {pct(abstention.get('accuracy'))}。"
+            )
+        by_symbol = pd.DataFrame(evaluation.get("by_symbol", []))
+        if not by_symbol.empty:
+            st.caption("個股分開評估：避免共享模型的總分掩蓋單一標的失效。")
+            st.dataframe(
+                by_symbol.rename(columns={"symbol": "標的", "rows": "樣本數", "accuracy": "準確率", "balanced_accuracy": "平衡準確率", "avg_future_return": "平均後續報酬", "model_directional_avg_return": "模型方向報酬", "max_drawdown_proxy": "最差後續報酬"}),
+                hide_index=True,
+                width="stretch",
+                column_config={"準確率": st.column_config.NumberColumn(format="%.2%"), "平衡準確率": st.column_config.NumberColumn(format="%.2%"), "平均後續報酬": st.column_config.NumberColumn(format="%.2%"), "模型方向報酬": st.column_config.NumberColumn(format="%.2%"), "最差後續報酬": st.column_config.NumberColumn(format="%.2%")},
+            )
+        qqq_compare = evaluation.get("qqq_direction_comparison", {})
+        if qqq_compare.get("status") == "可用":
+            st.caption(
+                f"相對 QQQ 方向：模型與 QQQ 同向 {pct(qqq_compare.get('model_matches_qqq_direction'))}；"
+                f"相對 QQQ 持續偏多基準差異 {pct(qqq_compare.get('model_edge_vs_qqq_long'))}。"
+            )
         audit = lstm_evaluation.get("leakage_audit", {})
         if audit.get("issues"):
             st.error("資料洩漏檢查：" + "；".join(audit["issues"]))

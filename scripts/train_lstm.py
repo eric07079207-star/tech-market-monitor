@@ -26,6 +26,7 @@ from src.lstm import (
     LSTM_FEATURE_VERSION,
     LSTM_TARGET_HORIZON_DAYS,
     LSTM_SEQUENCE_LENGTH,
+    LSTM_SHARED_SYMBOLS,
     build_lstm_feature_table,
     build_lstm_monitor_feature_table,
     build_lstm_status_from_artifacts,
@@ -33,6 +34,8 @@ from src.lstm import (
     save_lstm_status,
 )
 from src.data import PRICE_CACHE
+from src.fundamentals import load_fundamental_observations
+from src.kg import load_knowledge_graph
 
 
 try:
@@ -42,9 +45,9 @@ except Exception as exc:  # pragma: no cover - surfaced in CI/runtime
     raise RuntimeError("torch is required for LSTM training. Install dependencies first.") from exc
 
 
-MODEL_VERSION = "lstm-direction-v1"
-DEFAULT_SYMBOLS = ["TSLA"]
-EPOCHS = 5
+MODEL_VERSION = "lstm-regime-v2"
+DEFAULT_SYMBOLS = LSTM_SHARED_SYMBOLS
+EPOCHS = 12
 BATCH_SIZE = 64
 HIDDEN_SIZE = 48
 NUM_LAYERS = 1
@@ -63,6 +66,7 @@ class SplitData:
     x_test: np.ndarray
     y_test: np.ndarray
     test_meta: pd.DataFrame
+    split_meta: pd.DataFrame
     feature_mean: pd.Series
     feature_std: pd.Series
 
@@ -86,7 +90,8 @@ class LSTMClassifier(nn.Module):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train the LSTM model.")
     parser.add_argument("--symbols", nargs="*", default=DEFAULT_SYMBOLS, help="Symbols to use for the training run.")
-    parser.add_argument("--lookback-years", type=int, default=5, help="Historical lookback window for feature building.")
+    parser.add_argument("--start-date", default="2013-01-01", help="Earliest point-in-time training date.")
+    parser.add_argument("--lookback-years", type=int, default=None, help="Optional rolling lookback; normally leave unset to preserve full regimes.")
     parser.add_argument("--sample-step", type=int, default=5, help="Sample every N trading days.")
     args = parser.parse_args()
 
@@ -96,13 +101,18 @@ def main() -> None:
     if "date" in prices:
         prices["date"] = pd.to_datetime(prices["date"])
 
+    kg = load_knowledge_graph()
+    fundamentals = load_fundamental_observations()
     features = build_lstm_feature_table(
         prices=prices,
         target_horizon_days=LSTM_TARGET_HORIZON_DAYS,
         sequence_length=LSTM_SEQUENCE_LENGTH,
         symbols=args.symbols,
         lookback_years=args.lookback_years,
+        start_date=args.start_date,
         sample_step=args.sample_step,
+        fact_events=kg.facts,
+        fundamentals=fundamentals,
     )
     features.to_parquet(LSTM_TRAIN_FEATURE_CACHE, index=False)
 
@@ -115,7 +125,10 @@ def main() -> None:
 
     model = LSTMClassifier(input_size=split_data.x_train.shape[-1])
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    criterion = nn.BCEWithLogitsLoss()
+    positive = max(float(split_data.y_train.sum()), 1.0)
+    negative = max(float(len(split_data.y_train) - split_data.y_train.sum()), 1.0)
+    # Correct the historical class imbalance without changing the evaluation labels.
+    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(negative / positive, dtype=torch.float32))
 
     train_ds = torch.utils.data.TensorDataset(torch.tensor(split_data.x_train, dtype=torch.float32), torch.tensor(split_data.y_train, dtype=torch.float32))
     valid_x = torch.tensor(split_data.x_valid, dtype=torch.float32)
@@ -171,12 +184,15 @@ def main() -> None:
 
     backtest = _build_backtest_frame(split_data.test_meta, test_prob, test_pred)
     backtest.to_parquet(LSTM_BACKTEST_CACHE, index=False)
+    split_data.split_meta.to_parquet(LSTM_SPLIT_CACHE, index=False)
 
     monitor_features = build_lstm_monitor_feature_table(
         prices=prices,
         symbols=args.symbols,
         target_horizon_days=LSTM_TARGET_HORIZON_DAYS,
         sequence_length=LSTM_SEQUENCE_LENGTH,
+        fact_events=kg.facts,
+        fundamentals=fundamentals,
     )
     monitor_features.to_parquet(LSTM_MONITOR_FEATURE_CACHE, index=False)
     latest_predictions = _build_monitor_predictions(model, monitor_features, split_data.feature_mean, split_data.feature_std)
@@ -191,6 +207,11 @@ def main() -> None:
         "hidden_size": HIDDEN_SIZE,
         "num_layers": NUM_LAYERS,
         "learning_rate": LEARNING_RATE,
+        "symbols": args.symbols,
+        "training_start_date": args.start_date,
+        "sample_step": args.sample_step,
+        "class_balance_positive_weight": negative / positive,
+        "split_method": "time_series_purged_20d",
         "train_ratio": TRAIN_RATIO,
         "valid_ratio": VALID_RATIO,
         "test_ratio": TEST_RATIO,
@@ -241,21 +262,29 @@ def main() -> None:
 
 
 def _prepare_split(features: pd.DataFrame) -> SplitData:
-    data = features.copy().sort_values(["symbol", "date"]).reset_index(drop=True)
-    n = len(data)
-    train_end = max(int(n * TRAIN_RATIO), 1)
-    valid_end = max(int(n * (TRAIN_RATIO + VALID_RATIO)), train_end + 1)
-    split = np.array(["test"] * n, dtype=object)
-    split[:train_end] = "train"
-    split[train_end:valid_end] = "valid"
-    data["split"] = split
+    data = features.copy()
+    data["date"] = pd.to_datetime(data["date"], errors="coerce", utc=True)
+    data["target_date"] = pd.to_datetime(data["target_date"], errors="coerce", utc=True)
+    data = data.dropna(subset=["date", "target_date"]).sort_values(["date", "symbol"]).reset_index(drop=True)
+    unique_dates = np.sort(data["date"].unique())
+    train_cutoff = pd.Timestamp(unique_dates[max(int(len(unique_dates) * TRAIN_RATIO) - 1, 0)])
+    valid_cutoff = pd.Timestamp(unique_dates[max(int(len(unique_dates) * (TRAIN_RATIO + VALID_RATIO)) - 1, 0)])
+    purge = pd.offsets.BDay(LSTM_TARGET_HORIZON_DAYS)
+    valid_start = train_cutoff + purge
+    test_start = valid_cutoff + purge
+    data["split"] = "purged"
+    data.loc[data["date"] <= train_cutoff, "split"] = "train"
+    data.loc[(data["date"] >= valid_start) & (data["date"] <= valid_cutoff), "split"] = "valid"
+    data.loc[data["date"] >= test_start, "split"] = "test"
+    data = data[data["split"].isin(["train", "valid", "test"])].reset_index(drop=True)
     rows = []
     for row in data.itertuples():
         seq = json.loads(row.sequence_json)
         rows.append(seq)
     sequence_array = np.asarray(rows, dtype=np.float32)
     labels = data["label"].astype(int).to_numpy()
-    meta = data[["symbol", "date", "target_date", "future_return", "label", "feature_version", "split"]].copy()
+    meta_columns = [column for column in ["symbol", "date", "target_date", "future_return", "label", "qqq_future_return", "qqq_label", "feature_version", "split"] if column in data]
+    meta = data[meta_columns].copy()
     train_mask = data["split"].to_numpy() == "train"
     train_rows = sequence_array[train_mask]
     feature_mean = pd.Series(_safe_nanmean(train_rows, axis=(0, 1)), index=feature_columns())
@@ -274,6 +303,7 @@ def _prepare_split(features: pd.DataFrame) -> SplitData:
         x_test=normalized[test_mask],
         y_test=labels[test_mask],
         test_meta=meta[test_mask].reset_index(drop=True),
+        split_meta=meta.reset_index(drop=True),
         feature_mean=feature_mean,
         feature_std=feature_std,
     )

@@ -59,6 +59,9 @@ def evaluate_lstm_backtest(backtest: pd.DataFrame) -> dict:
     }
     result["directional_return_edge_vs_always_long"] = result["model_directional_avg_return"] - result["always_long_avg_return"]
     result["probability_calibration"] = _probability_calibration(data)
+    result["abstention"] = _abstention_metrics(data)
+    result["by_symbol"] = _by_symbol_metrics(data)
+    result["qqq_direction_comparison"] = _qqq_direction_comparison(data)
     result["model_beats_majority_baseline"] = bool(result["accuracy_edge_vs_baseline"] > 0)
     result["confidence_warning"] = _confidence_warning(len(data), result["accuracy_edge_vs_baseline"])
     return result
@@ -168,6 +171,56 @@ def _probability_calibration(data: pd.DataFrame) -> list[dict]:
         return []
     grouped = report.groupby("bucket", observed=True).agg(樣本數=("label", "size"), 實際上漲率=("label", "mean")).reset_index()
     return [{"bucket": str(row.bucket), "rows": int(row.樣本數), "actual_up_rate": float(row.實際上漲率)} for row in grouped.itertuples(index=False)]
+
+
+def _abstention_metrics(data: pd.DataFrame, band: float = 0.10) -> dict:
+    confident = data[(data["predicted_prob_up"] <= 0.5 - band) | (data["predicted_prob_up"] >= 0.5 + band)]
+    if confident.empty:
+        return {"band": band, "coverage": 0.0, "rows": 0, "accuracy": None, "state": "不交易／資料不足"}
+    return {
+        "band": band,
+        "coverage": float(len(confident) / len(data)),
+        "rows": int(len(confident)),
+        "accuracy": float((confident["label"].astype(int) == confident["predicted_label"].astype(int)).mean()),
+        "state": "可交易候選" if len(confident) >= 30 else "低信心／資料不足",
+    }
+
+
+def _by_symbol_metrics(data: pd.DataFrame) -> list[dict]:
+    if "symbol" not in data:
+        return []
+    rows = []
+    for symbol, group in data.groupby("symbol", sort=True):
+        y_true = group["label"].astype(int).to_numpy()
+        y_pred = group["predicted_label"].astype(int).to_numpy()
+        returns = group["future_return"].to_numpy(dtype=float)
+        rows.append({
+            "symbol": str(symbol),
+            "rows": int(len(group)),
+            "accuracy": float((y_true == y_pred).mean()),
+            "balanced_accuracy": _balanced_accuracy(y_true, y_pred),
+            "avg_future_return": float(np.mean(returns)),
+            "model_directional_avg_return": float(np.mean(np.where(y_pred == 1, returns, -returns))),
+            "max_drawdown_proxy": float(np.min(returns)),
+        })
+    return rows
+
+
+def _qqq_direction_comparison(data: pd.DataFrame) -> dict:
+    if "qqq_label" not in data:
+        return {"status": "資料不足", "rows": 0}
+    comparable = data.dropna(subset=["qqq_label"])
+    if comparable.empty:
+        return {"status": "資料不足", "rows": 0}
+    qqq = comparable["qqq_label"].astype(int).to_numpy()
+    model = comparable["predicted_label"].astype(int).to_numpy()
+    return {
+        "status": "可用",
+        "rows": int(len(comparable)),
+        "model_matches_qqq_direction": float((model == qqq).mean()),
+        "qqq_always_long_accuracy": float((qqq == 1).mean()),
+        "model_edge_vs_qqq_long": float((model == qqq).mean() - (qqq == 1).mean()),
+    }
 
 
 def _to_bool(value: object) -> bool | None:

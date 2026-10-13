@@ -44,6 +44,12 @@ jobs:
         if: github.event.schedule == '0 23 * * *' || github.event_name == 'workflow_dispatch'
         run: python scripts/train_lstm.py
 
+      - name: Train TSLA specialist LSTM model
+        if: github.event.schedule == '0 23 * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          LSTM_ARTIFACT_SUBDIR: tsla_specialist
+        run: python scripts/train_lstm.py --symbols TSLA
+
       - name: Generate daily AI summary if needed
         if: always()
         env:

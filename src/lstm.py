@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,12 +9,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .config import ALL_TICKERS
+from .config import ALL_TICKERS, STOCK_TICKERS
 from .data import PRICE_CACHE, cache_path
 from .indicators import add_price_indicators
 
 
-LSTM_DIR = cache_path("lstm")
+_ARTIFACT_SUBDIR = os.getenv("LSTM_ARTIFACT_SUBDIR", "").strip("/ ")
+LSTM_DIR = cache_path(f"lstm/{_ARTIFACT_SUBDIR}") if _ARTIFACT_SUBDIR else cache_path("lstm")
 LSTM_STATUS_CACHE = LSTM_DIR / "lstm_status.json"
 LSTM_TRAIN_FEATURE_CACHE = LSTM_DIR / "lstm_train_features.parquet"
 LSTM_MONITOR_FEATURE_CACHE = LSTM_DIR / "lstm_monitor_features.parquet"
@@ -27,10 +29,12 @@ LSTM_MODEL_CACHE = LSTM_DIR / "lstm_model.pt"
 LSTM_MODEL_METADATA_CACHE = LSTM_DIR / "lstm_model.json"
 LSTM_SCALER_CACHE = LSTM_DIR / "lstm_scaler.json"
 
-LSTM_FEATURE_VERSION = "lstm-demo-v1"
+LSTM_FEATURE_VERSION = "lstm-regime-v2"
 LSTM_TARGET_HORIZON_DAYS = 20
 LSTM_SEQUENCE_LENGTH = 60
-LSTM_DEFAULT_SYMBOLS = ["QQQ", "NVDA", "TSLA"]
+LSTM_SHARED_SYMBOLS = STOCK_TICKERS.copy()
+LSTM_SPECIALIST_SYMBOLS = ["TSLA"]
+LSTM_DEFAULT_SYMBOLS = LSTM_SHARED_SYMBOLS
 
 BASE_FEATURE_COLUMNS = [
     "close",
@@ -51,6 +55,21 @@ BASE_FEATURE_COLUMNS = [
     "gap_pct",
     "drawdown_52w",
 ]
+
+MARKET_FEATURE_COLUMNS = [
+    "market_qqq_ret_5d",
+    "market_spy_ret_5d",
+    "market_smh_ret_5d",
+    "market_vix_ret_5d",
+    "market_tlt_ret_5d",
+    "market_hyg_ret_5d",
+    "market_breadth_5d",
+    "market_dispersion_5d",
+]
+
+EVENT_FEATURE_COLUMNS = ["event_count_20d", "event_signed_impact_20d", "event_confidence_20d"]
+FUNDAMENTAL_FEATURE_COLUMNS = ["fundamental_revenue_growth", "fundamental_ocf_growth", "fundamental_age_days"]
+TICKER_FEATURE_COLUMNS = [f"ticker_{ticker.lower()}" for ticker in LSTM_SHARED_SYMBOLS]
 
 
 @dataclass(frozen=True)
@@ -133,12 +152,15 @@ def build_lstm_feature_table(
     end_date: str | pd.Timestamp | None = None,
     sample_step: int = 10,
     max_samples: int | None = None,
+    fact_events: pd.DataFrame | None = None,
+    fundamentals: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     prices = prices.copy() if prices is not None else _load_prices()
     if prices.empty:
         return _empty_feature_table()
 
     symbols = symbols or LSTM_DEFAULT_SYMBOLS
+    prices["date"] = pd.to_datetime(prices["date"], errors="coerce")
     price_source = prices[prices["symbol"].isin(symbols)].copy()
     if price_source.empty:
         return _empty_feature_table()
@@ -148,10 +170,16 @@ def build_lstm_feature_table(
 
     indicators = indicators.sort_values(["symbol", "date"]).reset_index(drop=True)
     max_date = pd.to_datetime(indicators["date"]).max()
-    sample_cutoff = pd.to_datetime(start_date) if start_date is not None else max_date - pd.DateOffset(years=lookback_years)
+    sample_cutoff = pd.to_datetime(start_date) if start_date is not None else max_date - pd.DateOffset(years=lookback_years or 20)
     sample_end = pd.to_datetime(end_date) if end_date is not None else max_date
-    wide = indicators.pivot_table(index="date", columns="symbol", values="close", aggfunc="last").sort_index().ffill()
+    # Target stocks are trained individually, while the complete cached universe supplies
+    # point-in-time market context. Keeping those separate avoids accidentally treating
+    # a benchmark as a target label.
+    market_indicators = add_price_indicators(prices.dropna(subset=["date", "symbol", "close"]))
+    wide = market_indicators.pivot_table(index="date", columns="symbol", values="close", aggfunc="last").sort_index().ffill()
     wide.columns = [str(col) for col in wide.columns]
+    event_context = _prepare_event_context(fact_events)
+    fundamental_context = _prepare_fundamental_context(fundamentals)
 
     rows = []
     for symbol, group in indicators.groupby("symbol", sort=False):
@@ -172,9 +200,10 @@ def build_lstm_feature_table(
                 continue
             future_return = future_price / current_close - 1
             label = int(future_return > 0)
-            seq = _sequence_features(window, wide, symbol)
+            seq = _sequence_features(window, wide, symbol, event_context, fundamental_context)
             if seq is None:
                 continue
+            qqq_future_return = _benchmark_future_return(wide, "QQQ", current["date"], data.iloc[idx + target_horizon_days]["date"])
             rows.append(
                 {
                     "symbol": symbol,
@@ -184,6 +213,8 @@ def build_lstm_feature_table(
                     "sequence_length": sequence_length,
                     "future_return": float(future_return),
                     "label": label,
+                    "qqq_future_return": qqq_future_return,
+                    "qqq_label": int(qqq_future_return > 0) if np.isfinite(qqq_future_return) else np.nan,
                     "feature_version": LSTM_FEATURE_VERSION,
                     "created_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     "sequence_json": json.dumps(seq, ensure_ascii=False),
@@ -208,12 +239,15 @@ def build_lstm_monitor_feature_table(
     symbols: list[str] | None = None,
     target_horizon_days: int = LSTM_TARGET_HORIZON_DAYS,
     sequence_length: int = LSTM_SEQUENCE_LENGTH,
+    fact_events: pd.DataFrame | None = None,
+    fundamentals: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build current inference rows without requiring a known future return."""
     prices = prices.copy() if prices is not None else _load_prices()
     if prices.empty:
         return _empty_monitor_feature_table()
     symbols = symbols or LSTM_DEFAULT_SYMBOLS
+    prices["date"] = pd.to_datetime(prices["date"], errors="coerce")
     source = prices[prices["symbol"].astype(str).isin(symbols)].copy()
     if source.empty:
         return _empty_monitor_feature_table()
@@ -222,8 +256,11 @@ def build_lstm_monitor_feature_table(
         return _empty_monitor_feature_table()
     indicators["date"] = pd.to_datetime(indicators["date"], errors="coerce")
     indicators = indicators.dropna(subset=["date"]).sort_values(["symbol", "date"]).reset_index(drop=True)
-    wide = indicators.pivot_table(index="date", columns="symbol", values="close", aggfunc="last").sort_index().ffill()
+    market_indicators = add_price_indicators(prices.dropna(subset=["date", "symbol", "close"]))
+    wide = market_indicators.pivot_table(index="date", columns="symbol", values="close", aggfunc="last").sort_index().ffill()
     wide.columns = [str(col) for col in wide.columns]
+    event_context = _prepare_event_context(fact_events)
+    fundamental_context = _prepare_fundamental_context(fundamentals)
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     rows = []
     for symbol, group in indicators.groupby("symbol", sort=False):
@@ -233,7 +270,7 @@ def build_lstm_monitor_feature_table(
         window = data.iloc[-sequence_length:]
         if window[BASE_FEATURE_COLUMNS].isna().all(axis=None):
             continue
-        seq = _sequence_features(window, wide, str(symbol))
+        seq = _sequence_features(window, wide, str(symbol), event_context, fundamental_context)
         current = data.iloc[-1]
         current_date = pd.to_datetime(current["date"], utc=True)
         if seq is None or pd.isna(current.get("close")):
@@ -367,7 +404,13 @@ def load_lstm_backtest(path: Path | None = None) -> pd.DataFrame:
     return _read_dataframe(path)
 
 
-def _sequence_features(window: pd.DataFrame, wide_close: pd.DataFrame, symbol: str) -> list[list[float]] | None:
+def _sequence_features(
+    window: pd.DataFrame,
+    wide_close: pd.DataFrame,
+    symbol: str,
+    event_context: dict[str, pd.DataFrame] | None = None,
+    fundamental_context: dict[str, pd.DataFrame] | None = None,
+) -> list[list[float]] | None:
     seq_rows = []
     for _, row in window.iterrows():
         current_date = pd.to_datetime(row.get("date"), errors="coerce")
@@ -379,12 +422,117 @@ def _sequence_features(window: pd.DataFrame, wide_close: pd.DataFrame, symbol: s
         seq_row.append(_relative_feature(wide_close, symbol, current_date, "QQQ"))
         seq_row.append(_relative_feature(wide_close, symbol, current_date, "SPY"))
         seq_row.append(_relative_feature(wide_close, symbol, current_date, "SMH"))
+        seq_row.extend(_market_context_features(wide_close, current_date))
+        seq_row.extend(_event_context_features(event_context, symbol, current_date))
+        seq_row.extend(_fundamental_context_features(fundamental_context, symbol, current_date))
+        seq_row.extend(_ticker_identity_features(symbol))
         seq_rows.append(seq_row)
     return seq_rows
 
 
 def feature_columns() -> list[str]:
-    return BASE_FEATURE_COLUMNS + ["rel_qqq_close", "rel_spy_close", "rel_smh_close"]
+    return BASE_FEATURE_COLUMNS + ["rel_qqq_close", "rel_spy_close", "rel_smh_close"] + MARKET_FEATURE_COLUMNS + EVENT_FEATURE_COLUMNS + FUNDAMENTAL_FEATURE_COLUMNS + TICKER_FEATURE_COLUMNS
+
+
+def _ticker_identity_features(symbol: str) -> list[float]:
+    return [1.0 if symbol.upper() == ticker else 0.0 for ticker in LSTM_SHARED_SYMBOLS]
+
+
+def _market_context_features(wide_close: pd.DataFrame, date: pd.Timestamp) -> list[float]:
+    returns = [_return_feature(wide_close, ticker, date, 5) for ticker in ["QQQ", "SPY", "SMH", "^VIX", "TLT", "HYG"]]
+    target_symbols = [ticker for ticker in LSTM_SHARED_SYMBOLS if ticker in wide_close]
+    cross_returns = [_return_feature(wide_close, ticker, date, 5) for ticker in target_symbols]
+    finite = [value for value in cross_returns if np.isfinite(value)]
+    breadth = float(np.mean(np.asarray(finite) > 0)) if finite else np.nan
+    dispersion = float(np.std(finite)) if finite else np.nan
+    return returns + [breadth, dispersion]
+
+
+def _return_feature(wide_close: pd.DataFrame, ticker: str, date: pd.Timestamp, periods: int) -> float:
+    if wide_close.empty or ticker not in wide_close:
+        return np.nan
+    series = pd.to_numeric(wide_close[ticker], errors="coerce").dropna()
+    if series.empty:
+        return np.nan
+    position = series.index.searchsorted(date, side="right") - 1
+    if position < periods:
+        return np.nan
+    current, previous = series.iloc[position], series.iloc[position - periods]
+    return float(current / previous - 1) if pd.notna(current) and pd.notna(previous) and previous else np.nan
+
+
+def _prepare_event_context(facts: pd.DataFrame | None) -> dict[str, pd.DataFrame]:
+    if facts is None or facts.empty:
+        return {}
+    data = facts.copy()
+    data["timestamp"] = pd.to_datetime(data.get("timestamp_utc", data.get("event_date")), errors="coerce", utc=True).dt.tz_localize(None)
+    data["impact_score"] = pd.to_numeric(data.get("impact_score"), errors="coerce").fillna(0.0)
+    data["confidence"] = pd.to_numeric(data.get("confidence"), errors="coerce").fillna(0.0)
+    direction = data.get("impact_direction", pd.Series("neutral", index=data.index)).astype(str).str.lower()
+    data["signed_impact"] = data["impact_score"] * np.where(direction.eq("positive"), 1.0, np.where(direction.eq("negative"), -1.0, 0.0))
+    return {ticker: group.dropna(subset=["timestamp"]).sort_values("timestamp") for ticker, group in _expand_affected_tickers(data).groupby("ticker")}
+
+
+def _expand_affected_tickers(data: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for row in data.itertuples(index=False):
+        affected = str(getattr(row, "affected_tickers", "") or getattr(row, "entity", "")).upper().replace(";", ",").split(",")
+        for ticker in {item.strip() for item in affected if item.strip()}:
+            rows.append({"ticker": ticker, "timestamp": getattr(row, "timestamp"), "signed_impact": getattr(row, "signed_impact"), "confidence": getattr(row, "confidence")})
+    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=["ticker", "timestamp", "signed_impact", "confidence"])
+
+
+def _event_context_features(context: dict[str, pd.DataFrame] | None, symbol: str, date: pd.Timestamp) -> list[float]:
+    data = (context or {}).get(symbol.upper())
+    if data is None or data.empty:
+        return [0.0, 0.0, 0.0]
+    end = pd.Timestamp(date).tz_localize(None) if getattr(pd.Timestamp(date), "tzinfo", None) else pd.Timestamp(date)
+    recent = data[(data["timestamp"] <= end) & (data["timestamp"] > end - pd.Timedelta(days=20))]
+    if recent.empty:
+        return [0.0, 0.0, 0.0]
+    return [float(len(recent)), float(recent["signed_impact"].sum()), float(recent["confidence"].mean())]
+
+
+def _prepare_fundamental_context(observations: pd.DataFrame | None) -> dict[str, pd.DataFrame]:
+    if observations is None or observations.empty:
+        return {}
+    data = observations.copy()
+    data["filed_at"] = pd.to_datetime(data.get("filed_at"), errors="coerce")
+    data["value"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data.dropna(subset=["ticker", "metric", "filed_at", "value"])
+    return {ticker: group.sort_values("filed_at") for ticker, group in data.groupby(data["ticker"].astype(str).str.upper())}
+
+
+def _fundamental_context_features(context: dict[str, pd.DataFrame] | None, symbol: str, date: pd.Timestamp) -> list[float]:
+    data = (context or {}).get(symbol.upper())
+    if data is None or data.empty:
+        return [0.0, 0.0, 730.0]
+    asof = pd.Timestamp(date).tz_localize(None) if getattr(pd.Timestamp(date), "tzinfo", None) else pd.Timestamp(date)
+    available = data[data["filed_at"] <= asof]
+    if available.empty:
+        return [0.0, 0.0, 730.0]
+    growth = []
+    for metric in ["revenue", "operating_cash_flow"]:
+        values = available[available["metric"].eq(metric)].sort_values("filed_at")["value"].tail(2).to_numpy(dtype=float)
+        growth.append(float(np.clip(values[-1] / values[-2] - 1, -2.0, 2.0)) if len(values) == 2 and values[-2] else 0.0)
+    age = float((asof - available["filed_at"].max()).days)
+    return growth + [float(np.clip(age, 0, 730))]
+
+
+def _benchmark_future_return(wide_close: pd.DataFrame, ticker: str, start: object, end: object) -> float:
+    if wide_close.empty or ticker not in wide_close:
+        return np.nan
+    series = pd.to_numeric(wide_close[ticker], errors="coerce").dropna()
+    if series.empty:
+        return np.nan
+    start_value = _asof_value(series, start)
+    end_value = _asof_value(series, end)
+    return float(end_value / start_value - 1) if np.isfinite(start_value) and np.isfinite(end_value) and start_value else np.nan
+
+
+def _asof_value(series: pd.Series, date: object) -> float:
+    index = series.index.searchsorted(pd.Timestamp(date), side="right") - 1
+    return float(series.iloc[index]) if index >= 0 else np.nan
 
 
 def _relative_feature(wide_close: pd.DataFrame, symbol: str, date: pd.Timestamp, benchmark: str) -> float:
@@ -460,6 +608,8 @@ def _empty_feature_table() -> pd.DataFrame:
             "sequence_length",
             "future_return",
             "label",
+            "qqq_future_return",
+            "qqq_label",
             "feature_version",
             "created_at_utc",
             "sequence_json",
