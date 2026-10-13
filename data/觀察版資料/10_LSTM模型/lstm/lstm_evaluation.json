@@ -22,7 +22,7 @@
     "always_long_avg_return": -0.017565618114412655,
     "model_directional_avg_return": 0.017565618114412655,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-10-13T03:26:21+00:00",
+    "evaluated_at_utc": "2026-10-13T13:43:48+00:00",
     "directional_return_edge_vs_always_long": 0.03513123622882531,
     "probability_calibration": [
       {
@@ -31,36 +31,58 @@
         "actual_up_rate": 0.3684210526315789
       }
     ],
+    "abstention": {
+      "band": 0.1,
+      "coverage": 0.0,
+      "rows": 0,
+      "accuracy": null,
+      "state": "不交易／資料不足"
+    },
+    "by_symbol": [
+      {
+        "symbol": "TSLA",
+        "rows": 38,
+        "accuracy": 0.631578947368421,
+        "balanced_accuracy": 0.5,
+        "avg_future_return": -0.017565618114412655,
+        "model_directional_avg_return": 0.017565618114412655,
+        "max_drawdown_proxy": -0.29072752497583665
+      }
+    ],
+    "qqq_direction_comparison": {
+      "status": "資料不足",
+      "rows": 0
+    },
     "model_beats_majority_baseline": false,
     "confidence_warning": "樣本少，低信心"
   },
   "rule_predictions": {
     "status": "可用",
-    "rows": 309,
+    "rows": 312,
     "by_horizon": [
       {
         "horizon": "20D",
-        "rows": 103,
-        "validated_rows": 83,
-        "accuracy": 0.4819277108433735,
-        "avg_return": 0.007468713254112956
+        "rows": 104,
+        "validated_rows": 84,
+        "accuracy": 0.4880952380952381,
+        "avg_return": 0.008020083355384401
       },
       {
         "horizon": "5D",
-        "rows": 103,
-        "validated_rows": 98,
-        "accuracy": 0.6122448979591837,
-        "avg_return": 0.004067373596847117
+        "rows": 104,
+        "validated_rows": 99,
+        "accuracy": 0.6060606060606061,
+        "avg_return": 0.003786947482999319
       },
       {
         "horizon": "60D",
-        "rows": 103,
-        "validated_rows": 43,
-        "accuracy": 0.5813953488372093,
-        "avg_return": 0.010533070952923218
+        "rows": 104,
+        "validated_rows": 44,
+        "accuracy": 0.5909090909090909,
+        "avg_return": 0.011807815602067244
       }
     ],
-    "evaluated_at_utc": "2026-10-13T03:26:21+00:00"
+    "evaluated_at_utc": "2026-10-13T13:43:48+00:00"
   },
   "leakage_audit": {
     "status": "可用",
