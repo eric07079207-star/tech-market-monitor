@@ -47,8 +47,11 @@ except Exception as exc:  # pragma: no cover - surfaced in CI/runtime
 
 MODEL_VERSION = "lstm-regime-v2"
 DEFAULT_SYMBOLS = LSTM_SHARED_SYMBOLS
-EPOCHS = 12
-BATCH_SIZE = 64
+# GitHub-hosted CPU runners have a bounded job window.  Six epochs preserve
+# more training passes than the previous five-epoch model, while the larger
+# batch keeps the shared eight-stock and TSLA specialist jobs reliable.
+EPOCHS = 6
+BATCH_SIZE = 256
 HIDDEN_SIZE = 48
 NUM_LAYERS = 1
 LEARNING_RATE = 1e-3
