@@ -1,7 +1,7 @@
 {
-  "generated_at_utc": "2026-10-21T12:35:52+00:00",
+  "generated_at_utc": "2026-10-21T14:45:21+00:00",
   "candidate_samples": 500,
-  "qualified_samples": 232,
+  "qualified_samples": 228,
   "regimes": [
     {
       "market_regime": "高波動／壓力",
@@ -46,7 +46,7 @@
     {
       "market_regime": "正常／溫和上漲",
       "candidate_samples": 150,
-      "qualified_samples": 71,
+      "qualified_samples": 67,
       "diagnostic_target": 30,
       "weight_target": 50,
       "diagnostic_completion_pct": 100.0,
@@ -56,17 +56,17 @@
   ],
   "sources": {
     "unique_source_count": 567,
-    "official_article_ratio": 0.3896,
-    "official_event_evidence_count": 621,
+    "official_article_ratio": 0.4058,
+    "official_event_evidence_count": 720,
     "confirmed_cluster_count": 256,
-    "cross_source_confirmation_ratio": 0.225,
+    "cross_source_confirmation_ratio": 0.207,
     "top_source_domain": "sec.gov",
-    "top_source_ratio": 0.1862
+    "top_source_ratio": 0.2074
   },
   "missing_reasons": [
     {
       "reason": "缺少跨來源新聞或官方事件",
-      "sample_count": 171
+      "sample_count": 174
     },
     {
       "reason": "缺少後續市場反應",
@@ -93,13 +93,13 @@
     },
     {
       "check": "重複事件列",
-      "status": "正常",
-      "count": 0
+      "status": "注意",
+      "count": 29
     },
     {
       "check": "單一媒體偏重",
       "status": "正常",
-      "count": 18.6
+      "count": 20.7
     }
   ],
   "thresholds": {
