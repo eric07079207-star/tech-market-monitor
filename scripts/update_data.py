@@ -55,6 +55,7 @@ from src.lstm import (
     save_lstm_status,
 )
 from src.news import DEFAULT_TSLA_KEYWORDS, fetch_international_news, fetch_news_batch, fetch_symbol_keyword_news
+from src.official_events import OFFICIAL_EVENT_CACHE, official_events_as_historical_evidence, refresh_official_events_if_due
 from src.predictions import build_market_prediction, load_prediction_log, update_prediction_log
 from src.sentiment import build_market_event_windows, build_sentiment_features
 from src.update_pipeline import (
@@ -564,12 +565,32 @@ def main() -> None:
         fundamentals = pd.DataFrame()
         _record(module_records, "sec_fundamental_observations", "基本面", "fallback", f"exception: {exc}", False)
 
+    try:
+        official_events = refresh_official_events_if_due()
+        _write_frame_module(
+            module_records,
+            module_name="official_event_layer",
+            category="知識圖譜",
+            filename=str(OFFICIAL_EVENT_CACHE.relative_to(OFFICIAL_EVENT_CACHE.parents[1])),
+            frame=official_events,
+            validation=FrameValidation(required_columns=("event_id", "published_at", "agency", "source_url"), allow_empty=False),
+            critical=False,
+            latest_columns=["published_at", "fetched_at_utc"],
+        )
+    except Exception as exc:
+        official_events = pd.DataFrame()
+        _record(module_records, "official_event_layer", "知識圖譜", "fallback", f"exception: {exc}", False)
+
     # Reproducible historical market sample. It intentionally labels missing KG/news and
     # point-in-time fundamentals instead of fabricating historical context.
     historical_samples = load_cached_frame(str(HISTORICAL_BACKTEST_CACHE.relative_to(HISTORICAL_BACKTEST_CACHE.parents[1])))
     try:
         historical_samples = annotate_sample_fundamental_coverage(build_stratified_market_samples(prices), fundamentals)
-        historical_samples = annotate_historical_event_coverage(historical_samples, load_historical_event_evidence())
+        historical_evidence = load_historical_event_evidence()
+        official_evidence = official_events_as_historical_evidence(historical_samples, official_events)
+        if not official_evidence.empty:
+            historical_evidence = pd.concat([historical_evidence, official_evidence], ignore_index=True).drop_duplicates(["sample_id", "article_url"], keep="last")
+        historical_samples = annotate_historical_event_coverage(historical_samples, historical_evidence)
         _write_frame_module(
             module_records,
             module_name="historical_market_samples",
@@ -601,7 +622,7 @@ def main() -> None:
         _record(module_records, "kg_historical_backtest_readiness", "回測", "fallback", f"exception: {exc}", False)
 
     try:
-        historical_evidence = load_historical_event_evidence()
+        historical_evidence = locals().get("historical_evidence", load_historical_event_evidence())
         historical_kg_backtest = build_historical_kg_backtest(historical_samples, historical_evidence)
         _write_frame_module(
             module_records,

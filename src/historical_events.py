@@ -85,11 +85,12 @@ def backfill_historical_event_evidence(
     previous_status = load_historical_event_status()
     processed = set(existing.get("sample_id", pd.Series(dtype=str)).dropna().astype(str))
     processed.update(map(str, previous_status.get("processed_sample_ids", [])))
+    regime_priority = _regime_priority(samples)
     queue = samples.copy()
     queue["prediction_date"] = pd.to_datetime(queue["prediction_date"], errors="coerce", utc=True)
     queue = queue[queue["prediction_date"].ge(HISTORICAL_SOURCE_START)]
     queue = queue[~queue["sample_id"].astype(str).isin(processed)]
-    queue = _balanced_queue(queue, max_samples=max_samples)
+    queue = _balanced_queue(queue, max_samples=max_samples, regime_priority=regime_priority)
 
     fetched_rows: list[dict[str, object]] = []
     failures: list[dict[str, str]] = []
@@ -143,17 +144,17 @@ def annotate_historical_event_coverage(samples: pd.DataFrame, evidence: pd.DataF
     metrics = _evidence_metrics(evidence)
     drop_columns = [
         "independent_news_source_count", "historical_event_count", "confirmed_event_cluster_count",
-        "historical_event_types", "kg_coverage_state",
+        "historical_event_types", "official_event_count", "kg_coverage_state",
     ]
     result = result.drop(columns=[column for column in drop_columns if column in result], errors="ignore")
     result = result.merge(metrics, on="sample_id", how="left")
-    for column in ["independent_news_source_count", "historical_event_count", "confirmed_event_cluster_count"]:
+    for column in ["independent_news_source_count", "historical_event_count", "confirmed_event_cluster_count", "official_event_count"]:
         result[column] = pd.to_numeric(result[column], errors="coerce").fillna(0).astype(int)
     result["historical_event_types"] = result["historical_event_types"].fillna("")
     result["kg_coverage_state"] = "需要歷史多來源事件回補"
     unavailable = pd.to_datetime(result["prediction_date"], utc=True).lt(HISTORICAL_SOURCE_START)
     result.loc[unavailable, "kg_coverage_state"] = "歷史新聞來源不可得"
-    ready = result["confirmed_event_cluster_count"].ge(1) & result["independent_news_source_count"].ge(2)
+    ready = (result["confirmed_event_cluster_count"].ge(1) & result["independent_news_source_count"].ge(2)) | result["official_event_count"].ge(1)
     result.loc[ready, "kg_coverage_state"] = "歷史多來源事件可用"
     return result
 
@@ -269,7 +270,7 @@ def _normalize_articles(sample_id: str, prediction_date: pd.Timestamp, articles:
 
 
 def _evidence_metrics(evidence: pd.DataFrame) -> pd.DataFrame:
-    columns = ["sample_id", "independent_news_source_count", "historical_event_count", "confirmed_event_cluster_count", "historical_event_types"]
+    columns = ["sample_id", "independent_news_source_count", "historical_event_count", "confirmed_event_cluster_count", "historical_event_types", "official_event_count"]
     if evidence is None or evidence.empty:
         return pd.DataFrame(columns=columns)
     data = evidence.copy()
@@ -281,6 +282,8 @@ def _evidence_metrics(evidence: pd.DataFrame) -> pd.DataFrame:
         .agg(source_count=("source_domain", "nunique"), story_count=("title_hash", "nunique"))
         .reset_index()
     )
+    official_mask = data.get("provider", pd.Series("", index=data.index)).eq("Official event layer")
+    official_counts = data[official_mask].groupby("sample_id")["event_cluster_key"].nunique().rename("official_event_count").reset_index()
     confirmed = event_groups[event_groups["source_count"].ge(2) & event_groups["story_count"].ge(2)]
     confirmed_evidence = data.merge(confirmed[["sample_id", "event_cluster_key"]], on=["sample_id", "event_cluster_key"], how="inner")
     base = (
@@ -293,15 +296,16 @@ def _evidence_metrics(evidence: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
     )
     counts = confirmed.groupby("sample_id").size().rename("confirmed_event_cluster_count").reset_index()
-    return base.merge(counts, on="sample_id", how="left").fillna({"confirmed_event_cluster_count": 0})
+    result = base.merge(counts, on="sample_id", how="left").merge(official_counts, on="sample_id", how="outer")
+    return result.fillna({"independent_news_source_count": 0, "historical_event_count": 0, "confirmed_event_cluster_count": 0, "historical_event_types": "", "official_event_count": 0})
 
 
-def _balanced_queue(queue: pd.DataFrame, max_samples: int) -> pd.DataFrame:
+def _balanced_queue(queue: pd.DataFrame, max_samples: int, regime_priority: list[str] | None = None) -> pd.DataFrame:
     """Round-robin regimes so early results are not all bull or stress samples."""
     limit = max(0, int(max_samples))
     if limit == 0 or queue.empty:
         return queue.head(0)
-    regimes = ["高波動／壓力", "明顯下跌趨勢", "強勢反彈／轉折", "橫盤／低波動", "正常／溫和上漲"]
+    regimes = regime_priority or ["高波動／壓力", "明顯下跌趨勢", "強勢反彈／轉折", "橫盤／低波動", "正常／溫和上漲"]
     pools = {
         regime: group.sort_values("prediction_date", ascending=False).reset_index(drop=True)
         for regime, group in queue.groupby("regime_bucket", dropna=False)
@@ -321,6 +325,19 @@ def _balanced_queue(queue: pd.DataFrame, max_samples: int) -> pd.DataFrame:
             break
         offset += 1
     return pd.DataFrame(selected).reset_index(drop=True) if selected else queue.head(0)
+
+
+def _regime_priority(samples: pd.DataFrame) -> list[str]:
+    default = ["高波動／壓力", "明顯下跌趨勢", "強勢反彈／轉折", "橫盤／低波動", "正常／溫和上漲"]
+    if samples is None or samples.empty or "regime_bucket" not in samples:
+        return default
+    source_count = pd.to_numeric(samples.get("independent_news_source_count"), errors="coerce").fillna(0)
+    official_count = pd.to_numeric(samples.get("official_event_count"), errors="coerce").fillna(0)
+    event_ready = source_count.ge(2) | official_count.ge(1)
+    fundamental_ready = samples.get("fundamental_coverage_state", pd.Series("", index=samples.index)).eq("完整（官方）")
+    eligible = event_ready & fundamental_ready
+    counts = samples.assign(_eligible=eligible).groupby("regime_bucket")["_eligible"].sum().to_dict()
+    return sorted(default, key=lambda regime: (int(counts.get(regime, 0)), default.index(regime)))
 
 
 def _event_type(title: str) -> str:

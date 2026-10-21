@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.historical_backtest import HISTORICAL_BACKTEST_CACHE
+from src.fundamentals import annotate_sample_fundamental_coverage, load_fundamental_observations
 from src.historical_events import (
     annotate_historical_event_coverage,
     backfill_historical_event_evidence,
@@ -25,6 +26,7 @@ from src.kg_backtest import (
     build_kg_backtest_readiness,
     save_historical_kg_quality_report,
 )
+from src.official_events import load_official_events, official_events_as_historical_evidence, refresh_official_events_if_due
 
 
 def main() -> None:
@@ -36,12 +38,22 @@ def main() -> None:
     if not HISTORICAL_BACKTEST_CACHE.exists():
         raise SystemExit("missing stratified historical market samples")
     samples = pd.read_parquet(HISTORICAL_BACKTEST_CACHE)
+    samples = annotate_sample_fundamental_coverage(samples, load_fundamental_observations())
     evidence, status = backfill_historical_event_evidence(
         samples,
         load_historical_event_evidence(),
         max_samples=args.max_samples,
         pause_seconds=args.pause_seconds,
     )
+    official_events = refresh_official_events_if_due()
+    official_evidence = official_events_as_historical_evidence(samples, official_events)
+    if not official_evidence.empty:
+        evidence = pd.concat([evidence, official_evidence], ignore_index=True)
+        evidence = evidence.drop_duplicates(["sample_id", "article_url"], keep="last")
+        evidence = evidence.drop_duplicates(["sample_id", "title_hash", "source_domain"], keep="last")
+        evidence = evidence.sort_values(["prediction_date", "published_at", "source_domain"]).reset_index(drop=True)
+        status["article_rows"] = int(len(evidence))
+        status["official_event_rows"] = int(evidence.get("provider", pd.Series(dtype=str)).eq("Official event layer").sum())
     annotated = annotate_historical_event_coverage(samples, evidence)
     readiness = build_kg_backtest_readiness(annotated)
     backtest = build_historical_kg_backtest(annotated, evidence)

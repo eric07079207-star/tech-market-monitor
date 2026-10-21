@@ -1885,6 +1885,10 @@ with tab_kg:
                 top_source = source_quality.get("top_source_domain", "")
                 if top_source:
                     st.caption(f"最大單一來源：{top_source}（占 {pct(source_quality.get('top_source_ratio', 0))}）。官方來源優先使用 SEC、Fed、BLS、BEA 與公司 IR；一般新聞仍需跨出版者確認。")
+                st.caption(
+                    f"官方事件證據 {int(source_quality.get('official_event_evidence_count', 0))} 筆。"
+                    "SEC/Fed 有精確發布日期時可進入 point-in-time 回測；BLS/BEA 若只有觀測月份，會保存原值與版本狀態，但不冒充發布時間。"
+                )
                 if threshold_state.get("weight_evaluation_ready"):
                     st.success("五種市場環境均已達正式門檻，可開始評估模型權重；新權重仍須通過獨立期間驗證。")
                 elif threshold_state.get("factor_diagnostic_ready"):

@@ -28,7 +28,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Backfill bounded historical event windows
-        run: python scripts/backfill_historical_events.py --max-samples 8 --pause-seconds 5.5
+        run: python scripts/backfill_historical_events.py --max-samples 12 --pause-seconds 5.5
 
       - name: Export readable artifacts
         run: python scripts/export_observation_data.py
@@ -48,6 +48,7 @@ jobs:
             data/cache/backtest/historical_kg_quality_report.json \
             data/cache/backtest/stratified_market_samples.parquet \
             data/cache/kg/historical_backtest_readiness.parquet \
+            data/cache/official/official_events.parquet \
             data/觀察版資料
           git diff --cached --quiet && exit 0
           git commit -m "Backfill historical KG evidence"

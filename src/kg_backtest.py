@@ -31,7 +31,8 @@ def build_kg_backtest_readiness(samples: pd.DataFrame) -> pd.DataFrame:
     data = samples.copy()
     source_count = pd.to_numeric(data.get("independent_news_source_count"), errors="coerce").fillna(0)
     fundamental_ok = data.get("fundamental_coverage_state", pd.Series("資料不足", index=data.index)).eq("完整（官方）")
-    event_ok = source_count.ge(2)
+    official_count = pd.to_numeric(data.get("official_event_count"), errors="coerce").fillna(0)
+    event_ok = source_count.ge(2) | official_count.ge(1)
     data["event_evidence_ready"] = event_ok
     data["fundamental_evidence_ready"] = fundamental_ok
     data["eligible_for_full_kg_backtest"] = event_ok & fundamental_ok
@@ -45,8 +46,8 @@ def build_kg_backtest_readiness(samples: pd.DataFrame) -> pd.DataFrame:
     columns = [
         "sample_id", "prediction_date", "regime_bucket", "research_scope",
         "independent_news_source_count", "historical_event_count", "confirmed_event_cluster_count",
-        "historical_event_types", "fundamental_ticker_coverage",
-        "fundamental_coverage_state", "event_evidence_ready", "fundamental_evidence_ready",
+        "historical_event_types", "official_event_count", "fundamental_ticker_coverage",
+        "fundamental_coverage_state", "fundamental_missing_reason", "event_evidence_ready", "fundamental_evidence_ready",
         "eligible_for_full_kg_backtest", "kg_backtest_state",
         "future_return_1d", "future_return_5d", "future_return_20d", "future_max_drawdown_20d",
     ]
@@ -138,6 +139,7 @@ def build_historical_kg_quality_report(readiness: pd.DataFrame, evidence: pd.Dat
     source_count = int(news.get("source_domain", pd.Series(dtype=str)).replace("", pd.NA).nunique(dropna=True))
     domains = news.get("source_domain", pd.Series("", index=news.index)).fillna("").astype(str).str.lower()
     official = domains.map(lambda value: any(value == suffix or value.endswith(f".{suffix}") for suffix in OFFICIAL_DOMAIN_SUFFIXES))
+    official_event_evidence_count = int(news.get("provider", pd.Series("", index=news.index)).eq("Official event layer").sum())
     official_ratio = float(official.mean()) if len(news) else 0.0
     cluster = pd.DataFrame()
     if not news.empty and {"sample_id", "event_cluster_key", "source_domain", "title_hash"}.issubset(news.columns):
@@ -164,10 +166,14 @@ def build_historical_kg_quality_report(readiness: pd.DataFrame, evidence: pd.Dat
     reaction_cols = [column for column in ("future_return_1d", "future_return_5d", "future_return_20d") if column in ready]
     reaction_ready = ready[reaction_cols].notna().all(axis=1) if reaction_cols else pd.Series(False, index=ready.index)
     missing_reasons = [
-        {"reason": "缺少跨來源新聞", "sample_count": int((~event_ready).sum())},
-        {"reason": "缺少 point-in-time 基本面", "sample_count": int((~fundamental_ready).sum())},
+        {"reason": "缺少跨來源新聞或官方事件", "sample_count": int((~event_ready).sum())},
         {"reason": "缺少後續市場反應", "sample_count": int((~reaction_ready).sum())},
     ]
+    if "fundamental_missing_reason" in ready:
+        reason_counts = ready.loc[~fundamental_ready, "fundamental_missing_reason"].fillna("未分類基本面缺口").replace("", "未分類基本面缺口").value_counts()
+        missing_reasons.extend({"reason": f"基本面：{reason}", "sample_count": int(count)} for reason, count in reason_counts.items())
+    else:
+        missing_reasons.append({"reason": "缺少 point-in-time 基本面", "sample_count": int((~fundamental_ready).sum())})
     checks = [
         {"check": "未來資料洩漏", "status": "正常" if future_leakage_rows == 0 else "異常", "count": future_leakage_rows},
         {"check": "重複事件列", "status": "正常" if duplicate_rows == 0 else "注意", "count": duplicate_rows},
@@ -183,6 +189,7 @@ def build_historical_kg_quality_report(readiness: pd.DataFrame, evidence: pd.Dat
         "sources": {
             "unique_source_count": source_count,
             "official_article_ratio": round(official_ratio, 4),
+            "official_event_evidence_count": official_event_evidence_count,
             "confirmed_cluster_count": confirmed,
             "cross_source_confirmation_ratio": round(confirmation_ratio, 4),
             "top_source_domain": top_source_domain,
