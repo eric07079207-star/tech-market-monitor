@@ -23,7 +23,13 @@ from src.governance import annotate_governance, governance_summary
 from src.factor_effectiveness import FACTOR_EFFECTIVENESS_CACHE, build_factor_effectiveness
 from src.fundamentals import FUNDAMENTAL_CACHE, annotate_sample_fundamental_coverage, refresh_sec_fundamentals_if_due
 from src.historical_backtest import HISTORICAL_BACKTEST_CACHE, build_stratified_market_samples
-from src.kg_backtest import KG_BACKTEST_READINESS_CACHE, build_kg_backtest_readiness
+from src.historical_events import annotate_historical_event_coverage, load_historical_event_evidence
+from src.kg_backtest import (
+    HISTORICAL_KG_BACKTEST_CACHE,
+    KG_BACKTEST_READINESS_CACHE,
+    build_historical_kg_backtest,
+    build_kg_backtest_readiness,
+)
 from src.indicators import add_price_indicators, detect_anomalies, latest_snapshot, regime_summary, today_conclusion
 from src.kg import (
     FACT_CACHE,
@@ -561,6 +567,7 @@ def main() -> None:
     historical_samples = load_cached_frame(str(HISTORICAL_BACKTEST_CACHE.relative_to(HISTORICAL_BACKTEST_CACHE.parents[1])))
     try:
         historical_samples = annotate_sample_fundamental_coverage(build_stratified_market_samples(prices), fundamentals)
+        historical_samples = annotate_historical_event_coverage(historical_samples, load_historical_event_evidence())
         _write_frame_module(
             module_records,
             module_name="historical_market_samples",
@@ -590,6 +597,21 @@ def main() -> None:
         )
     except Exception as exc:
         _record(module_records, "kg_historical_backtest_readiness", "回測", "fallback", f"exception: {exc}", False)
+
+    try:
+        historical_kg_backtest = build_historical_kg_backtest(historical_samples, load_historical_event_evidence())
+        _write_frame_module(
+            module_records,
+            module_name="historical_kg_backtest",
+            category="回測",
+            filename=str(HISTORICAL_KG_BACKTEST_CACHE.relative_to(HISTORICAL_KG_BACKTEST_CACHE.parents[1])),
+            frame=historical_kg_backtest,
+            validation=FrameValidation(required_columns=("sample_id", "prediction_date", "predicted_direction"), allow_empty=True),
+            critical=False,
+            latest_columns=["prediction_date", "generated_at_utc"],
+        )
+    except Exception as exc:
+        _record(module_records, "historical_kg_backtest", "回測", "fallback", f"exception: {exc}", False)
 
     try:
         factor_report = build_factor_effectiveness(historical_samples)

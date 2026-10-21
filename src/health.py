@@ -245,16 +245,25 @@ def _sentiment_signal_row(sentiment: pd.DataFrame | None, cache_updated: str) ->
         data = sentiment.copy()
         latest_row = data.sort_values("date").tail(1).squeeze()
         latest = latest_row.get("date", "n/a") if isinstance(latest_row, pd.Series) else "n/a"
-        confidence = _numeric_value(latest_row.get("news_sentiment_confidence", 0), 0.0) if isinstance(latest_row, pd.Series) else 0.0
-        signal_rows = int(_numeric_value(latest_row.get("news_signal_rows", 0), 0.0)) if isinstance(latest_row, pd.Series) else 0
-        rejected_rows = int(_numeric_value(latest_row.get("news_rejected_rows", 0), 0.0)) if isinstance(latest_row, pd.Series) else 0
+        signal_counts = pd.to_numeric(data.get("news_signal_rows", 0), errors="coerce").fillna(0)
+        signal_history = data[signal_counts.gt(0)].sort_values("date")
+        signal_row = signal_history.tail(1).squeeze() if not signal_history.empty else latest_row
+        confidence = _numeric_value(signal_row.get("news_sentiment_confidence", 0), 0.0) if isinstance(signal_row, pd.Series) else 0.0
+        signal_rows = int(_numeric_value(signal_row.get("news_signal_rows", 0), 0.0)) if isinstance(signal_row, pd.Series) else 0
+        rejected_rows = int(_numeric_value(signal_row.get("news_rejected_rows", 0), 0.0)) if isinstance(signal_row, pd.Series) else 0
+        signal_date = signal_row.get("date", "n/a") if isinstance(signal_row, pd.Series) else "n/a"
+        latest_ts = pd.to_datetime(latest, errors="coerce")
+        signal_ts = pd.to_datetime(signal_date, errors="coerce")
+        signal_age_days = (latest_ts.normalize() - signal_ts.normalize()).days if pd.notna(latest_ts) and pd.notna(signal_ts) else 999
         if confidence >= 60:
-            status = "🟢 正常"
+            status = "🟢 正常" if signal_age_days <= 3 else "🟡 注意"
         elif confidence >= 35 or signal_rows > 0:
             status = "🟡 注意"
         else:
             status = "🔴 無資料"
-        detail = f"最新情緒信心 {confidence:.1f}/100；可用新聞 {signal_rows}；拒收 {rejected_rows}"
+        detail = f"最近有效新聞訊號 {_format_dateish(signal_date)}；信心 {confidence:.1f}/100；可用新聞 {signal_rows}；拒收 {rejected_rows}"
+        if signal_age_days > 0 and signal_age_days < 999:
+            detail += f"；市場列較新聞訊號晚 {signal_age_days} 天"
     return {
         "狀態": status,
         "資料分類": "情緒",

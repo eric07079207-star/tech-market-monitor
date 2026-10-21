@@ -1,0 +1,61 @@
+name: Backfill historical KG evidence
+
+on:
+  schedule:
+    # Slow daily batch; independent from the six-hour production refresh.
+    - cron: "35 18 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: tech-market-monitor-cache-writer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  historical-backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Backfill bounded historical event windows
+        run: python scripts/backfill_historical_events.py --max-samples 8 --pause-seconds 5.5
+
+      - name: Export readable artifacts
+        run: python scripts/export_observation_data.py
+
+      - name: Smoke check
+        run: python scripts/smoke_check.py
+
+      - name: Commit compact historical artifacts
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/cache/backtest/historical_event_evidence.parquet \
+            data/cache/backtest/historical_event_backfill_status.json \
+            data/cache/backtest/historical_kg_backtest.parquet \
+            data/cache/backtest/stratified_market_samples.parquet \
+            data/cache/kg/historical_backtest_readiness.parquet \
+            data/觀察版資料/07_預測驗證 \
+            data/觀察版資料/09_金融知識圖譜
+          git diff --cached --quiet && exit 0
+          git commit -m "Backfill historical KG evidence"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep $((attempt * 3))
+          done
+          exit 1

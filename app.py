@@ -118,7 +118,7 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         return pd.DataFrame()
 try:
     from src.factor_effectiveness import factor_effectiveness_summary, load_factor_effectiveness
-    from src.kg_backtest import kg_backtest_readiness_summary, load_kg_backtest_readiness
+    from src.kg_backtest import kg_backtest_readiness_summary, load_historical_kg_backtest, load_kg_backtest_readiness
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def load_factor_effectiveness() -> pd.DataFrame:
         return pd.DataFrame()
@@ -127,6 +127,9 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         return pd.DataFrame()
 
     def load_kg_backtest_readiness() -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def load_historical_kg_backtest() -> pd.DataFrame:
         return pd.DataFrame()
 
     def kg_backtest_readiness_summary(report: pd.DataFrame) -> pd.DataFrame:
@@ -842,6 +845,7 @@ historical_market_samples = load_stratified_market_samples()
 fundamental_observations = load_fundamental_observations()
 factor_effectiveness = load_factor_effectiveness()
 kg_backtest_readiness = load_kg_backtest_readiness()
+historical_kg_backtest = load_historical_kg_backtest()
 metadata = load_metadata()
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
@@ -1825,6 +1829,31 @@ with tab_kg:
                     column_config={"平均20日報酬": st.column_config.NumberColumn(format="%.2%"), "平均20日回撤": st.column_config.NumberColumn(format="%.2%")},
                 )
                 st.caption("只有同時具備當時多來源事件與官方基本面的日期，才會進入完整 KG 回測。其餘樣本僅作市場技術基線。")
+
+            st.markdown("##### KG 歷史回測結果")
+            if historical_kg_backtest.empty:
+                st.info("尚未累積同時具備多來源事件與官方基本面的合格樣本。")
+            else:
+                completed = historical_kg_backtest.dropna(subset=["future_return_20d"])
+                kg_metrics = st.columns(4)
+                kg_metrics[0].metric("合格樣本", f"{len(historical_kg_backtest)} 筆")
+                kg_metrics[1].metric("方向一致率", pct(completed["direction_correct"].mean()) if not completed.empty else "資料不足")
+                kg_metrics[2].metric("平均 20 日報酬", pct(completed["future_return_20d"].mean()) if not completed.empty else "資料不足")
+                regime_count = historical_kg_backtest["regime_bucket"].nunique(dropna=True)
+                kg_metrics[3].metric("涵蓋市場狀態", f"{regime_count} / 5")
+                if len(historical_kg_backtest) < 30 or regime_count < 3:
+                    st.warning("目前仍是低信心回補階段；樣本少或市場狀態集中時，方向一致率不能視為模型準確率。")
+                st.dataframe(
+                    historical_kg_backtest.sort_values("prediction_date", ascending=False),
+                    hide_index=True,
+                    width="stretch",
+                    column_config={
+                        "future_return_20d": st.column_config.NumberColumn(format="%.2%"),
+                        "future_max_drawdown_20d": st.column_config.NumberColumn(format="%.2%"),
+                        "kg_vote_score": st.column_config.NumberColumn(format="%.2f"),
+                        "mean_source_reliability": st.column_config.NumberColumn(format="%.2f"),
+                    },
+                )
 
 with tab_memory:
     st.subheader("專案記憶 / 討論摘要")
