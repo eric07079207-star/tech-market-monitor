@@ -79,8 +79,52 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # The dashboard only needs compact inference/evaluation artifacts.
+          # Training sequences and split tables are reproducible intermediate
+          # files; committing them duplicates tens of MB in cache and exports.
           git add data/cache data/觀察版資料
+          heavy_lstm_artifacts=(
+            data/cache/lstm/lstm_features.parquet
+            data/cache/lstm/lstm_train_features.parquet
+            data/cache/lstm/lstm_split.parquet
+            data/cache/lstm/lstm_monitor_features.parquet
+            data/cache/lstm/tsla_specialist/lstm_features.parquet
+            data/cache/lstm/tsla_specialist/lstm_train_features.parquet
+            data/cache/lstm/tsla_specialist/lstm_split.parquet
+            data/cache/lstm/tsla_specialist/lstm_monitor_features.parquet
+            data/觀察版資料/10_LSTM模型/lstm/lstm_features.parquet
+            data/觀察版資料/10_LSTM模型/lstm/lstm_train_features.parquet
+            data/觀察版資料/10_LSTM模型/lstm/lstm_split.parquet
+            data/觀察版資料/10_LSTM模型/lstm/lstm_monitor_features.parquet
+            data/觀察版資料/10_LSTM模型/lstm_features.csv
+            data/觀察版資料/10_LSTM模型/lstm_train_features.csv
+            data/觀察版資料/10_LSTM模型/lstm_split.csv
+            data/觀察版資料/10_LSTM模型/lstm_monitor_features.csv
+          )
+          for artifact in "${heavy_lstm_artifacts[@]}"; do
+            git reset -q -- "$artifact" 2>/dev/null || true
+          done
+
           git diff --cached --quiet && exit 0
+
+          staged_bytes=$(
+            git diff --cached --name-only --diff-filter=ACMRTUXB -z |
+              xargs -0 -r du -cb |
+              tail -1 |
+              cut -f1
+          )
+          staged_bytes=${staged_bytes:-0}
+          max_staged_bytes=$((40 * 1024 * 1024))
+          if (( staged_bytes > max_staged_bytes )); then
+            echo "Refusing to publish a cache commit larger than 40 MB (${staged_bytes} bytes)."
+            git diff --cached --name-only --diff-filter=ACMRTUXB -z |
+              xargs -0 -r du -h |
+              sort -h |
+              tail -20
+            exit 1
+          fi
+
           git commit -m "Update market data cache"
           for attempt in 1 2 3; do
             if git pull --rebase origin main && git push origin HEAD:main; then
