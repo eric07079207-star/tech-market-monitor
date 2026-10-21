@@ -83,8 +83,13 @@ def backfill_historical_event_evidence(
         existing["event_cluster_key"] = existing["canonical_event"]
         existing["impact_direction"] = existing["title"].map(_impact_direction)
     previous_status = load_historical_event_status()
-    processed = set(existing.get("sample_id", pd.Series(dtype=str)).dropna().astype(str))
-    processed.update(map(str, previous_status.get("processed_sample_ids", [])))
+    # Official events are mapped across all matching sample dates, but that does
+    # not mean the broader historical news window has been searched. Keep these
+    # states separate so official coverage cannot prematurely stop backfilling.
+    providers = existing.get("provider", pd.Series("", index=existing.index)).fillna("").astype(str)
+    searched_evidence = existing[providers.ne("Official event layer")]
+    processed = set(searched_evidence.get("sample_id", pd.Series(dtype=str)).dropna().astype(str))
+    processed.update(map(str, previous_status.get("searched_sample_ids", [])))
     regime_priority = _regime_priority(samples)
     queue = samples.copy()
     queue["prediction_date"] = pd.to_datetime(queue["prediction_date"], errors="coerce", utc=True)
@@ -123,6 +128,7 @@ def backfill_historical_event_evidence(
         "provider": "Google News RSS; GDELT DOC 2.0 fallback",
         "provider_coverage_start": HISTORICAL_SOURCE_START.isoformat(),
         "processed_sample_ids": sorted(processed | set(completed_this_run)),
+        "searched_sample_ids": sorted(processed | set(completed_this_run)),
         "processed_sample_windows": int(len(processed | set(completed_this_run))),
         "eligible_sample_windows": int(samples["prediction_date"].pipe(pd.to_datetime, errors="coerce", utc=True).ge(HISTORICAL_SOURCE_START).sum()),
         "article_rows": int(len(combined)),
