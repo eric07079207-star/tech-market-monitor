@@ -49,9 +49,19 @@ def load_historical_event_evidence(path: Path | None = None) -> pd.DataFrame:
     if not path.exists():
         return _empty_evidence()
     try:
-        return pd.read_parquet(path)
+        evidence = pd.read_parquet(path)
     except Exception:
         return _empty_evidence()
+    if evidence.empty:
+        return evidence
+    if {"sample_id", "article_url"}.issubset(evidence.columns):
+        evidence = evidence.drop_duplicates(["sample_id", "article_url"], keep="last")
+    if {"sample_id", "title_hash", "source_domain"}.issubset(evidence.columns):
+        evidence = evidence.drop_duplicates(["sample_id", "title_hash", "source_domain"], keep="last")
+    sort_columns = [column for column in ("prediction_date", "published_at", "source_domain") if column in evidence]
+    if sort_columns:
+        evidence = evidence.sort_values(sort_columns)
+    return evidence.reset_index(drop=True)
 
 
 def load_historical_event_status(path: Path | None = None) -> dict:

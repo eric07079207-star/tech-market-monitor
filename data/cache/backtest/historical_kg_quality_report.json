@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-21T17:45:20+00:00",
+  "generated_at_utc": "2026-10-21T17:48:07+00:00",
   "candidate_samples": 500,
   "qualified_samples": 228,
   "regimes": [
@@ -56,12 +56,12 @@
   ],
   "sources": {
     "unique_source_count": 567,
-    "official_article_ratio": 0.4058,
-    "official_event_evidence_count": 720,
+    "official_article_ratio": 0.4011,
+    "official_event_evidence_count": 691,
     "confirmed_cluster_count": 256,
-    "cross_source_confirmation_ratio": 0.207,
+    "cross_source_confirmation_ratio": 0.2119,
     "top_source_domain": "sec.gov",
-    "top_source_ratio": 0.2074
+    "top_source_ratio": 0.2012
   },
   "missing_reasons": [
     {
@@ -93,13 +93,13 @@
     },
     {
       "check": "重複事件列",
-      "status": "注意",
-      "count": 29
+      "status": "正常",
+      "count": 0
     },
     {
       "check": "單一媒體偏重",
       "status": "正常",
-      "count": 20.7
+      "count": 20.1
     }
   ],
   "thresholds": {

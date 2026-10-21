@@ -620,6 +620,9 @@ def main() -> None:
         official_evidence = official_events_as_historical_evidence(historical_samples, official_events)
         if not official_evidence.empty:
             historical_evidence = pd.concat([historical_evidence, official_evidence], ignore_index=True).drop_duplicates(["sample_id", "article_url"], keep="last")
+            historical_evidence = historical_evidence.drop_duplicates(
+                ["sample_id", "title_hash", "source_domain"], keep="last"
+            )
         historical_samples = annotate_historical_event_coverage(historical_samples, historical_evidence)
         _write_frame_module(
             module_records,
