@@ -28,7 +28,9 @@ from src.project_memory import (  # noqa: E402
 )
 
 
-DOC_FONT = "PingFangTC-Regular"
+# Use the macOS Traditional Chinese family name rather than the PostScript
+# variant; LibreOffice resolves the family name consistently during export.
+DOC_FONT = "Heiti TC"
 
 
 def set_run_font(run, name: str = DOC_FONT, size: float = 11, bold: bool = False) -> None:
