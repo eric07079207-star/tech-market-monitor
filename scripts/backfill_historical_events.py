@@ -21,7 +21,9 @@ from src.kg_backtest import (
     HISTORICAL_KG_BACKTEST_CACHE,
     KG_BACKTEST_READINESS_CACHE,
     build_historical_kg_backtest,
+    build_historical_kg_quality_report,
     build_kg_backtest_readiness,
+    save_historical_kg_quality_report,
 )
 
 
@@ -43,11 +45,13 @@ def main() -> None:
     annotated = annotate_historical_event_coverage(samples, evidence)
     readiness = build_kg_backtest_readiness(annotated)
     backtest = build_historical_kg_backtest(annotated, evidence)
+    quality_report = build_historical_kg_quality_report(readiness, evidence)
 
     save_historical_event_artifacts(evidence, status)
     annotated.to_parquet(HISTORICAL_BACKTEST_CACHE, index=False)
     readiness.to_parquet(KG_BACKTEST_READINESS_CACHE, index=False)
     backtest.to_parquet(HISTORICAL_KG_BACKTEST_CACHE, index=False)
+    save_historical_kg_quality_report(quality_report)
 
     ready = int(readiness.get("eligible_for_full_kg_backtest", pd.Series(dtype=bool)).sum())
     print(

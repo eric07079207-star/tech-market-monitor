@@ -45,6 +45,7 @@ jobs:
             data/cache/backtest/historical_event_evidence.parquet \
             data/cache/backtest/historical_event_backfill_status.json \
             data/cache/backtest/historical_kg_backtest.parquet \
+            data/cache/backtest/historical_kg_quality_report.json \
             data/cache/backtest/stratified_market_samples.parquet \
             data/cache/kg/historical_backtest_readiness.parquet \
             data/觀察版資料

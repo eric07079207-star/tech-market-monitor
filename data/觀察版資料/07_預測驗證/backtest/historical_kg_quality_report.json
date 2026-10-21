@@ -1,0 +1,101 @@
+{
+  "generated_at_utc": "2026-10-21T12:19:03+00:00",
+  "candidate_samples": 500,
+  "qualified_samples": 30,
+  "regimes": [
+    {
+      "market_regime": "高波動／壓力",
+      "candidate_samples": 100,
+      "qualified_samples": 17,
+      "diagnostic_target": 30,
+      "weight_target": 50,
+      "diagnostic_completion_pct": 56.7,
+      "weight_completion_pct": 34.0,
+      "readiness_state": "資料累積中"
+    },
+    {
+      "market_regime": "明顯下跌趨勢",
+      "candidate_samples": 125,
+      "qualified_samples": 4,
+      "diagnostic_target": 30,
+      "weight_target": 50,
+      "diagnostic_completion_pct": 13.3,
+      "weight_completion_pct": 8.0,
+      "readiness_state": "資料累積中"
+    },
+    {
+      "market_regime": "強勢反彈／轉折",
+      "candidate_samples": 75,
+      "qualified_samples": 3,
+      "diagnostic_target": 30,
+      "weight_target": 50,
+      "diagnostic_completion_pct": 10.0,
+      "weight_completion_pct": 6.0,
+      "readiness_state": "資料累積中"
+    },
+    {
+      "market_regime": "橫盤／低波動",
+      "candidate_samples": 50,
+      "qualified_samples": 3,
+      "diagnostic_target": 30,
+      "weight_target": 50,
+      "diagnostic_completion_pct": 10.0,
+      "weight_completion_pct": 6.0,
+      "readiness_state": "資料累積中"
+    },
+    {
+      "market_regime": "正常／溫和上漲",
+      "candidate_samples": 150,
+      "qualified_samples": 3,
+      "diagnostic_target": 30,
+      "weight_target": 50,
+      "diagnostic_completion_pct": 10.0,
+      "weight_completion_pct": 6.0,
+      "readiness_state": "資料累積中"
+    }
+  ],
+  "sources": {
+    "unique_source_count": 342,
+    "official_article_ratio": 0.0423,
+    "confirmed_cluster_count": 148,
+    "cross_source_confirmation_ratio": 0.523,
+    "top_source_domain": "reuters.com",
+    "top_source_ratio": 0.1245
+  },
+  "missing_reasons": [
+    {
+      "reason": "缺少跨來源新聞",
+      "sample_count": 470
+    },
+    {
+      "reason": "缺少 point-in-time 基本面",
+      "sample_count": 252
+    },
+    {
+      "reason": "缺少後續市場反應",
+      "sample_count": 0
+    }
+  ],
+  "quality_checks": [
+    {
+      "check": "未來資料洩漏",
+      "status": "正常",
+      "count": 0
+    },
+    {
+      "check": "重複事件列",
+      "status": "正常",
+      "count": 0
+    },
+    {
+      "check": "單一媒體偏重",
+      "status": "正常",
+      "count": 12.5
+    }
+  ],
+  "thresholds": {
+    "factor_diagnostic_ready": false,
+    "weight_evaluation_ready": false,
+    "current_state": "資料累積中"
+  }
+}

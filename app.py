@@ -118,7 +118,12 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
         return pd.DataFrame()
 try:
     from src.factor_effectiveness import factor_effectiveness_summary, load_factor_effectiveness
-    from src.kg_backtest import kg_backtest_readiness_summary, load_historical_kg_backtest, load_kg_backtest_readiness
+    from src.kg_backtest import (
+        kg_backtest_readiness_summary,
+        load_historical_kg_backtest,
+        load_historical_kg_quality_report,
+        load_kg_backtest_readiness,
+    )
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
     def load_factor_effectiveness() -> pd.DataFrame:
         return pd.DataFrame()
@@ -131,6 +136,9 @@ except ImportError:  # pragma: no cover - protects Streamlit Cloud during partia
 
     def load_historical_kg_backtest() -> pd.DataFrame:
         return pd.DataFrame()
+
+    def load_historical_kg_quality_report() -> dict:
+        return {}
 
     def kg_backtest_readiness_summary(report: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
@@ -846,6 +854,7 @@ fundamental_observations = load_fundamental_observations()
 factor_effectiveness = load_factor_effectiveness()
 kg_backtest_readiness = load_kg_backtest_readiness()
 historical_kg_backtest = load_historical_kg_backtest()
+historical_kg_quality = load_historical_kg_quality_report()
 metadata = load_metadata()
 ai_summary = load_cached_ai_summary()
 ai_quality = ai_summary_quality(ai_summary) if ai_summary else {}
@@ -1829,6 +1838,59 @@ with tab_kg:
                     column_config={"平均20日報酬": st.column_config.NumberColumn(format="%.2%"), "平均20日回撤": st.column_config.NumberColumn(format="%.2%")},
                 )
                 st.caption("只有同時具備當時多來源事件與官方基本面的日期，才會進入完整 KG 回測。其餘樣本僅作市場技術基線。")
+
+            st.markdown("##### KG 回補品質控制台")
+            if not historical_kg_quality:
+                st.info("品質報告會在下一次歷史回補或市場更新後建立。")
+            else:
+                source_quality = historical_kg_quality.get("sources", {})
+                threshold_state = historical_kg_quality.get("thresholds", {})
+                quality_metrics = st.columns(4)
+                quality_metrics[0].metric("新聞來源", f"{int(source_quality.get('unique_source_count', 0))} 個")
+                quality_metrics[1].metric("官方來源比例", pct(source_quality.get("official_article_ratio", 0)))
+                quality_metrics[2].metric("跨來源確認率", pct(source_quality.get("cross_source_confirmation_ratio", 0)))
+                quality_metrics[3].metric("目前階段", threshold_state.get("current_state", "資料累積中"))
+
+                regime_progress = pd.DataFrame(historical_kg_quality.get("regimes", []))
+                if not regime_progress.empty:
+                    st.markdown("###### 五種市場環境進度")
+                    st.dataframe(
+                        regime_progress.rename(
+                            columns={
+                                "market_regime": "市場環境", "candidate_samples": "候選樣本",
+                                "qualified_samples": "合格樣本", "diagnostic_target": "診斷門檻",
+                                "weight_target": "權重門檻", "diagnostic_completion_pct": "診斷完成率",
+                                "weight_completion_pct": "權重完成率", "readiness_state": "階段",
+                            }
+                        ),
+                        hide_index=True,
+                        width="stretch",
+                        column_config={
+                            "診斷完成率": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.1f%%"),
+                            "權重完成率": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.1f%%"),
+                        },
+                    )
+
+                missing = pd.DataFrame(historical_kg_quality.get("missing_reasons", []))
+                checks = pd.DataFrame(historical_kg_quality.get("quality_checks", []))
+                left_quality, right_quality = st.columns(2)
+                with left_quality:
+                    st.markdown("###### 尚缺資料")
+                    if not missing.empty:
+                        st.dataframe(missing.rename(columns={"reason": "缺口原因", "sample_count": "樣本數"}), hide_index=True, width="stretch")
+                with right_quality:
+                    st.markdown("###### 污染與偏差檢查")
+                    if not checks.empty:
+                        st.dataframe(checks.rename(columns={"check": "檢查項目", "status": "狀態", "count": "數值"}), hide_index=True, width="stretch")
+                top_source = source_quality.get("top_source_domain", "")
+                if top_source:
+                    st.caption(f"最大單一來源：{top_source}（占 {pct(source_quality.get('top_source_ratio', 0))}）。官方來源優先使用 SEC、Fed、BLS、BEA 與公司 IR；一般新聞仍需跨出版者確認。")
+                if threshold_state.get("weight_evaluation_ready"):
+                    st.success("五種市場環境均已達正式門檻，可開始評估模型權重；新權重仍須通過獨立期間驗證。")
+                elif threshold_state.get("factor_diagnostic_ready"):
+                    st.success("五種市場環境均已達初步門檻，可開始因子有效性診斷，暫不調整正式權重。")
+                else:
+                    st.info("尚未同時達到五種環境的最低樣本門檻；系統會繼續回補，不提前調整權重。")
 
             st.markdown("##### KG 歷史回測結果")
             if historical_kg_backtest.empty:

@@ -25,6 +25,12 @@ GDELT_DOC_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss/search"
 HISTORICAL_SOURCE_START = pd.Timestamp("2006-01-01", tz="UTC")
 QUERY = '(NASDAQ OR "stock market" OR "Federal Reserve" OR inflation OR earnings OR tariff OR semiconductor)'
+OFFICIAL_QUERY = (
+    '(site:sec.gov OR site:federalreserve.gov OR site:bls.gov OR site:bea.gov '
+    'OR site:apple.com OR site:microsoft.com OR site:nvidia.com OR site:amd.com '
+    'OR site:tesla.com OR site:amazon.com OR site:abc.xyz OR site:meta.com) '
+    '(earnings OR filing OR guidance OR inflation OR employment OR rate OR policy OR investor)'
+)
 DIRECT_MARKET_TERMS = {
     "nasdaq", "stock market", "wall street", "fed", "federal reserve", "earnings", "guidance",
     "semiconductor", "chip", "technology stocks",
@@ -32,6 +38,10 @@ DIRECT_MARKET_TERMS = {
 }
 CONTEXTUAL_MACRO_TERMS = {"inflation", "cpi", "pce", "tariff", "trade", "interest rate", "recession"}
 US_MARKET_CONTEXT_TERMS = {"u.s.", " us ", "united states", "america", "market", "technology", "fed", "wall street"}
+OFFICIAL_DOMAIN_SUFFIXES = (
+    "sec.gov", "federalreserve.gov", "bls.gov", "bea.gov", "whitehouse.gov", "commerce.gov",
+    "apple.com", "microsoft.com", "nvidia.com", "amd.com", "tesla.com", "amazon.com", "abc.xyz", "meta.com",
+)
 
 
 def load_historical_event_evidence(path: Path | None = None) -> pd.DataFrame:
@@ -104,6 +114,7 @@ def backfill_historical_event_evidence(
         combined = pd.concat([existing, additions], ignore_index=True)
     if not combined.empty:
         combined = combined.drop_duplicates(["sample_id", "article_url"], keep="last")
+        combined = combined.drop_duplicates(["sample_id", "title_hash", "source_domain"], keep="last")
         combined = combined.sort_values(["prediction_date", "published_at", "source_domain"]).reset_index(drop=True)
 
     status = {
@@ -154,17 +165,26 @@ def save_historical_event_artifacts(evidence: pd.DataFrame, status: dict) -> Non
 
 
 def _fetch_historical_window(prediction_date: pd.Timestamp, timeout: int) -> list[dict]:
-    articles = _fetch_google_news_window(prediction_date, timeout=timeout)
+    # Search official releases first, then supplement them with broad independent
+    # reporting. The publication cutoff is still enforced during normalization.
+    official = _fetch_google_news_window(prediction_date, timeout=timeout, query_text=OFFICIAL_QUERY)
+    broad = _fetch_google_news_window(prediction_date, timeout=timeout, query_text=QUERY)
+    articles = official + broad
     if articles:
-        return articles
+        unique: dict[str, dict] = {}
+        for article in articles:
+            key = str(article.get("url") or article.get("title") or "")
+            if key:
+                unique[key] = article
+        return list(unique.values())
     return _fetch_gdelt_window(prediction_date, timeout=timeout)
 
 
-def _fetch_google_news_window(prediction_date: pd.Timestamp, timeout: int) -> list[dict]:
+def _fetch_google_news_window(prediction_date: pd.Timestamp, timeout: int, query_text: str = QUERY) -> list[dict]:
     end_date = prediction_date.tz_convert("UTC").normalize()
     start_date = end_date - pd.Timedelta(days=3)
     before_date = end_date + pd.Timedelta(days=1)
-    query = f'{QUERY} after:{start_date:%Y-%m-%d} before:{before_date:%Y-%m-%d}'
+    query = f'{query_text} after:{start_date:%Y-%m-%d} before:{before_date:%Y-%m-%d}'
     url = f"{GOOGLE_NEWS_RSS_URL}?q={quote(query)}&hl=en-US&gl=US&ceid=US:en"
     response = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0 tech-market-monitor-research"})
     response.raise_for_status()
@@ -220,7 +240,9 @@ def _normalize_articles(sample_id: str, prediction_date: pd.Timestamp, articles:
         url = str(article.get("url") or "").strip()
         domain = str(article.get("domain") or _domain(url)).lower().removeprefix("www.")
         published = pd.to_datetime(article.get("seendate"), errors="coerce", utc=True)
-        if not title or not url or pd.isna(published) or published > cutoff or not _market_relevant(title):
+        if not title or not url or pd.isna(published) or published > cutoff:
+            continue
+        if not _market_relevant(title) and not _is_official_domain(domain):
             continue
         event_type = _event_type(title)
         rows.append(
@@ -350,6 +372,11 @@ def _normalize_title(title: str) -> str:
 
 def _domain(url: str) -> str:
     return urlparse(url).netloc
+
+
+def _is_official_domain(domain: str) -> bool:
+    value = str(domain).lower().removeprefix("www.")
+    return any(value == suffix or value.endswith(f".{suffix}") for suffix in OFFICIAL_DOMAIN_SUFFIXES)
 
 
 def _empty_evidence() -> pd.DataFrame:

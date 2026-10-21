@@ -11,6 +11,8 @@ RELIABLE_DOMAINS = {
     "reuters.com": 0.95,
     "sec.gov": 0.98,
     "federalreserve.gov": 0.98,
+    "bls.gov": 0.98,
+    "bea.gov": 0.98,
     "fomc": 0.98,
     "stlouisfed.org": 0.96,
     "whitehouse.gov": 0.95,

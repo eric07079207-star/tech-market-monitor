@@ -41,6 +41,7 @@ EXPORTS = [
     ExportItem("backtest/historical_event_evidence.parquet", "07_預測驗證", "歷史事件原始證據", "依樣本日期取得的歷史新聞證據，保留出版時間、網址與出版者網域。"),
     ExportItem("backtest/historical_event_backfill_status.json", "07_預測驗證", "歷史事件回補進度", "歷史新聞資料源涵蓋範圍、已掃描樣本與失敗紀錄。"),
     ExportItem("backtest/historical_kg_backtest.parquet", "07_預測驗證", "KG歷史回測結果", "僅使用具多來源事件與 point-in-time 基本面的合格樣本。"),
+    ExportItem("backtest/historical_kg_quality_report.json", "07_預測驗證", "KG回補品質報告", "五種市場環境完成率、來源品質、缺口與資料洩漏檢查。"),
     ExportItem("fundamentals/sec_fundamental_observations.parquet", "02_總經與市場壓力", "SEC基本面觀測", "以 SEC filing date 保存的公司基本面原始觀測，供 point-in-time 歷史研究使用。"),
     ExportItem("ai_summary.json", "08_AI摘要", "AI市場摘要", "每日 AI 或規則摘要結果。"),
     ExportItem("ai_summary_history.parquet", "08_AI摘要", "AI摘要歷史", "每日 AI 或規則摘要歷史，用於回看與後續準確率驗證。"),

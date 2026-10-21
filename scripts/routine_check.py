@@ -47,6 +47,7 @@ REMOTE_CORE_CACHE_FILES = [
     "data/cache/backtest/historical_event_evidence.parquet",
     "data/cache/backtest/historical_event_backfill_status.json",
     "data/cache/backtest/historical_kg_backtest.parquet",
+    "data/cache/backtest/historical_kg_quality_report.json",
     "data/cache/fundamentals/sec_fundamental_observations.parquet",
     "data/cache/lstm/lstm_status.json",
     "data/cache/lstm/lstm_train_features.parquet",

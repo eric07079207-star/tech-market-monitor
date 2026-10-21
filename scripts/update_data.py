@@ -28,7 +28,9 @@ from src.kg_backtest import (
     HISTORICAL_KG_BACKTEST_CACHE,
     KG_BACKTEST_READINESS_CACHE,
     build_historical_kg_backtest,
+    build_historical_kg_quality_report,
     build_kg_backtest_readiness,
+    save_historical_kg_quality_report,
 )
 from src.indicators import add_price_indicators, detect_anomalies, latest_snapshot, regime_summary, today_conclusion
 from src.kg import (
@@ -599,7 +601,8 @@ def main() -> None:
         _record(module_records, "kg_historical_backtest_readiness", "回測", "fallback", f"exception: {exc}", False)
 
     try:
-        historical_kg_backtest = build_historical_kg_backtest(historical_samples, load_historical_event_evidence())
+        historical_evidence = load_historical_event_evidence()
+        historical_kg_backtest = build_historical_kg_backtest(historical_samples, historical_evidence)
         _write_frame_module(
             module_records,
             module_name="historical_kg_backtest",
@@ -610,6 +613,7 @@ def main() -> None:
             critical=False,
             latest_columns=["prediction_date", "generated_at_utc"],
         )
+        save_historical_kg_quality_report(build_historical_kg_quality_report(kg_readiness, historical_evidence))
     except Exception as exc:
         _record(module_records, "historical_kg_backtest", "回測", "fallback", f"exception: {exc}", False)
 

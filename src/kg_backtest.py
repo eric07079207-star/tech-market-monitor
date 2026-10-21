@@ -6,6 +6,7 @@ enough point-in-time event evidence for a full knowledge-graph backtest.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -15,6 +16,12 @@ from .config import CACHE_DIR
 
 KG_BACKTEST_READINESS_CACHE = CACHE_DIR / "kg" / "historical_backtest_readiness.parquet"
 HISTORICAL_KG_BACKTEST_CACHE = CACHE_DIR / "backtest" / "historical_kg_backtest.parquet"
+HISTORICAL_KG_QUALITY_CACHE = CACHE_DIR / "backtest" / "historical_kg_quality_report.json"
+REGIME_ORDER = ["高波動／壓力", "明顯下跌趨勢", "強勢反彈／轉折", "橫盤／低波動", "正常／溫和上漲"]
+OFFICIAL_DOMAIN_SUFFIXES = (
+    "sec.gov", "federalreserve.gov", "bls.gov", "bea.gov", "whitehouse.gov", "commerce.gov",
+    "apple.com", "microsoft.com", "nvidia.com", "amd.com", "tesla.com", "amazon.com", "abc.xyz", "meta.com",
+)
 
 
 def build_kg_backtest_readiness(samples: pd.DataFrame) -> pd.DataFrame:
@@ -103,6 +110,108 @@ def kg_backtest_readiness_summary(readiness: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
         .sort_values("樣本數", ascending=False)
     )
+
+
+def build_historical_kg_quality_report(readiness: pd.DataFrame, evidence: pd.DataFrame) -> dict:
+    """Build auditable coverage, source-quality and leakage diagnostics."""
+    ready = readiness.copy() if readiness is not None else pd.DataFrame()
+    news = evidence.copy() if evidence is not None else pd.DataFrame()
+    eligible = ready.get("eligible_for_full_kg_backtest", pd.Series(False, index=ready.index)).fillna(False).astype(bool)
+
+    regime_rows = []
+    for regime in REGIME_ORDER:
+        group = ready[ready.get("regime_bucket", pd.Series("", index=ready.index)).eq(regime)]
+        qualified = int(group.get("eligible_for_full_kg_backtest", pd.Series(False, index=group.index)).fillna(False).sum())
+        regime_rows.append(
+            {
+                "market_regime": regime,
+                "candidate_samples": int(len(group)),
+                "qualified_samples": qualified,
+                "diagnostic_target": 30,
+                "weight_target": 50,
+                "diagnostic_completion_pct": round(min(qualified / 30, 1.0) * 100, 1),
+                "weight_completion_pct": round(min(qualified / 50, 1.0) * 100, 1),
+                "readiness_state": "可評估權重" if qualified >= 50 else "可開始因子診斷" if qualified >= 30 else "資料累積中",
+            }
+        )
+
+    source_count = int(news.get("source_domain", pd.Series(dtype=str)).replace("", pd.NA).nunique(dropna=True))
+    domains = news.get("source_domain", pd.Series("", index=news.index)).fillna("").astype(str).str.lower()
+    official = domains.map(lambda value: any(value == suffix or value.endswith(f".{suffix}") for suffix in OFFICIAL_DOMAIN_SUFFIXES))
+    official_ratio = float(official.mean()) if len(news) else 0.0
+    cluster = pd.DataFrame()
+    if not news.empty and {"sample_id", "event_cluster_key", "source_domain", "title_hash"}.issubset(news.columns):
+        cluster = news.groupby(["sample_id", "event_cluster_key"], dropna=False).agg(
+            source_count=("source_domain", "nunique"), story_count=("title_hash", "nunique")
+        ).reset_index()
+    confirmed = int((cluster["source_count"].ge(2) & cluster["story_count"].ge(2)).sum()) if not cluster.empty else 0
+    confirmation_ratio = confirmed / len(cluster) if len(cluster) else 0.0
+
+    duplicate_rows = 0
+    if not news.empty and {"sample_id", "title_hash", "source_domain"}.issubset(news.columns):
+        duplicate_rows = int(news.duplicated(["sample_id", "title_hash", "source_domain"], keep="first").sum())
+    future_leakage_rows = 0
+    if not news.empty and {"published_at", "prediction_date"}.issubset(news.columns):
+        published = pd.to_datetime(news["published_at"], errors="coerce", utc=True)
+        cutoff = pd.to_datetime(news["prediction_date"], errors="coerce", utc=True) + pd.Timedelta(days=1)
+        future_leakage_rows = int((published >= cutoff).fillna(False).sum())
+    top_source = domains.value_counts().head(1)
+    top_source_domain = str(top_source.index[0]) if not top_source.empty else ""
+    top_source_ratio = float(top_source.iloc[0] / len(news)) if len(news) and not top_source.empty else 0.0
+
+    event_ready = ready.get("event_evidence_ready", pd.Series(False, index=ready.index)).fillna(False).astype(bool)
+    fundamental_ready = ready.get("fundamental_evidence_ready", pd.Series(False, index=ready.index)).fillna(False).astype(bool)
+    reaction_cols = [column for column in ("future_return_1d", "future_return_5d", "future_return_20d") if column in ready]
+    reaction_ready = ready[reaction_cols].notna().all(axis=1) if reaction_cols else pd.Series(False, index=ready.index)
+    missing_reasons = [
+        {"reason": "缺少跨來源新聞", "sample_count": int((~event_ready).sum())},
+        {"reason": "缺少 point-in-time 基本面", "sample_count": int((~fundamental_ready).sum())},
+        {"reason": "缺少後續市場反應", "sample_count": int((~reaction_ready).sum())},
+    ]
+    checks = [
+        {"check": "未來資料洩漏", "status": "正常" if future_leakage_rows == 0 else "異常", "count": future_leakage_rows},
+        {"check": "重複事件列", "status": "正常" if duplicate_rows == 0 else "注意", "count": duplicate_rows},
+        {"check": "單一媒體偏重", "status": "正常" if top_source_ratio <= 0.35 else "注意", "count": round(top_source_ratio * 100, 1)},
+    ]
+    diagnostic_ready = all(row["qualified_samples"] >= 30 for row in regime_rows) and int(eligible.sum()) >= 150
+    weight_ready = all(row["qualified_samples"] >= 50 for row in regime_rows) and int(eligible.sum()) >= 250
+    return {
+        "generated_at_utc": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"),
+        "candidate_samples": int(len(ready)),
+        "qualified_samples": int(eligible.sum()),
+        "regimes": regime_rows,
+        "sources": {
+            "unique_source_count": source_count,
+            "official_article_ratio": round(official_ratio, 4),
+            "confirmed_cluster_count": confirmed,
+            "cross_source_confirmation_ratio": round(confirmation_ratio, 4),
+            "top_source_domain": top_source_domain,
+            "top_source_ratio": round(top_source_ratio, 4),
+        },
+        "missing_reasons": missing_reasons,
+        "quality_checks": checks,
+        "thresholds": {
+            "factor_diagnostic_ready": diagnostic_ready,
+            "weight_evaluation_ready": weight_ready,
+            "current_state": "可評估權重" if weight_ready else "可開始因子診斷" if diagnostic_ready else "資料累積中",
+        },
+    }
+
+
+def save_historical_kg_quality_report(report: dict, path: Path | None = None) -> None:
+    path = path or HISTORICAL_KG_QUALITY_CACHE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_historical_kg_quality_report(path: Path | None = None) -> dict:
+    path = path or HISTORICAL_KG_QUALITY_CACHE
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
 
 
 def load_kg_backtest_readiness(path: Path | None = None) -> pd.DataFrame:
