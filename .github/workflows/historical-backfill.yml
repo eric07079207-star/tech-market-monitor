@@ -47,8 +47,7 @@ jobs:
             data/cache/backtest/historical_kg_backtest.parquet \
             data/cache/backtest/stratified_market_samples.parquet \
             data/cache/kg/historical_backtest_readiness.parquet \
-            data/觀察版資料/07_預測驗證 \
-            data/觀察版資料/09_金融知識圖譜
+            data/觀察版資料
           git diff --cached --quiet && exit 0
           git commit -m "Backfill historical KG evidence"
           for attempt in 1 2 3; do
