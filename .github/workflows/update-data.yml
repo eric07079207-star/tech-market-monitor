@@ -127,7 +127,9 @@ jobs:
 
           git commit -m "Update market data cache"
           for attempt in 1 2 3; do
-            if git pull --rebase origin main && git push origin HEAD:main; then
+            # Reproducible training tables stay uncommitted by design. Autostash
+            # them while rebasing so concurrent cache jobs can still synchronize.
+            if git pull --rebase --autostash origin main && git push origin HEAD:main; then
               exit 0
             fi
             git rebase --abort || true

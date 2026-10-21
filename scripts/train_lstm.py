@@ -117,6 +117,9 @@ def main() -> None:
         fact_events=kg.facts,
         fundamentals=fundamentals,
     )
+    # Specialist runs redirect all artifacts to a nested directory. Ensure the
+    # selected artifact directory exists before writing the first feature file.
+    LSTM_TRAIN_FEATURE_CACHE.parent.mkdir(parents=True, exist_ok=True)
     features.to_parquet(LSTM_TRAIN_FEATURE_CACHE, index=False)
 
     if features.empty:
