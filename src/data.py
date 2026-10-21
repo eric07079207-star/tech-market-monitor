@@ -4,6 +4,7 @@ import json
 import csv
 import io
 import re
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timezone
 from io import StringIO
@@ -35,6 +36,11 @@ BEA_PAGE_SERIES = {
 
 DOL_SERIES = {
     "ICSA": {"label": "US Initial Jobless Claims"},
+}
+
+TREASURY_SERIES = {
+    "DGS2": {"field": "BC_2YEAR", "label": "US 2Y Yield"},
+    "DGS10": {"field": "BC_10YEAR", "label": "US 10Y Yield"},
 }
 
 HTTP_TIMEOUT_SHORT = 8
@@ -217,6 +223,73 @@ def _fetch_fred_csv(series_id: str, start_ts: pd.Timestamp) -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def fetch_treasury_yields(start: date | str | None = None) -> pd.DataFrame:
+    """Read Treasury yields directly and derive the 10Y-2Y curve.
+
+    Only the years needed to refresh the existing cache are requested. Historical
+    observations already present in the cache remain untouched by the merge step.
+    """
+    start_ts = pd.to_datetime(start or default_start_date())
+    current_year = pd.Timestamp.now(tz="UTC").year
+    first_year = max(start_ts.year, current_year - 1)
+    records: list[dict] = []
+    namespaces = {
+        "atom": "http://www.w3.org/2005/Atom",
+        "m": "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata",
+        "d": "http://schemas.microsoft.com/ado/2007/08/dataservices",
+    }
+
+    for year in range(first_year, current_year + 1):
+        url = (
+            "https://home.treasury.gov/resource-center/data-chart-center/"
+            f"interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value={year}"
+        )
+        try:
+            response = HTTP.get(url, timeout=HTTP_TIMEOUT_MEDIUM)
+            response.raise_for_status()
+            root = ET.fromstring(response.content)
+        except Exception:
+            continue
+
+        for properties in root.findall(".//m:properties", namespaces):
+            date_node = properties.find("d:NEW_DATE", namespaces)
+            observed = pd.to_datetime(date_node.text if date_node is not None else None, errors="coerce")
+            if pd.isna(observed) or observed < start_ts:
+                continue
+            values: dict[str, float] = {}
+            for series_id, meta in TREASURY_SERIES.items():
+                node = properties.find(f"d:{meta['field']}", namespaces)
+                value = pd.to_numeric(node.text if node is not None else None, errors="coerce")
+                if pd.notna(value):
+                    values[series_id] = float(value)
+                    records.append(
+                        {
+                            "date": observed,
+                            "series": series_id,
+                            "label": meta["label"],
+                            "value": float(value),
+                            "source": "US Treasury",
+                            "provider_series": meta["field"],
+                        }
+                    )
+            if {"DGS2", "DGS10"}.issubset(values):
+                records.append(
+                    {
+                        "date": observed,
+                        "series": "T10Y2Y",
+                        "label": "10Y-2Y Curve",
+                        "value": values["DGS10"] - values["DGS2"],
+                        "source": "US Treasury",
+                        "provider_series": "BC_10YEAR-BC_2YEAR",
+                    }
+                )
+
+    columns = ["date", "series", "label", "value", "source", "provider_series"]
+    if not records:
+        return pd.DataFrame(columns=columns)
+    return pd.DataFrame(records, columns=columns).sort_values(["series", "date"])
+
+
 def fetch_bls_series(start: date | str | None = None) -> pd.DataFrame:
     start_ts = pd.to_datetime(start or default_start_date())
     start_year = int(start_ts.year)
@@ -353,6 +426,7 @@ def fetch_macro_series(start: date | str | None = None, previous: pd.DataFrame |
 
     frames = [
         fetch_fred_series(start=start, series_map=fred_only_map),
+        fetch_treasury_yields(start=start),
         fetch_bls_series(start=start),
         fetch_bea_pce_series(start=start),
         fetch_dol_initial_claims_series(start=start),

@@ -251,13 +251,14 @@ def main() -> None:
             critical=True,
             latest_columns=["date"],
         )
-        required_macro = set(FRED_SERIES) | {"PCEPI", "ICSA"}
+        required_macro = {"DGS10", "DGS2", "T10Y2Y", "CPIAUCSL", "UNRATE", "PAYEMS", "PCEPI", "ICSA"}
+        optional_macro = {"BAMLH0A0HYM2", "BAMLC0A0CM", "NFCI"}
         available_macro = set(fresh_macro.get("series", pd.Series(dtype=str)).dropna().astype(str))
         missing_macro = sorted(required_macro - available_macro)
         latest_by_series = fresh_macro.assign(date=pd.to_datetime(fresh_macro.get("date"), errors="coerce", utc=True)).groupby("series")["date"].max() if not fresh_macro.empty else pd.Series(dtype="datetime64[ns, UTC]")
         now = pd.Timestamp.now(tz="UTC")
         max_age_days = {series: 10 for series in required_macro}
-        max_age_days.update({"NFCI": 21, "CPIAUCSL": 70, "UNRATE": 70, "PAYEMS": 70, "PCEPI": 100, "ICSA": 21})
+        max_age_days.update({"CPIAUCSL": 70, "UNRATE": 70, "PAYEMS": 70, "PCEPI": 100, "ICSA": 21})
         stale_macro = sorted(series for series in required_macro if series in latest_by_series and (now - latest_by_series[series]).days > max_age_days[series])
         if missing_macro or stale_macro:
             detail = []
@@ -267,6 +268,10 @@ def main() -> None:
                 detail.append(f"stale required series: {', '.join(stale_macro)}")
             _record(module_records, "market_macro", "主資料", "failed", "; ".join(detail), True)
         else:
+            stale_optional = sorted(
+                series for series in optional_macro
+                if series in latest_by_series and (now - latest_by_series[series]).days > (21 if series == "NFCI" else 10)
+            )
             _write_frame_module(
                 module_records,
                 module_name="market_macro",
@@ -277,6 +282,15 @@ def main() -> None:
                 critical=True,
                 latest_columns=["date"],
             )
+            if stale_optional:
+                _record(
+                    module_records,
+                    "market_macro_optional",
+                    "主資料",
+                    "warning",
+                    "optional licensed series retained but stale: " + ", ".join(stale_optional),
+                    False,
+                )
 
     prices, macro = _current_market()
 
