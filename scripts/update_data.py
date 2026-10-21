@@ -10,7 +10,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.config import NEWS_QUERIES, default_start_date
+from src.config import FRED_SERIES, NEWS_QUERIES, default_start_date
 from src.data import fetch_macro_series, fetch_price_history, load_cached_market_data
 from src.discovery import (
     build_discovery_candidates,
@@ -251,16 +251,32 @@ def main() -> None:
             critical=True,
             latest_columns=["date"],
         )
-        _write_frame_module(
-            module_records,
-            module_name="market_macro",
-            category="主資料",
-            filename="macro.parquet",
-            frame=fresh_macro,
-            validation=FrameValidation(required_columns=("date", "series", "value"), latest_column="date", min_rows=10, min_fraction_of_previous=0.2),
-            critical=True,
-            latest_columns=["date"],
-        )
+        required_macro = set(FRED_SERIES) | {"PCEPI", "ICSA"}
+        available_macro = set(fresh_macro.get("series", pd.Series(dtype=str)).dropna().astype(str))
+        missing_macro = sorted(required_macro - available_macro)
+        latest_by_series = fresh_macro.assign(date=pd.to_datetime(fresh_macro.get("date"), errors="coerce", utc=True)).groupby("series")["date"].max() if not fresh_macro.empty else pd.Series(dtype="datetime64[ns, UTC]")
+        now = pd.Timestamp.now(tz="UTC")
+        max_age_days = {series: 10 for series in required_macro}
+        max_age_days.update({"NFCI": 21, "CPIAUCSL": 70, "UNRATE": 70, "PAYEMS": 70, "PCEPI": 100, "ICSA": 21})
+        stale_macro = sorted(series for series in required_macro if series in latest_by_series and (now - latest_by_series[series]).days > max_age_days[series])
+        if missing_macro or stale_macro:
+            detail = []
+            if missing_macro:
+                detail.append(f"missing required series: {', '.join(missing_macro)}")
+            if stale_macro:
+                detail.append(f"stale required series: {', '.join(stale_macro)}")
+            _record(module_records, "market_macro", "主資料", "failed", "; ".join(detail), True)
+        else:
+            _write_frame_module(
+                module_records,
+                module_name="market_macro",
+                category="主資料",
+                filename="macro.parquet",
+                frame=fresh_macro,
+                validation=FrameValidation(required_columns=("date", "series", "value"), latest_column="date", min_rows=10, min_fraction_of_previous=0.2),
+                critical=True,
+                latest_columns=["date"],
+            )
 
     prices, macro = _current_market()
 

@@ -4,6 +4,7 @@ import json
 import csv
 import io
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timezone
 from io import StringIO
 from pathlib import Path
@@ -171,15 +172,18 @@ def fetch_fred_series(
     start_ts = pd.to_datetime(start or default_start_date())
     series_map = series_map or FRED_SERIES
     frames = []
-    for series_id, label in series_map.items():
-        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
-        try:
-            response = HTTP.get(url, timeout=HTTP_TIMEOUT_SHORT)
-            response.raise_for_status()
-            data = pd.read_csv(StringIO(response.text))
-        except Exception:
-            continue
+    with ThreadPoolExecutor(max_workers=min(6, max(len(series_map), 1))) as executor:
+        futures = {executor.submit(_fetch_fred_csv, series_id, start_ts): (series_id, label) for series_id, label in series_map.items()}
+        results = []
+        for future in as_completed(futures):
+            series_id, label = futures[future]
+            try:
+                data = future.result()
+            except Exception:
+                continue
+            results.append((series_id, label, data))
 
+    for series_id, label, data in results:
         if data.empty:
             continue
         data = data.rename(columns={"observation_date": "date", series_id: "value"})
@@ -195,6 +199,22 @@ def fetch_fred_series(
     if not frames:
         return pd.DataFrame(columns=["date", "series", "label", "value", "source", "provider_series"])
     return pd.concat(frames, ignore_index=True).sort_values(["series", "date"])
+
+
+def _fetch_fred_csv(series_id: str, start_ts: pd.Timestamp) -> pd.DataFrame:
+    url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}&cosd={start_ts:%Y-%m-%d}"
+    for attempt in range(2):
+        try:
+            response = requests.get(
+                url,
+                timeout=HTTP_TIMEOUT_MEDIUM,
+                headers={"User-Agent": "Mozilla/5.0 tech-market-monitor", "Connection": "close"},
+            )
+            response.raise_for_status()
+            return pd.read_csv(StringIO(response.text))
+        except Exception:
+            continue
+    return pd.DataFrame()
 
 
 def fetch_bls_series(start: date | str | None = None) -> pd.DataFrame:

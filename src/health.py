@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from .config import FRED_SERIES
 from .data import cache_path
 
 
@@ -32,7 +33,7 @@ def data_health_report(
     rows = [
         _pipeline_row(metadata),
         _row("市場價格", "主資料", "prices.parquet", prices, "date", "價格與量能快取", cache_updated, 36),
-        _row("總經資料", "主資料", "macro.parquet", macro, "date", "FRED 與市場壓力資料", cache_updated, 72),
+        _macro_row(macro, cache_updated),
         _row("標的新聞", "主資料", "news.parquet", news, "published", "watchlist 新聞", cache_updated, 12),
         _row("國際新聞", "主資料", "international_news.parquet", international_news, "published", "國際重大與隨機新聞", cache_updated, 12),
         _row("AI摘要歷史", "摘要", "ai_summary_history.parquet", ai_summary_history, "generated_at_utc", "每日摘要版本與品質紀錄", cache_updated, 72),
@@ -55,6 +56,31 @@ def data_health_report(
     if "最近抓取 UTC" in report.columns:
         report["最新掃描 UTC"] = report["最近抓取 UTC"]
     return report
+
+
+def _macro_row(macro: pd.DataFrame | None, cache_updated: str) -> dict:
+    row = _row("總經資料", "主資料", "macro.parquet", macro, "date", "官方總經、利率、信用利差與市場壓力資料", cache_updated, 72)
+    required = set(FRED_SERIES) | {"PCEPI", "ICSA"}
+    available = set() if macro is None or macro.empty or "series" not in macro else set(macro["series"].dropna().astype(str))
+    missing = sorted(required - available)
+    latest_by_series = pd.Series(dtype="datetime64[ns, UTC]")
+    if macro is not None and not macro.empty and {"series", "date"}.issubset(macro.columns):
+        latest_by_series = macro.assign(date=pd.to_datetime(macro["date"], errors="coerce", utc=True)).groupby("series")["date"].max()
+    max_age_days = {series: 10 for series in required}
+    max_age_days.update({"NFCI": 21, "CPIAUCSL": 70, "UNRATE": 70, "PAYEMS": 70, "PCEPI": 100, "ICSA": 21})
+    now = pd.Timestamp.now(tz="UTC")
+    stale = sorted(series for series in required if series in latest_by_series and (now - latest_by_series[series]).days > max_age_days[series])
+    if missing or stale:
+        row["狀態"] = "🔴 異常"
+        details = []
+        if missing:
+            details.append(f"缺少必要系列：{', '.join(missing)}")
+        if stale:
+            details.append(f"必要系列過期：{', '.join(stale)}")
+        row["說明"] = "；".join(details) + "；檔案非空也不得判定正常"
+    else:
+        row["說明"] += f"；必要系列 {len(required)}/{len(required)} 完整"
+    return row
 
 
 def missing_price_symbols(prices: pd.DataFrame, symbols: list[str]) -> list[str]:
