@@ -3,7 +3,7 @@
   "mode": "train",
   "status": "已訓練完成，驗證準確率 47.03%，測試準確率 43.31%",
   "model_version": "lstm-regime-v2",
-  "feature_version": "lstm-regime-v2",
+  "feature_version": "lstm-demo-v1",
   "horizon_days": 20,
   "sequence_length": 60,
   "last_train_at_utc": "2026-10-23T01:18:19+00:00",
@@ -11,8 +11,8 @@
   "last_backtest_at_utc": "2026-10-23T01:18:15+00:00",
   "prediction_rows": 8,
   "backtest_rows": 792,
-  "feature_rows": 5503,
-  "train_feature_rows": 5503,
+  "feature_rows": 247,
+  "train_feature_rows": 247,
   "monitor_feature_rows": 8,
   "train_rows": 3863,
   "valid_rows": 791,
@@ -23,6 +23,6 @@
   "prediction_date": "2026-10-21 00:00:00+00:00",
   "prediction_target_date": "2026-11-18 00:00:00+00:00",
   "prediction_target_date_type": "estimated",
-  "monitor_updated_at_utc": "2026-10-23T01:18:19+00:00",
-  "updated_at_utc": "2026-10-23T01:12:43+00:00"
+  "monitor_updated_at_utc": "2026-10-23T03:35:03+00:00",
+  "updated_at_utc": "2026-10-23T03:35:03+00:00"
 }
