@@ -1,12 +1,12 @@
 {
-  "generated_at_utc": "2026-10-23T21:37:00+00:00",
+  "generated_at_utc": "2026-10-24T01:22:23+00:00",
   "candidate_samples": 500,
-  "qualified_samples": 233,
+  "qualified_samples": 235,
   "regimes": [
     {
       "market_regime": "高波動／壓力",
       "candidate_samples": 100,
-      "qualified_samples": 61,
+      "qualified_samples": 58,
       "diagnostic_target": 30,
       "weight_target": 50,
       "diagnostic_completion_pct": 100.0,
@@ -46,7 +46,7 @@
     {
       "market_regime": "正常／溫和上漲",
       "candidate_samples": 150,
-      "qualified_samples": 63,
+      "qualified_samples": 68,
       "diagnostic_target": 30,
       "weight_target": 50,
       "diagnostic_completion_pct": 100.0,
@@ -56,17 +56,17 @@
   ],
   "sources": {
     "unique_source_count": 746,
-    "official_article_ratio": 0.4155,
-    "official_event_evidence_count": 896,
+    "official_article_ratio": 0.418,
+    "official_event_evidence_count": 920,
     "confirmed_cluster_count": 377,
-    "cross_source_confirmation_ratio": 0.244,
+    "cross_source_confirmation_ratio": 0.234,
     "top_source_domain": "sec.gov",
-    "top_source_ratio": 0.1865
+    "top_source_ratio": 0.1898
   },
   "missing_reasons": [
     {
       "reason": "缺少跨來源新聞或官方事件",
-      "sample_count": 170
+      "sample_count": 167
     },
     {
       "reason": "缺少後續市場反應",
@@ -74,7 +74,7 @@
     },
     {
       "reason": "基本面：早於至少六家公司可同時比較的 SEC XBRL 起點 2012-07-31，不再等待",
-      "sample_count": 142
+      "sample_count": 143
     },
     {
       "reason": "基本面：僅 5/8 家具備營收與營運現金流",
@@ -99,7 +99,7 @@
     {
       "check": "單一媒體偏重",
       "status": "正常",
-      "count": 18.6
+      "count": 19.0
     }
   ],
   "thresholds": {
