@@ -177,12 +177,26 @@ def _abstention_metrics(data: pd.DataFrame, band: float = 0.10) -> dict:
     confident = data[(data["predicted_prob_up"] <= 0.5 - band) | (data["predicted_prob_up"] >= 0.5 + band)]
     if confident.empty:
         return {"band": band, "coverage": 0.0, "rows": 0, "accuracy": None, "state": "不交易／資料不足"}
+    labels = confident["label"].astype(int)
+    predictions = confident["predicted_label"].astype(int)
+    accuracy = float((labels == predictions).mean())
+    majority_label = int(labels.mean() >= 0.5)
+    baseline_accuracy = float((labels == majority_label).mean())
+    edge = accuracy - baseline_accuracy
+    if len(confident) < 30:
+        state = "低信心／資料不足"
+    elif edge <= 0:
+        state = "不交易／未超過基準"
+    else:
+        state = "可交易候選／仍需校準"
     return {
         "band": band,
         "coverage": float(len(confident) / len(data)),
         "rows": int(len(confident)),
-        "accuracy": float((confident["label"].astype(int) == confident["predicted_label"].astype(int)).mean()),
-        "state": "可交易候選" if len(confident) >= 30 else "低信心／資料不足",
+        "accuracy": accuracy,
+        "baseline_accuracy": baseline_accuracy,
+        "accuracy_edge_vs_baseline": edge,
+        "state": state,
     }
 
 

@@ -22,7 +22,7 @@
     "always_long_avg_return": 0.028127772138039648,
     "model_directional_avg_return": -0.021022297791540242,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-10-26T03:27:08+00:00",
+    "evaluated_at_utc": "2026-10-26T07:37:49+00:00",
     "directional_return_edge_vs_always_long": -0.04915006992957989,
     "probability_calibration": [
       {
@@ -46,7 +46,9 @@
       "coverage": 0.049937578027465665,
       "rows": 40,
       "accuracy": 0.425,
-      "state": "可交易候選"
+      "baseline_accuracy": 0.575,
+      "accuracy_edge_vs_baseline": -0.14999999999999997,
+      "state": "不交易／未超過基準"
     },
     "by_symbol": [
       {
@@ -141,24 +143,24 @@
         "rows": 112,
         "validated_rows": 92,
         "accuracy": 0.4673913043478261,
-        "avg_return": 0.0056751574533796464
+        "avg_return": 0.005675157453379647
       },
       {
         "horizon": "5D",
         "rows": 112,
         "validated_rows": 107,
         "accuracy": 0.5700934579439252,
-        "avg_return": 0.0013637390940084422
+        "avg_return": 0.0013637390940084435
       },
       {
         "horizon": "60D",
         "rows": 112,
         "validated_rows": 52,
         "accuracy": 0.6153846153846154,
-        "avg_return": 0.017174761392583362
+        "avg_return": 0.01717476139258336
       }
     ],
-    "evaluated_at_utc": "2026-10-26T03:27:08+00:00"
+    "evaluated_at_utc": "2026-10-26T07:37:49+00:00"
   },
   "leakage_audit": {
     "status": "可用",

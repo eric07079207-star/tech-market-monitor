@@ -1374,8 +1374,9 @@ with tab_prediction:
         abstention = evaluation.get("abstention", {})
         if abstention:
             st.caption(
-                f"低信心／不交易區間：上漲機率落在 40%–60% 時不下方向；目前可交易覆蓋率 {pct(abstention.get('coverage'))}，"
-                f"覆蓋樣本 {abstention.get('rows', 0)}，準確率 {pct(abstention.get('accuracy'))}。"
+                f"低信心／不交易區間：上漲機率落在 40%–60% 時不下方向；目前門檻外覆蓋率 {pct(abstention.get('coverage'))}，"
+                f"覆蓋樣本 {abstention.get('rows', 0)}，準確率 {pct(abstention.get('accuracy'))}，"
+                f"區間基準 {pct(abstention.get('baseline_accuracy'))}；狀態：{abstention.get('state', '資料不足')}。"
             )
         by_symbol = pd.DataFrame(evaluation.get("by_symbol", []))
         if not by_symbol.empty:
