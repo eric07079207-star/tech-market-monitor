@@ -3,133 +3,133 @@
     "status": "可用",
     "rows": 801,
     "positive_rate": 0.5543071161048689,
-    "predicted_positive_rate": 0.20224719101123595,
-    "accuracy": 0.4581772784019975,
+    "predicted_positive_rate": 0.02122347066167291,
+    "accuracy": 0.4544319600499376,
     "baseline_accuracy": 0.5543071161048689,
-    "accuracy_edge_vs_baseline": -0.09612983770287142,
+    "accuracy_edge_vs_baseline": -0.09987515605493136,
     "always_long_accuracy": 0.5543071161048689,
-    "accuracy_edge_vs_always_long": -0.09612983770287142,
+    "accuracy_edge_vs_always_long": -0.09987515605493136,
     "walk_forward_majority_accuracy": 0.5531370038412292,
-    "balanced_accuracy": 0.4904042698160345,
-    "precision_up": 0.5308641975308642,
-    "recall_up": 0.19369369369369369,
-    "f1_up": 0.2838283828382838,
-    "brier_score": 0.2562653407011244,
-    "avg_future_return": 0.028127772138039648,
+    "balanced_accuracy": 0.5065107123930653,
+    "precision_up": 0.7058823529411765,
+    "recall_up": 0.02702702702702703,
+    "f1_up": 0.052060737527114966,
+    "brier_score": 0.2835335442331988,
+    "avg_future_return": 0.02812777246720885,
     "median_future_return": 0.014940404282289821,
     "worst_future_return": -0.33335214848834227,
     "best_future_return": 0.757517527237539,
-    "always_long_avg_return": 0.028127772138039648,
-    "model_directional_avg_return": -0.021022297791540242,
+    "always_long_avg_return": 0.02812777246720885,
+    "model_directional_avg_return": -0.025887343107098466,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-10-26T07:37:49+00:00",
-    "directional_return_edge_vs_always_long": -0.04915006992957989,
+    "evaluated_at_utc": "2026-10-26T09:02:05+00:00",
+    "directional_return_edge_vs_always_long": -0.05401511557430731,
     "probability_calibration": [
       {
         "bucket": "0-40%",
-        "rows": 40,
-        "actual_up_rate": 0.575
+        "rows": 634,
+        "actual_up_rate": 0.5315457413249212
       },
       {
         "bucket": "40-50%",
-        "rows": 599,
-        "actual_up_rate": 0.5592654424040067
+        "rows": 150,
+        "actual_up_rate": 0.6333333333333333
       },
       {
         "bucket": "50-60%",
-        "rows": 162,
-        "actual_up_rate": 0.5308641975308642
+        "rows": 17,
+        "actual_up_rate": 0.7058823529411765
       }
     ],
     "abstention": {
       "band": 0.1,
-      "coverage": 0.049937578027465665,
-      "rows": 40,
-      "accuracy": 0.425,
-      "baseline_accuracy": 0.575,
-      "accuracy_edge_vs_baseline": -0.14999999999999997,
+      "coverage": 0.7915106117353309,
+      "rows": 634,
+      "accuracy": 0.46845425867507884,
+      "baseline_accuracy": 0.5315457413249212,
+      "accuracy_edge_vs_baseline": -0.06309148264984232,
       "state": "不交易／未超過基準"
     },
     "by_symbol": [
       {
         "symbol": "AAPL",
         "rows": 100,
-        "accuracy": 0.45,
-        "balanced_accuracy": 0.44745691467002946,
-        "avg_future_return": 0.018781261361506298,
-        "model_directional_avg_return": -0.006190926703891974,
-        "max_drawdown_proxy": -0.20230346332754556
+        "accuracy": 0.43,
+        "balanced_accuracy": 0.5189155107187894,
+        "avg_future_return": 0.01878126299940185,
+        "model_directional_avg_return": -0.007982323810451726,
+        "max_drawdown_proxy": -0.20230351716414274
       },
       {
         "symbol": "AMD",
         "rows": 100,
-        "accuracy": 0.53,
-        "balanced_accuracy": 0.5112179487179487,
+        "accuracy": 0.52,
+        "balanced_accuracy": 0.5,
         "avg_future_return": 0.07149640328562924,
-        "model_directional_avg_return": -0.0663583623514275,
+        "model_directional_avg_return": -0.07149640328562924,
         "max_drawdown_proxy": -0.24291431127319463
       },
       {
         "symbol": "AMZN",
         "rows": 100,
-        "accuracy": 0.42,
-        "balanced_accuracy": 0.4967159277504105,
+        "accuracy": 0.43,
+        "balanced_accuracy": 0.5020525451559934,
         "avg_future_return": 0.01627108851469383,
-        "model_directional_avg_return": -0.016269603418891773,
+        "model_directional_avg_return": -0.013343993725190264,
         "max_drawdown_proxy": -0.16537912755446027
       },
       {
         "symbol": "GOOGL",
         "rows": 100,
-        "accuracy": 0.42,
-        "balanced_accuracy": 0.46604414261460103,
-        "avg_future_return": 0.03450842282489397,
-        "model_directional_avg_return": -0.009620850403619822,
-        "max_drawdown_proxy": -0.18140374866204112
+        "accuracy": 0.38,
+        "balanced_accuracy": 0.5,
+        "avg_future_return": 0.034508423563426954,
+        "model_directional_avg_return": -0.034508423563426954,
+        "max_drawdown_proxy": -0.18140388547434194
       },
       {
         "symbol": "META",
         "rows": 100,
         "accuracy": 0.49,
         "balanced_accuracy": 0.5,
-        "avg_future_return": 0.014907196466960294,
-        "model_directional_avg_return": -0.014907196466960294,
-        "max_drawdown_proxy": -0.19159738535197324
+        "avg_future_return": 0.01490720002895745,
+        "model_directional_avg_return": -0.01490720002895745,
+        "max_drawdown_proxy": -0.19159722511964616
       },
       {
         "symbol": "MSFT",
         "rows": 100,
-        "accuracy": 0.44,
-        "balanced_accuracy": 0.44310897435897434,
-        "avg_future_return": 0.013470520854466666,
-        "model_directional_avg_return": -0.013721696321447324,
-        "max_drawdown_proxy": -0.17298521565652936
+        "accuracy": 0.52,
+        "balanced_accuracy": 0.5,
+        "avg_future_return": 0.013470522801613887,
+        "model_directional_avg_return": -0.013470522801613887,
+        "max_drawdown_proxy": -0.1729852815674352
       },
       {
         "symbol": "NVDA",
         "rows": 100,
-        "accuracy": 0.45,
-        "balanced_accuracy": 0.5411840411840412,
-        "avg_future_return": 0.02715524250724877,
-        "model_directional_avg_return": -0.010745932024784808,
+        "accuracy": 0.39,
+        "balanced_accuracy": 0.5158730158730158,
+        "avg_future_return": 0.027155237258321186,
+        "model_directional_avg_return": -0.022935432062290748,
         "max_drawdown_proxy": -0.18548724849465337
       },
       {
         "symbol": "TSLA",
         "rows": 101,
-        "accuracy": 0.46534653465346537,
-        "balanced_accuracy": 0.4886006289308176,
+        "accuracy": 0.4752475247524752,
+        "balanced_accuracy": 0.5,
         "avg_future_return": 0.028429028723067764,
-        "model_directional_avg_return": -0.030271324375459218,
+        "model_directional_avg_return": -0.028429028723067764,
         "max_drawdown_proxy": -0.33335214848834227
       }
     ],
     "qqq_direction_comparison": {
       "status": "可用",
       "rows": 801,
-      "model_matches_qqq_direction": 0.4044943820224719,
+      "model_matches_qqq_direction": 0.3682896379525593,
       "qqq_always_long_accuracy": 0.6379525593008739,
-      "model_edge_vs_qqq_long": -0.233458177278402
+      "model_edge_vs_qqq_long": -0.2696629213483146
     },
     "model_beats_majority_baseline": false,
     "confidence_warning": "未超過多數類別基準"
@@ -143,24 +143,24 @@
         "rows": 112,
         "validated_rows": 92,
         "accuracy": 0.4673913043478261,
-        "avg_return": 0.005675157453379647
+        "avg_return": 0.0056751574533796464
       },
       {
         "horizon": "5D",
         "rows": 112,
         "validated_rows": 107,
         "accuracy": 0.5700934579439252,
-        "avg_return": 0.0013637390940084435
+        "avg_return": 0.0013637390940084422
       },
       {
         "horizon": "60D",
         "rows": 112,
         "validated_rows": 52,
         "accuracy": 0.6153846153846154,
-        "avg_return": 0.01717476139258336
+        "avg_return": 0.017174761392583362
       }
     ],
-    "evaluated_at_utc": "2026-10-26T07:37:49+00:00"
+    "evaluated_at_utc": "2026-10-26T09:02:05+00:00"
   },
   "leakage_audit": {
     "status": "可用",
