@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import csv
 import io
+import os
 import re
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -198,7 +199,7 @@ def fetch_fred_series(
         data = data[data["date"] >= start_ts].dropna(subset=["value"])
         data["series"] = series_id
         data["label"] = label
-        data["source"] = "FRED"
+        data["source"] = str(data.attrs.get("source") or "FRED CSV fallback")
         data["provider_series"] = series_id
         frames.append(data[["date", "series", "label", "value", "source", "provider_series"]])
 
@@ -208,6 +209,12 @@ def fetch_fred_series(
 
 
 def _fetch_fred_csv(series_id: str, start_ts: pd.Timestamp) -> pd.DataFrame:
+    api_key = os.getenv("FRED_API_KEY", "").strip()
+    if api_key:
+        api_data = _fetch_fred_api(series_id, start_ts, api_key)
+        if not api_data.empty:
+            return api_data
+
     url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}&cosd={start_ts:%Y-%m-%d}"
     for attempt in range(2):
         try:
@@ -217,10 +224,37 @@ def _fetch_fred_csv(series_id: str, start_ts: pd.Timestamp) -> pd.DataFrame:
                 headers={"User-Agent": "Mozilla/5.0 tech-market-monitor", "Connection": "close"},
             )
             response.raise_for_status()
-            return pd.read_csv(StringIO(response.text))
+            data = pd.read_csv(StringIO(response.text))
+            data.attrs["source"] = "FRED CSV fallback"
+            return data
         except Exception:
             continue
     return pd.DataFrame()
+
+
+def _fetch_fred_api(series_id: str, start_ts: pd.Timestamp, api_key: str) -> pd.DataFrame:
+    url = "https://api.stlouisfed.org/fred/series/observations"
+    params = {
+        "series_id": series_id,
+        "api_key": api_key,
+        "file_type": "json",
+        "observation_start": start_ts.strftime("%Y-%m-%d"),
+        "sort_order": "asc",
+    }
+    try:
+        response = HTTP.get(url, params=params, timeout=HTTP_TIMEOUT_MEDIUM)
+        response.raise_for_status()
+        observations = response.json().get("observations", [])
+    except (requests.RequestException, ValueError, AttributeError):
+        return pd.DataFrame()
+    if not observations:
+        return pd.DataFrame()
+    data = pd.DataFrame(observations)
+    if not {"date", "value"}.issubset(data.columns):
+        return pd.DataFrame()
+    data = data.rename(columns={"date": "observation_date", "value": series_id})
+    data.attrs["source"] = "FRED API"
+    return data[["observation_date", series_id]]
 
 
 def fetch_treasury_yields(start: date | str | None = None) -> pd.DataFrame:

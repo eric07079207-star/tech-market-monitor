@@ -52,6 +52,14 @@ export OPENAI_MODEL="gpt-4.1-mini"
 
 沒有 API key 時，系統會使用規則式摘要。
 
+總經資料更新可另外設定免費的 `FRED_API_KEY`。GitHub Actions 會用它取得
+NFCI 與 ICE 信用利差；若 API 暫時失效，程式會保留既有歷史並回退免金鑰
+來源，不會以代理數值覆蓋原始系列。
+
+```bash
+export FRED_API_KEY="你的 32 字元 FRED API key"
+```
+
 ## 注意
 
 這是研究與監控工具，不是投資建議。歷史相似情境呈現的是條件式統計，不代表未來必然重演。

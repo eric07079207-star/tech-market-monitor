@@ -30,6 +30,10 @@ OPENAI_API_KEY = "你的 key"
 OPENAI_MODEL = "gpt-4.1-mini"
 ```
 
+在 GitHub repository 的 Actions secrets 另加入免費的 `FRED_API_KEY`，供每
+6 小時更新 NFCI、投資級與高收益債信用利差。此金鑰只供 GitHub Actions
+讀取，不應提交到 repository。
+
 6. 部署完成後會得到一個公開或受控分享的網址，例如：
 
 ```text
