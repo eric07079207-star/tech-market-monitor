@@ -131,8 +131,23 @@ jobs:
           for attempt in 1 2 3; do
             # Reproducible training tables stay uncommitted by design. Autostash
             # them while rebasing so concurrent cache jobs can still synchronize.
-            if git pull --rebase --autostash origin main && git push origin HEAD:main; then
-              exit 0
+            if git pull --rebase --autostash origin main; then
+              # A concurrent cache writer may have published a newer LSTM
+              # backtest while this job was running. Rebuild the compact
+              # evaluation after rebasing so the dashboard never combines a
+              # new backtest with stale metrics from the pre-rebase checkout.
+              python scripts/evaluate_prediction_quality.py
+              cp data/cache/lstm/lstm_evaluation.json \
+                data/觀察版資料/10_LSTM模型/lstm/lstm_evaluation.json
+              git add \
+                data/cache/lstm/lstm_evaluation.json \
+                data/觀察版資料/10_LSTM模型/lstm/lstm_evaluation.json
+              if ! git diff --cached --quiet; then
+                git commit --amend --no-edit
+              fi
+              if git push origin HEAD:main; then
+                exit 0
+              fi
             fi
             git rebase --abort || true
             sleep $((attempt * 3))
