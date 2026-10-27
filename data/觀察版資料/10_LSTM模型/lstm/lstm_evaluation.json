@@ -22,7 +22,7 @@
     "always_long_avg_return": 0.028297099243944246,
     "model_directional_avg_return": -0.02371760698887377,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-10-27T11:41:36+00:00",
+    "evaluated_at_utc": "2026-10-27T17:33:55+00:00",
     "directional_return_edge_vs_always_long": -0.052014706232818016,
     "probability_calibration": [
       {
@@ -193,31 +193,31 @@
   },
   "rule_predictions": {
     "status": "可用",
-    "rows": 339,
+    "rows": 342,
     "by_horizon": [
       {
         "horizon": "20D",
-        "rows": 113,
-        "validated_rows": 93,
-        "accuracy": 0.46236559139784944,
-        "avg_return": 0.005258937485535532
+        "rows": 114,
+        "validated_rows": 94,
+        "accuracy": 0.4574468085106383,
+        "avg_return": 0.004959642349874942
       },
       {
         "horizon": "5D",
-        "rows": 113,
-        "validated_rows": 108,
-        "accuracy": 0.5740740740740741,
-        "avg_return": 0.0012717132645250016
+        "rows": 114,
+        "validated_rows": 109,
+        "accuracy": 0.5779816513761468,
+        "avg_return": 0.0013037678511486994
       },
       {
         "horizon": "60D",
-        "rows": 113,
-        "validated_rows": 53,
-        "accuracy": 0.6226415094339622,
-        "avg_return": 0.0175350138937011
+        "rows": 114,
+        "validated_rows": 54,
+        "accuracy": 0.6296296296296297,
+        "avg_return": 0.017785136018422472
       }
     ],
-    "evaluated_at_utc": "2026-10-27T11:41:36+00:00"
+    "evaluated_at_utc": "2026-10-27T17:33:55+00:00"
   },
   "leakage_audit": {
     "status": "可用",
