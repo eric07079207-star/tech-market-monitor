@@ -61,6 +61,7 @@ def evaluate_lstm_backtest(backtest: pd.DataFrame) -> dict:
     result["probability_calibration"] = _probability_calibration(data)
     result["abstention"] = _abstention_metrics(data)
     result["by_symbol"] = _by_symbol_metrics(data)
+    result["by_regime"] = _by_regime_metrics(data)
     result["qqq_direction_comparison"] = _qqq_direction_comparison(data)
     result["model_beats_majority_baseline"] = bool(result["accuracy_edge_vs_baseline"] > 0)
     result["confidence_warning"] = _confidence_warning(len(data), result["accuracy_edge_vs_baseline"])
@@ -217,6 +218,31 @@ def _by_symbol_metrics(data: pd.DataFrame) -> list[dict]:
             "model_directional_avg_return": float(np.mean(np.where(y_pred == 1, returns, -returns))),
             "max_drawdown_proxy": float(np.min(returns)),
         })
+    return rows
+
+
+def _by_regime_metrics(data: pd.DataFrame) -> list[dict]:
+    if "regime_bucket" not in data:
+        return []
+    rows = []
+    for regime, group in data.groupby("regime_bucket", sort=True, dropna=False):
+        y_true = group["label"].astype(int).to_numpy()
+        y_pred = group["predicted_label"].astype(int).to_numpy()
+        baseline_label = int(y_true.mean() >= 0.5)
+        accuracy = float((y_true == y_pred).mean())
+        baseline_accuracy = float((y_true == baseline_label).mean())
+        rows.append(
+            {
+                "regime": str(regime),
+                "rows": int(len(group)),
+                "actual_up_rate": float(y_true.mean()),
+                "predicted_up_rate": float(y_pred.mean()),
+                "accuracy": accuracy,
+                "balanced_accuracy": _balanced_accuracy(y_true, y_pred),
+                "baseline_accuracy": baseline_accuracy,
+                "edge_vs_baseline": accuracy - baseline_accuracy,
+            }
+        )
     return rows
 
 

@@ -1323,10 +1323,11 @@ with tab_prediction:
         f"完整時間：訓練 {_display_utc(lstm_status.get('last_train_at_utc'))}｜"
         f"預測 {_display_utc(lstm_status.get('last_predict_at_utc'))}"
     )
-    lstm_quality_cols = st.columns(3)
+    lstm_quality_cols = st.columns(4)
     lstm_quality_cols[0].metric("訓練/驗證/測試", f"{lstm_status.get('train_rows', 0)}/{lstm_status.get('valid_rows', 0)}/{lstm_status.get('test_rows', 0)}")
     lstm_quality_cols[1].metric("回測正確率", pct(lstm_status.get("backtest_accuracy")))
     lstm_quality_cols[2].metric("信心等級", str(lstm_status.get("prediction_confidence_level", "低信心")))
+    lstm_quality_cols[3].metric("驗證集校準門檻", f"{float(lstm_status.get('decision_threshold', 0.5)):.2f}")
     if lstm_tsla_specialist:
         st.caption(
             "TSLA 專屬模型："
@@ -1338,18 +1339,22 @@ with tab_prediction:
         st.info("目前沒有即時推論列；下一次模型訓練完成後會產生。")
     else:
         current = lstm_predictions.copy()
-        display_columns = [column for column in ["symbol", "prediction_date", "target_date", "target_date_type", "predicted_prob_up", "prediction_direction", "prediction_type"] if column in current]
+        display_columns = [column for column in ["symbol", "prediction_date", "target_date", "target_date_type", "predicted_prob_up", "decision_threshold", "prediction_direction", "prediction_type"] if column in current]
         st.dataframe(
             current[display_columns].rename(
                 columns={
                     "symbol": "標的", "prediction_date": "預測日", "target_date": "目標日（估計）",
                     "target_date_type": "目標日類型", "predicted_prob_up": "上漲機率",
+                    "decision_threshold": "方向門檻",
                     "prediction_direction": "方向", "prediction_type": "推論類型",
                 }
             ),
             hide_index=True,
             width="stretch",
-            column_config={"上漲機率": st.column_config.NumberColumn(format="%.2%")},
+            column_config={
+                "上漲機率": st.column_config.NumberColumn(format="%.2%"),
+                "方向門檻": st.column_config.NumberColumn(format="%.2f"),
+            },
         )
         st.caption("即時推論不等待未來報酬標籤；目標日是依交易日推估，待期滿後才會進入回測驗證。")
     evaluation = lstm_evaluation.get("lstm", {}) if isinstance(lstm_evaluation, dict) else {}
@@ -1386,6 +1391,29 @@ with tab_prediction:
                 hide_index=True,
                 width="stretch",
                 column_config={"準確率": st.column_config.NumberColumn(format="%.2%"), "平衡準確率": st.column_config.NumberColumn(format="%.2%"), "平均後續報酬": st.column_config.NumberColumn(format="%.2%"), "模型方向報酬": st.column_config.NumberColumn(format="%.2%"), "最差後續報酬": st.column_config.NumberColumn(format="%.2%")},
+            )
+        by_regime = pd.DataFrame(evaluation.get("by_regime", []))
+        if not by_regime.empty:
+            st.caption("市場環境分層評估：確認模型改善不是只來自單一多頭或壓力時期。")
+            st.dataframe(
+                by_regime.rename(
+                    columns={
+                        "regime": "市場環境", "rows": "樣本數", "actual_up_rate": "實際上漲率",
+                        "predicted_up_rate": "預測上漲率", "accuracy": "準確率",
+                        "balanced_accuracy": "平衡準確率", "baseline_accuracy": "環境基準",
+                        "edge_vs_baseline": "相對基準",
+                    }
+                ),
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "實際上漲率": st.column_config.NumberColumn(format="%.2%"),
+                    "預測上漲率": st.column_config.NumberColumn(format="%.2%"),
+                    "準確率": st.column_config.NumberColumn(format="%.2%"),
+                    "平衡準確率": st.column_config.NumberColumn(format="%.2%"),
+                    "環境基準": st.column_config.NumberColumn(format="%.2%"),
+                    "相對基準": st.column_config.NumberColumn(format="%.2%"),
+                },
             )
         qqq_compare = evaluation.get("qqq_direction_comparison", {})
         if qqq_compare.get("status") == "可用":

@@ -45,7 +45,7 @@ except Exception as exc:  # pragma: no cover - surfaced in CI/runtime
     raise RuntimeError("torch is required for LSTM training. Install dependencies first.") from exc
 
 
-MODEL_VERSION = "lstm-regime-v2"
+MODEL_VERSION = "lstm-regime-v3"
 DEFAULT_SYMBOLS = LSTM_SHARED_SYMBOLS
 # GitHub-hosted CPU runners have a bounded job window.  Six epochs preserve
 # more training passes than the previous five-epoch model, while the larger
@@ -58,6 +58,7 @@ LEARNING_RATE = 1e-3
 TRAIN_RATIO = 0.7
 VALID_RATIO = 0.15
 TEST_RATIO = 0.15
+RANDOM_SEED = 42
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,7 @@ class SplitData:
     y_valid: np.ndarray
     x_test: np.ndarray
     y_test: np.ndarray
+    train_regimes: np.ndarray
     test_meta: pd.DataFrame
     split_meta: pd.DataFrame
     feature_mean: pd.Series
@@ -97,6 +99,8 @@ def main() -> None:
     parser.add_argument("--lookback-years", type=int, default=None, help="Optional rolling lookback; normally leave unset to preserve full regimes.")
     parser.add_argument("--sample-step", type=int, default=5, help="Sample every N trading days.")
     args = parser.parse_args()
+    np.random.seed(RANDOM_SEED)
+    torch.manual_seed(RANDOM_SEED)
 
     if not PRICE_CACHE.exists():
         raise RuntimeError("prices.parquet is missing; run scripts/update_data.py first.")
@@ -139,7 +143,18 @@ def main() -> None:
     train_ds = torch.utils.data.TensorDataset(torch.tensor(split_data.x_train, dtype=torch.float32), torch.tensor(split_data.y_train, dtype=torch.float32))
     valid_x = torch.tensor(split_data.x_valid, dtype=torch.float32)
     valid_y = torch.tensor(split_data.y_valid, dtype=torch.float32)
-    train_loader = torch.utils.data.DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
+    regime_counts = pd.Series(split_data.train_regimes).value_counts()
+    regime_weights = np.asarray(
+        [1.0 / max(float(regime_counts.get(regime, 1)), 1.0) for regime in split_data.train_regimes],
+        dtype=np.float64,
+    )
+    regime_weights /= max(regime_weights.mean(), 1e-12)
+    sampler = torch.utils.data.WeightedRandomSampler(
+        weights=torch.tensor(regime_weights, dtype=torch.double),
+        num_samples=len(regime_weights),
+        replacement=True,
+    )
+    train_loader = torch.utils.data.DataLoader(train_ds, batch_size=BATCH_SIZE, sampler=sampler)
 
     best_state = None
     best_valid_loss = np.inf
@@ -179,9 +194,12 @@ def main() -> None:
     model.load_state_dict(best_state["model_state"])
     model.eval()
     with torch.no_grad():
+        valid_logits = model(valid_x)
+        valid_prob = torch.sigmoid(valid_logits).cpu().numpy()
+        decision_threshold, threshold_metrics = _calibrate_threshold(valid_prob, split_data.y_valid)
         test_logits = model(torch.tensor(split_data.x_test, dtype=torch.float32))
         test_prob = torch.sigmoid(test_logits).cpu().numpy()
-        test_pred = (test_prob >= 0.5).astype(int)
+        test_pred = (test_prob >= decision_threshold).astype(int)
         test_acc = float((test_pred == split_data.y_test).mean()) if len(split_data.y_test) else np.nan
 
     LSTM_DIR.mkdir(parents=True, exist_ok=True)
@@ -189,6 +207,7 @@ def main() -> None:
     _save_scaler(split_data, LSTM_SCALER_CACHE)
 
     backtest = _build_backtest_frame(split_data.test_meta, test_prob, test_pred)
+    backtest["decision_threshold"] = float(decision_threshold)
     backtest.to_parquet(LSTM_BACKTEST_CACHE, index=False)
     split_data.split_meta.to_parquet(LSTM_SPLIT_CACHE, index=False)
 
@@ -201,7 +220,13 @@ def main() -> None:
         fundamentals=fundamentals,
     )
     monitor_features.to_parquet(LSTM_MONITOR_FEATURE_CACHE, index=False)
-    latest_predictions = _build_monitor_predictions(model, monitor_features, split_data.feature_mean, split_data.feature_std)
+    latest_predictions = _build_monitor_predictions(
+        model,
+        monitor_features,
+        split_data.feature_mean,
+        split_data.feature_std,
+        decision_threshold,
+    )
     latest_predictions.to_parquet(LSTM_PREDICTIONS_CACHE, index=False)
 
     metadata = {
@@ -213,10 +238,16 @@ def main() -> None:
         "hidden_size": HIDDEN_SIZE,
         "num_layers": NUM_LAYERS,
         "learning_rate": LEARNING_RATE,
+        "random_seed": RANDOM_SEED,
         "symbols": args.symbols,
         "training_start_date": args.start_date,
         "sample_step": args.sample_step,
         "class_balance_positive_weight": negative / positive,
+        "regime_balance_method": "inverse_frequency_weighted_sampler",
+        "train_regime_counts": {str(key): int(value) for key, value in regime_counts.items()},
+        "decision_threshold": float(decision_threshold),
+        "threshold_calibration": threshold_metrics,
+        "threshold_calibration_source": "validation_only",
         "split_method": "time_series_purged_20d",
         "train_ratio": TRAIN_RATIO,
         "valid_ratio": VALID_RATIO,
@@ -226,6 +257,8 @@ def main() -> None:
         "test_rows": int(len(split_data.y_test)),
         "valid_loss": float(best_state["valid_loss"]),
         "valid_acc": float(best_state["valid_acc"]),
+        "calibrated_valid_acc": float(threshold_metrics.get("accuracy", best_state["valid_acc"])),
+        "calibrated_valid_balanced_acc": float(threshold_metrics.get("balanced_accuracy", np.nan)),
         "test_acc": test_acc,
         "trained_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "history": history,
@@ -242,7 +275,10 @@ def main() -> None:
             "horizon_days": LSTM_TARGET_HORIZON_DAYS,
             "sequence_length": LSTM_SEQUENCE_LENGTH,
             "last_train_at_utc": metadata["trained_at_utc"],
-            "status": f"已訓練完成，驗證準確率 {best_state['valid_acc']:.2%}，測試準確率 {test_acc:.2%}",
+            "status": f"已訓練完成，驗證集校準門檻 {decision_threshold:.2f}，測試準確率 {test_acc:.2%}",
+            "decision_threshold": float(decision_threshold),
+            "threshold_calibration_source": "validation_only",
+            "train_regime_counts": {str(key): int(value) for key, value in regime_counts.items()},
             "prediction_rows": int(len(latest_predictions)),
             "backtest_rows": int(len(backtest)),
             "feature_rows": int(len(features)),
@@ -272,6 +308,7 @@ def _prepare_split(features: pd.DataFrame) -> SplitData:
     data["date"] = pd.to_datetime(data["date"], errors="coerce", utc=True)
     data["target_date"] = pd.to_datetime(data["target_date"], errors="coerce", utc=True)
     data = data.dropna(subset=["date", "target_date"]).sort_values(["date", "symbol"]).reset_index(drop=True)
+    data["regime_bucket"] = data["sequence_json"].map(_market_regime_from_sequence)
     unique_dates = np.sort(data["date"].unique())
     train_cutoff = pd.Timestamp(unique_dates[max(int(len(unique_dates) * TRAIN_RATIO) - 1, 0)])
     valid_cutoff = pd.Timestamp(unique_dates[max(int(len(unique_dates) * (TRAIN_RATIO + VALID_RATIO)) - 1, 0)])
@@ -289,7 +326,7 @@ def _prepare_split(features: pd.DataFrame) -> SplitData:
         rows.append(seq)
     sequence_array = np.asarray(rows, dtype=np.float32)
     labels = data["label"].astype(int).to_numpy()
-    meta_columns = [column for column in ["symbol", "date", "target_date", "future_return", "label", "qqq_future_return", "qqq_label", "feature_version", "split"] if column in data]
+    meta_columns = [column for column in ["symbol", "date", "target_date", "future_return", "label", "qqq_future_return", "qqq_label", "regime_bucket", "feature_version", "split"] if column in data]
     meta = data[meta_columns].copy()
     train_mask = data["split"].to_numpy() == "train"
     train_rows = sequence_array[train_mask]
@@ -308,6 +345,7 @@ def _prepare_split(features: pd.DataFrame) -> SplitData:
         y_valid=labels[valid_mask],
         x_test=normalized[test_mask],
         y_test=labels[test_mask],
+        train_regimes=data.loc[train_mask, "regime_bucket"].astype(str).to_numpy(),
         test_meta=meta[test_mask].reset_index(drop=True),
         split_meta=meta.reset_index(drop=True),
         feature_mean=feature_mean,
@@ -345,6 +383,7 @@ def _build_monitor_predictions(
     monitor_features: pd.DataFrame,
     mean: pd.Series,
     std: pd.Series,
+    decision_threshold: float,
 ) -> pd.DataFrame:
     if monitor_features.empty:
         return pd.DataFrame()
@@ -368,13 +407,69 @@ def _build_monitor_predictions(
                 "model_version": MODEL_VERSION,
                 "feature_version": str(latest.feature_version),
                 "predicted_prob_up": float(prob),
-                "predicted_label": int(prob >= 0.5),
-                "prediction_direction": "看漲" if prob >= 0.5 else "看跌",
+                "predicted_label": int(prob >= decision_threshold),
+                "prediction_direction": "看漲" if prob >= decision_threshold else "看跌",
+                "decision_threshold": float(decision_threshold),
                 "created_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "prediction_type": "real_time_inference",
             }
         )
     return pd.DataFrame(latest_rows)
+
+
+def _calibrate_threshold(probabilities: np.ndarray, labels: np.ndarray) -> tuple[float, dict]:
+    probabilities = np.asarray(probabilities, dtype=float)
+    labels = np.asarray(labels, dtype=int)
+    if not len(probabilities) or len(np.unique(labels)) < 2:
+        return 0.5, {"objective": "balanced_accuracy", "status": "insufficient_validation_classes"}
+
+    candidates = np.linspace(0.25, 0.75, 101)
+    rows = []
+    for threshold in candidates:
+        prediction = (probabilities >= threshold).astype(int)
+        recalls = []
+        for label in (0, 1):
+            actual = labels == label
+            recalls.append(float((prediction[actual] == label).mean()) if actual.any() else np.nan)
+        balanced_accuracy = float(np.nanmean(recalls))
+        accuracy = float((prediction == labels).mean())
+        rows.append((balanced_accuracy, accuracy, -abs(float(threshold) - 0.5), float(threshold)))
+    best_balanced, best_accuracy, _, best_threshold = max(rows)
+    return best_threshold, {
+        "objective": "balanced_accuracy",
+        "status": "calibrated",
+        "balanced_accuracy": best_balanced,
+        "accuracy": best_accuracy,
+        "candidate_min": float(candidates.min()),
+        "candidate_max": float(candidates.max()),
+        "candidate_count": int(len(candidates)),
+    }
+
+
+def _market_regime_from_sequence(sequence_json: str) -> str:
+    try:
+        sequence = np.asarray(json.loads(sequence_json), dtype=float)
+        latest = sequence[-1]
+        columns = feature_columns()
+        market_offset = columns.index("market_qqq_ret_5d")
+        qqq_return = float(latest[market_offset])
+        vix_return = float(latest[columns.index("market_vix_ret_5d")])
+        hyg_return = float(latest[columns.index("market_hyg_ret_5d")])
+        breadth = float(latest[columns.index("market_breadth_5d")])
+    except (TypeError, ValueError, IndexError, json.JSONDecodeError):
+        return "資料不足"
+    if not all(np.isfinite(value) for value in [qqq_return, vix_return, hyg_return, breadth]):
+        return "資料不足"
+
+    if qqq_return <= -0.04 or vix_return >= 0.12 or hyg_return <= -0.02:
+        return "高波動／壓力"
+    if qqq_return <= -0.015 or breadth < 0.35:
+        return "明顯下跌趨勢"
+    if qqq_return >= 0.04 and (vix_return < 0 or hyg_return > 0):
+        return "強勢反彈／轉折"
+    if abs(qqq_return) < 0.01 and abs(vix_return) < 0.05:
+        return "橫盤／低波動"
+    return "正常／溫和上漲"
 
 
 def _safe_nanmean(values: np.ndarray, axis=None) -> np.ndarray:
