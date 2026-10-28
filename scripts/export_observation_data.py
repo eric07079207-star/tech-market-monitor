@@ -46,6 +46,8 @@ EXPORTS = [
     ExportItem("official/official_events.parquet", "09_金融知識圖譜", "官方事件層", "SEC 申報與 Fed 公告的可追溯官方事件，保存發布時間、原始連結與修訂狀態。"),
     ExportItem("ai_summary.json", "08_AI摘要", "AI市場摘要", "每日 AI 或規則摘要結果。"),
     ExportItem("ai_summary_history.parquet", "08_AI摘要", "AI摘要歷史", "每日 AI 或規則摘要歷史，用於回看與後續準確率驗證。"),
+    ExportItem("api_usage_ledger.parquet", "08_AI摘要", "OpenAI API使用帳本", "從指定餘額基準後，每次 AI 摘要的 token 與估算成本紀錄。"),
+    ExportItem("api_balance.json", "08_AI摘要", "OpenAI API餘額估算", "依已記錄 token 成本計算的 API 剩餘餘額估算。"),
     ExportItem("kg/fact_events.parquet", "09_金融知識圖譜", "事實層", "客觀事件與來源資料。"),
     ExportItem("kg/narrative_features.parquet", "09_金融知識圖譜", "敘事層", "量化敘事與情緒特徵。"),
     ExportItem("kg/market_reactions.parquet", "09_金融知識圖譜", "反應層", "事件後市場反應與驗證結果。"),

@@ -9,6 +9,23 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 try:
+    from src.api_balance import api_balance_snapshot, load_api_usage_ledger
+except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
+    def load_api_usage_ledger(path=None) -> pd.DataFrame:
+        return pd.DataFrame()
+
+    def api_balance_snapshot(ledger=None, now_utc=None) -> dict:
+        return {
+            "baseline_balance_usd": 8.24,
+            "estimated_remaining_usd": 8.24,
+            "estimated_spend_since_baseline_usd": 0.0,
+            "estimated_spend_7d_usd": 0.0,
+            "usage_requests_since_baseline": 0,
+            "estimated_days_remaining": None,
+            "baseline_at_utc": "",
+            "last_usage_at_utc": "",
+        }
+try:
     from streamlit_autorefresh import st_autorefresh
 except ImportError:  # pragma: no cover - optional local dependency
     st_autorefresh = None
@@ -2285,8 +2302,8 @@ VOO,,,500
 with tab_quant:
     st.subheader("量化數據中心")
     st.caption("集中查核各模組的原始數字與可回測欄位；文字結論、圖表與研究解讀保留在原本功能頁面。")
-    quant_market, quant_analogs, quant_emotion, quant_model, quant_kg, quant_portfolio = st.tabs(
-        ["市場數據", "歷史相似", "情緒數據", "預測數據", "知識圖譜數據", "持倉數據"]
+    quant_market, quant_analogs, quant_emotion, quant_model, quant_kg, quant_portfolio, quant_api = st.tabs(
+        ["市場數據", "歷史相似", "情緒數據", "預測數據", "知識圖譜數據", "持倉數據", "API 餘額"]
     )
 
     with quant_market:
@@ -2488,3 +2505,79 @@ with tab_quant:
         else:
             st.markdown("#### 持倉原始數據")
             st.dataframe(portfolio_view, hide_index=True, width="stretch")
+
+    with quant_api:
+        st.markdown("#### OpenAI API 餘額估算")
+        api_usage_ledger = load_api_usage_ledger()
+        api_balance = api_balance_snapshot(api_usage_ledger)
+        estimated_remaining = float(api_balance.get("estimated_remaining_usd", 0.0) or 0.0)
+        estimated_spend = float(api_balance.get("estimated_spend_since_baseline_usd", 0.0) or 0.0)
+        spend_7d = float(api_balance.get("estimated_spend_7d_usd", 0.0) or 0.0)
+        request_count = int(api_balance.get("usage_requests_since_baseline", 0) or 0)
+        balance_columns = st.columns(4)
+        balance_columns[0].metric("估算剩餘餘額", f"${estimated_remaining:,.2f}")
+        balance_columns[1].metric("基準後累積成本", f"${estimated_spend:,.4f}")
+        balance_columns[2].metric("最近 7 日成本", f"${spend_7d:,.4f}")
+        balance_columns[3].metric("已記錄 API 請求", f"{request_count:,} 次")
+
+        if estimated_remaining <= 1:
+            st.error("估算餘額已低於 $1，建議檢查 OpenAI Billing，避免每日摘要中斷。")
+        elif estimated_remaining <= 3:
+            st.warning("估算餘額已低於 $3，建議安排檢查官方餘額。")
+        else:
+            st.success("估算餘額仍在正常範圍。")
+
+        estimated_days = api_balance.get("estimated_days_remaining")
+        if estimated_days is not None:
+            st.caption(f"依最近 7 日平均用量推估，約可使用 {float(estimated_days):,.0f} 天。")
+        baseline_at = pd.to_datetime(api_balance.get("baseline_at_utc"), errors="coerce", utc=True)
+        baseline_label = baseline_at.tz_convert("Asia/Taipei").strftime("%Y-%m-%d %H:%M") if pd.notna(baseline_at) else "未設定"
+        last_usage_at = pd.to_datetime(api_balance.get("last_usage_at_utc"), errors="coerce", utc=True)
+        last_usage_label = last_usage_at.tz_convert("Asia/Taipei").strftime("%Y-%m-%d %H:%M") if pd.notna(last_usage_at) else "尚無新呼叫"
+        st.caption(
+            f"計算基準：{baseline_label}（台北時間）由你確認餘額為 $8.24；最近一筆 API 用量：{last_usage_label}。"
+        )
+        st.info(
+            "此數字以 OpenAI 回傳的實際 token 用量與設定單價自動估算。它不會讀取你的信用卡或官方帳戶餘額；"
+            "若有再次儲值、退款、額度到期或價格調整，仍需用 OpenAI Billing 金額重新校正基準。"
+        )
+
+        st.markdown("#### 成本計算設定")
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {"項目": "一般輸入", "每 100 萬 token 估算單價": 0.75},
+                    {"項目": "快取輸入", "每 100 萬 token 估算單價": 0.075},
+                    {"項目": "模型輸出", "每 100 萬 token 估算單價": 4.50},
+                ]
+            ),
+            hide_index=True,
+            width="stretch",
+            column_config={"每 100 萬 token 估算單價": st.column_config.NumberColumn(format="$%.3f")},
+        )
+
+        st.markdown("#### API 使用紀錄")
+        if api_usage_ledger.empty:
+            st.info("目前從 $8.24 基準開始記錄；下一次 AI 摘要成功生成後，會自動加入 token 與成本明細。")
+        else:
+            ledger_view = api_usage_ledger.sort_values("generated_at_utc", ascending=False).copy()
+            ledger_view["generated_at_utc"] = pd.to_datetime(ledger_view["generated_at_utc"], errors="coerce", utc=True).dt.tz_convert("Asia/Taipei")
+            ledger_view = ledger_view.rename(
+                columns={
+                    "generated_at_utc": "生成時間",
+                    "model": "模型",
+                    "input_tokens": "輸入 token",
+                    "cached_input_tokens": "快取輸入 token",
+                    "output_tokens": "輸出 token",
+                    "total_tokens": "總 token",
+                    "estimated_cost_usd": "估算成本",
+                    "usage_status": "狀態",
+                }
+            )
+            shown_columns = ["生成時間", "模型", "輸入 token", "快取輸入 token", "輸出 token", "總 token", "估算成本", "狀態"]
+            st.dataframe(
+                ledger_view[[column for column in shown_columns if column in ledger_view]],
+                hide_index=True,
+                width="stretch",
+                column_config={"估算成本": st.column_config.NumberColumn(format="$%.6f")},
+            )

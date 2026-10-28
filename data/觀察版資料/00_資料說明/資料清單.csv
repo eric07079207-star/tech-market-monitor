@@ -20,6 +20,8 @@
 09_金融知識圖譜,官方事件層,data/cache/official/official_events.parquet,SEC 申報與 Fed 公告的可追溯官方事件，保存發布時間、原始連結與修訂狀態。,是,是,是,3852,,2026-10-21T12:28:30.555137+00:00,170.3 KB,data/觀察版資料/09_金融知識圖譜/official/official_events.parquet；data/觀察版資料/09_金融知識圖譜/official_events.csv
 08_AI摘要,AI市場摘要,data/cache/ai_summary.json,每日 AI 或規則摘要結果。,是,是,是,1,2026-10-28T02:07:59+00:00,2026-10-28T02:07:59+00:00,5.8 KB,data/觀察版資料/08_AI摘要/ai_summary.json
 08_AI摘要,AI摘要歷史,data/cache/ai_summary_history.parquet,每日 AI 或規則摘要歷史，用於回看與後續準確率驗證。,是,是,是,147,2026-10-28T02:07:59+00:00,2026-10-28T06:27:41+00:00,251.8 KB,data/觀察版資料/08_AI摘要/ai_summary_history.parquet；data/觀察版資料/08_AI摘要/ai_summary_history.csv
+08_AI摘要,OpenAI API使用帳本,data/cache/api_usage_ledger.parquet,從指定餘額基準後，每次 AI 摘要的 token 與估算成本紀錄。,是,是,是,0,,2026-10-28T06:27:41+00:00,6.6 KB,data/觀察版資料/08_AI摘要/api_usage_ledger.parquet；data/觀察版資料/08_AI摘要/api_usage_ledger.csv
+08_AI摘要,OpenAI API餘額估算,data/cache/api_balance.json,依已記錄 token 成本計算的 API 剩餘餘額估算。,是,是,是,1,,2026-10-28T06:27:41+00:00,504 B,data/觀察版資料/08_AI摘要/api_balance.json
 09_金融知識圖譜,事實層,data/cache/kg/fact_events.parquet,客觀事件與來源資料。,是,是,是,155,,2026-10-28T06:27:41+00:00,88.4 KB,data/觀察版資料/09_金融知識圖譜/kg/fact_events.parquet；data/觀察版資料/09_金融知識圖譜/fact_events.csv
 09_金融知識圖譜,敘事層,data/cache/kg/narrative_features.parquet,量化敘事與情緒特徵。,是,是,是,155,,2026-10-28T06:27:41+00:00,23.4 KB,data/觀察版資料/09_金融知識圖譜/kg/narrative_features.parquet；data/觀察版資料/09_金融知識圖譜/narrative_features.csv
 09_金融知識圖譜,反應層,data/cache/kg/market_reactions.parquet,事件後市場反應與驗證結果。,是,是,是,524,,2026-10-28T06:27:41+00:00,22.0 KB,data/觀察版資料/09_金融知識圖譜/kg/market_reactions.parquet；data/觀察版資料/09_金融知識圖譜/market_reactions.csv
@@ -33,9 +35,9 @@
 11_資料治理,更新模組紀錄,data/cache/update_modules.csv,每個更新模組的 success、fallback 或 failed 狀態與原因。,是,是,是,17763,,2026-10-28T06:27:41+00:00,2.5 MB,data/觀察版資料/11_資料治理/update_modules.csv
 12_市場情緒,市場情緒層,data/cache/sentiment.parquet,VIX、信用利差、相對強弱與新聞情緒的日度特徵。,是,是,是,5037,2026-10-28T00:00:00+00:00,2026-10-28T06:27:41+00:00,319.7 KB,data/觀察版資料/12_市場情緒/sentiment.parquet；data/觀察版資料/12_市場情緒/sentiment.csv
 12_市場情緒,大盤事件窗,data/cache/market_event_windows.parquet,VOO/QQQ 在 20 個交易日內波動超過 10% 的歷史事件樣本。,是,是,是,78,,2026-10-28T06:27:41+00:00,15.4 KB,data/觀察版資料/12_市場情緒/market_event_windows.parquet；data/觀察版資料/12_市場情緒/market_event_windows.csv
-10_LSTM模型,LSTM訓練特徵表,data/cache/lstm/lstm_train_features.parquet,需要未來報酬標籤的 LSTM 訓練與回測序列特徵。,是,是,是,5505,2026-09-28T00:00:00+00:00,2026-10-28T06:27:41+00:00,86.4 MB,data/觀察版資料/10_LSTM模型/lstm/lstm_train_features.parquet；data/觀察版資料/10_LSTM模型/lstm_train_features.csv
-10_LSTM模型,LSTM日常監控特徵表,data/cache/lstm/lstm_monitor_features.parquet,不等待未來報酬標籤的每日即時推論特徵。,是,是,是,8,2026-10-27T00:00:00+00:00,2026-10-28T06:27:41+00:00,189.6 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_monitor_features.parquet；data/觀察版資料/10_LSTM模型/lstm_monitor_features.csv
-10_LSTM模型,LSTM切分表,data/cache/lstm/lstm_split.parquet,LSTM 訓練/驗證/測試切分。,是,是,是,5448,2026-09-28T00:00:00+00:00,2026-10-28T06:27:41+00:00,118.8 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_split.parquet；data/觀察版資料/10_LSTM模型/lstm_split.csv
+10_LSTM模型,LSTM訓練特徵表,data/cache/lstm/lstm_train_features.parquet,需要未來報酬標籤的 LSTM 訓練與回測序列特徵。,是,是,是,247,2026-09-10T00:00:00+00:00,2026-10-28T06:27:41+00:00,1.5 MB,data/觀察版資料/10_LSTM模型/lstm/lstm_train_features.parquet；data/觀察版資料/10_LSTM模型/lstm_train_features.csv
+10_LSTM模型,LSTM日常監控特徵表,data/cache/lstm/lstm_monitor_features.parquet,不等待未來報酬標籤的每日即時推論特徵。,是,是,是,8,2026-10-21T00:00:00+00:00,2026-10-28T06:27:41+00:00,186.3 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_monitor_features.parquet；data/觀察版資料/10_LSTM模型/lstm_monitor_features.csv
+10_LSTM模型,LSTM切分表,data/cache/lstm/lstm_split.parquet,LSTM 訓練/驗證/測試切分。,是,是,是,248,2026-04-24T00:00:00+00:00,2026-10-28T06:27:41+00:00,1.5 MB,data/觀察版資料/10_LSTM模型/lstm/lstm_split.parquet；data/觀察版資料/10_LSTM模型/lstm_split.csv
 10_LSTM模型,LSTM最新預測,data/cache/lstm/lstm_predictions.parquet,LSTM 每次更新產生的最新預測結果。,是,是,是,8,2026-10-27T00:00:00+00:00,2026-10-28T06:27:41+00:00,8.6 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_predictions.parquet；data/觀察版資料/10_LSTM模型/lstm_predictions.csv
 10_LSTM模型,LSTM回測,data/cache/lstm/lstm_backtest.parquet,LSTM 歷史回測與驗證紀錄。,是,是,是,792,2026-09-28T00:00:00+00:00,2026-10-28T06:27:41+00:00,31.5 KB,data/觀察版資料/10_LSTM模型/lstm/lstm_backtest.parquet；data/觀察版資料/10_LSTM模型/lstm_backtest.csv
 10_LSTM模型,LSTM模型權重,data/cache/lstm/lstm_model.pt,LSTM 訓練後輸出的模型權重。,是,是,是,,,2026-10-28T06:27:41+00:00,77.2 KB,

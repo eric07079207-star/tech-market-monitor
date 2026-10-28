@@ -1,0 +1,18 @@
+{
+  "currency": "USD",
+  "baseline_balance_usd": 8.24,
+  "baseline_at_utc": "2026-10-28T09:50:02+00:00",
+  "model_pricing": {
+    "gpt-5.4-mini": {
+      "input_usd_per_million": 0.75,
+      "cached_input_usd_per_million": 0.075,
+      "output_usd_per_million": 4.5
+    }
+  },
+  "default_pricing": {
+    "input_usd_per_million": 0.75,
+    "cached_input_usd_per_million": 0.075,
+    "output_usd_per_million": 4.5
+  },
+  "note": "User-confirmed balance baseline. Future balance is estimated from recorded API response token usage."
+}

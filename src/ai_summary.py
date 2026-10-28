@@ -14,6 +14,7 @@ import pandas as pd
 import requests
 
 from .data import cache_path
+from .api_balance import append_openai_usage
 from .edge import dedup_key, quality_score
 from .news import rule_based_news_summary
 from .research_profile import PERSONAL_RESEARCH_PROFILE, RESEARCH_PROFILE_VERSION
@@ -72,7 +73,13 @@ def build_openai_summary(
             timeout=45,
         )
         response.raise_for_status()
-        text = _extract_openai_text(response.json())
+        response_payload = response.json()
+        try:
+            usage_record = append_openai_usage(response_payload, model, generated_at)
+        except Exception:
+            # Balance accounting must never turn a successful AI summary into a failure.
+            usage_record = {}
+        text = _extract_openai_text(response_payload)
         if _is_complete_summary(text):
             return _summary_payload(
                 text=text,
@@ -82,6 +89,7 @@ def build_openai_summary(
                 used_ai=True,
                 status="OpenAI AI 摘要已成功產生。",
                 research_plan=research_plan,
+                usage=usage_record,
             )
         hybrid_text = _complete_with_rule_sections(text, fallback_text)
         if _is_complete_summary(hybrid_text):
@@ -93,6 +101,7 @@ def build_openai_summary(
                 used_ai=True,
                 status="OpenAI 摘要已產生；未完成章節已由當日規則資料補足。",
                 research_plan=research_plan,
+                usage=usage_record,
             )
         return _summary_payload(
             text=fallback_text,
@@ -102,6 +111,7 @@ def build_openai_summary(
             used_ai=False,
             status="OpenAI 回覆過短或章節不完整，已改用規則摘要。",
             research_plan=research_plan,
+            usage=usage_record,
         )
     except Exception as exc:
         return _summary_payload(
@@ -285,9 +295,10 @@ def _summary_payload(
     used_ai: bool,
     status: str,
     research_plan: dict | None = None,
+    usage: dict | None = None,
 ) -> dict:
     plan = research_plan or {}
-    return {
+    payload = {
         "text": text,
         "provider": provider,
         "model": model,
@@ -300,6 +311,18 @@ def _summary_payload(
         "change_state": plan.get("change_state", "資料同步中"),
         "input_fingerprint": plan.get("input_fingerprint", ""),
     }
+    if usage:
+        payload.update(
+            {
+                "api_request_id": usage.get("request_id", ""),
+                "input_tokens": usage.get("input_tokens", 0),
+                "cached_input_tokens": usage.get("cached_input_tokens", 0),
+                "output_tokens": usage.get("output_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0),
+                "estimated_cost_usd": usage.get("estimated_cost_usd", 0.0),
+            }
+        )
+    return payload
 
 
 def _should_preserve_existing_summary(existing: dict, incoming: dict) -> bool:
@@ -362,6 +385,12 @@ def _summary_history_row(payload: dict) -> dict:
         "research_focus": str(payload.get("research_focus", "")),
         "change_state": str(payload.get("change_state", "")),
         "input_fingerprint": str(payload.get("input_fingerprint", "")),
+        "api_request_id": str(payload.get("api_request_id", "")),
+        "input_tokens": int(payload.get("input_tokens", 0) or 0),
+        "cached_input_tokens": int(payload.get("cached_input_tokens", 0) or 0),
+        "output_tokens": int(payload.get("output_tokens", 0) or 0),
+        "total_tokens": int(payload.get("total_tokens", 0) or 0),
+        "estimated_cost_usd": float(payload.get("estimated_cost_usd", 0.0) or 0.0),
         "text": text,
     }
 

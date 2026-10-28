@@ -40,6 +40,7 @@ def _check_lstm_evaluation_consistency() -> None:
 def main() -> None:
     modules = [
         "app",
+        "src.api_balance",
         "src.ai_summary",
         "src.data",
         "src.health",
