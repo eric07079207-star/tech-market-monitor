@@ -442,7 +442,10 @@ st.markdown(
 )
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+LOCAL_DATA_TTL_SECONDS = 60 * 10
+
+
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_market(start: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     if not PRICE_CACHE.exists():
         return pd.DataFrame(), pd.DataFrame()
@@ -456,7 +459,7 @@ def load_market(start: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     return prices, macro
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 3)
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_news(days: int) -> pd.DataFrame:
     news_path = cache_path("news.parquet")
     if not news_path.exists():
@@ -466,7 +469,7 @@ def load_news(days: int) -> pd.DataFrame:
     return news
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 3)
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_international_news(days: int) -> pd.DataFrame:
     news_path = cache_path("international_news.parquet")
     if not news_path.exists():
@@ -476,7 +479,7 @@ def load_international_news(days: int) -> pd.DataFrame:
     return news
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_discovery() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     news_path = cache_path("discovery_news.parquet")
     candidates_path = cache_path("discovery_candidates.parquet")
@@ -491,7 +494,7 @@ def load_discovery() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataF
     return discovery_news, mentions, candidates, history
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 3)
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_tsla_keyword_news() -> pd.DataFrame:
     path = cache_path("tsla_keyword_news.parquet")
     if not path.exists():
@@ -502,7 +505,7 @@ def load_tsla_keyword_news() -> pd.DataFrame:
     return data
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 3)
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_governance_summary() -> pd.DataFrame:
     path = cache_path("governance_summary.parquet")
     if not path.exists():
@@ -510,7 +513,7 @@ def load_governance_summary() -> pd.DataFrame:
     return pd.read_parquet(path)
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_sentiment_layer() -> pd.DataFrame:
     if not SENTIMENT_CACHE.exists():
         return pd.DataFrame()
@@ -520,7 +523,7 @@ def load_sentiment_layer() -> pd.DataFrame:
     return data
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_market_event_windows() -> pd.DataFrame:
     if not EVENT_WINDOWS_CACHE.exists():
         return pd.DataFrame()
@@ -536,7 +539,7 @@ def load_project_memory_data():
     return load_memory_bundle()
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_discovery_perf() -> pd.DataFrame:
     return load_discovery_performance()
 
@@ -551,7 +554,7 @@ def load_portfolio_news(tickers: tuple[str, ...], days: int) -> pd.DataFrame:
     return fetch_news_batch(symbols=list(tickers), days=days, limit_per_symbol=8)
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_lstm_evaluation() -> dict:
     path = cache_path("lstm/lstm_evaluation.json")
     if not path.exists():
@@ -563,7 +566,7 @@ def load_lstm_evaluation() -> dict:
     return payload if isinstance(payload, dict) else {}
 
 
-@st.cache_data(show_spinner=False, ttl=60 * 60 * 6)
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_lstm_specialist_status() -> dict:
     path = cache_path("lstm/tsla_specialist/lstm_status.json")
     if not path.exists():
