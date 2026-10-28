@@ -1,12 +1,12 @@
 {
-  "generated_at_utc": "2026-10-28T22:15:19+00:00",
+  "generated_at_utc": "2026-10-28T22:48:39+00:00",
   "candidate_samples": 500,
-  "qualified_samples": 245,
+  "qualified_samples": 250,
   "regimes": [
     {
       "market_regime": "高波動／壓力",
       "candidate_samples": 100,
-      "qualified_samples": 60,
+      "qualified_samples": 61,
       "diagnostic_target": 30,
       "weight_target": 50,
       "diagnostic_completion_pct": 100.0,
@@ -26,22 +26,22 @@
     {
       "market_regime": "強勢反彈／轉折",
       "candidate_samples": 75,
-      "qualified_samples": 42,
+      "qualified_samples": 43,
       "diagnostic_target": 30,
       "weight_target": 50,
       "diagnostic_completion_pct": 100.0,
-      "weight_completion_pct": 84.0,
+      "weight_completion_pct": 86.0,
       "readiness_state": "可開始因子診斷"
     },
     {
       "market_regime": "橫盤／低波動",
       "candidate_samples": 50,
-      "qualified_samples": 27,
+      "qualified_samples": 30,
       "diagnostic_target": 30,
       "weight_target": 50,
-      "diagnostic_completion_pct": 90.0,
-      "weight_completion_pct": 54.0,
-      "readiness_state": "資料累積中"
+      "diagnostic_completion_pct": 100.0,
+      "weight_completion_pct": 60.0,
+      "readiness_state": "可開始因子診斷"
     },
     {
       "market_regime": "正常／溫和上漲",
@@ -55,18 +55,18 @@
     }
   ],
   "sources": {
-    "unique_source_count": 933,
-    "official_article_ratio": 0.4643,
+    "unique_source_count": 960,
+    "official_article_ratio": 0.4757,
     "official_event_evidence_count": 1316,
-    "confirmed_cluster_count": 539,
-    "cross_source_confirmation_ratio": 0.2472,
+    "confirmed_cluster_count": 570,
+    "cross_source_confirmation_ratio": 0.2635,
     "top_source_domain": "sec.gov",
-    "top_source_ratio": 0.1927
+    "top_source_ratio": 0.1861
   },
   "missing_reasons": [
     {
       "reason": "缺少跨來源新聞或官方事件",
-      "sample_count": 158
+      "sample_count": 153
     },
     {
       "reason": "缺少後續市場反應",
@@ -99,12 +99,12 @@
     {
       "check": "單一媒體偏重",
       "status": "正常",
-      "count": 19.3
+      "count": 18.6
     }
   ],
   "thresholds": {
-    "factor_diagnostic_ready": false,
+    "factor_diagnostic_ready": true,
     "weight_evaluation_ready": false,
-    "current_state": "資料累積中"
+    "current_state": "可開始因子診斷"
   }
 }
