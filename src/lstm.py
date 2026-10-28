@@ -360,6 +360,8 @@ def build_lstm_status_from_artifacts(
     monitor_features = monitor_features if monitor_features is not None else _read_dataframe(LSTM_MONITOR_FEATURE_CACHE)
     status = load_lstm_status()
     metadata = _read_json(LSTM_MODEL_METADATA_CACHE)
+    metadata_feature_rows = int(metadata.get("feature_rows", 0) or 0)
+    metadata_feature_version = _safe_str(metadata.get("feature_version"))
     test_acc = metadata.get("test_acc")
     latest_prediction = predictions.sort_values("prediction_date").tail(1) if not predictions.empty and "prediction_date" in predictions else pd.DataFrame()
     probability = _numeric(latest_prediction.iloc[0].get("predicted_prob_up")) if not latest_prediction.empty else np.nan
@@ -368,8 +370,10 @@ def build_lstm_status_from_artifacts(
         {
             "prediction_rows": int(len(predictions)),
             "backtest_rows": int(len(backtest)),
-            "feature_rows": int(len(features)),
-            "train_feature_rows": int(len(features)),
+            # Large training features are intentionally not always published to
+            # GitHub. Prefer the immutable model metadata over a stale local demo.
+            "feature_rows": metadata_feature_rows or int(len(features)),
+            "train_feature_rows": metadata_feature_rows or int(len(features)),
             "monitor_feature_rows": int(len(monitor_features)),
             "train_rows": int(metadata.get("train_rows", 0)),
             "valid_rows": int(metadata.get("valid_rows", 0)),
@@ -385,9 +389,9 @@ def build_lstm_status_from_artifacts(
             "last_backtest_at_utc": _latest_timestamp(backtest, "validated_at_utc"),
             "last_train_at_utc": _metadata_timestamp(LSTM_MODEL_METADATA_CACHE, "trained_at_utc"),
             "model_version": _safe_str(predictions["model_version"].iloc[-1]) if not predictions.empty and "model_version" in predictions else "n/a",
-            "feature_version": _safe_str(features["feature_version"].iloc[-1]) if not features.empty and "feature_version" in features else LSTM_FEATURE_VERSION,
+            "feature_version": metadata_feature_version or (_safe_str(features["feature_version"].iloc[-1]) if not features.empty and "feature_version" in features else LSTM_FEATURE_VERSION),
             "status": status.get("status") or ("已接上訓練特徵與監控特徵" if len(features) or len(monitor_features) else "尚未接上特徵表"),
-            "enabled": bool(len(features)),
+            "enabled": bool(metadata.get("model_version") or len(features)),
         }
     )
     return status

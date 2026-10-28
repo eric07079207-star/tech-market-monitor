@@ -45,7 +45,7 @@ except Exception as exc:  # pragma: no cover - surfaced in CI/runtime
     raise RuntimeError("torch is required for LSTM training. Install dependencies first.") from exc
 
 
-MODEL_VERSION = "lstm-regime-v3"
+MODEL_VERSION = "lstm-regime-v4"
 DEFAULT_SYMBOLS = LSTM_SHARED_SYMBOLS
 # GitHub-hosted CPU runners have a bounded job window.  Six epochs preserve
 # more training passes than the previous five-epoch model, while the larger
@@ -70,6 +70,7 @@ class SplitData:
     x_test: np.ndarray
     y_test: np.ndarray
     train_regimes: np.ndarray
+    valid_regimes: np.ndarray
     test_meta: pd.DataFrame
     split_meta: pd.DataFrame
     feature_mean: pd.Series
@@ -196,7 +197,11 @@ def main() -> None:
     with torch.no_grad():
         valid_logits = model(valid_x)
         valid_prob = torch.sigmoid(valid_logits).cpu().numpy()
-        decision_threshold, threshold_metrics = _calibrate_threshold(valid_prob, split_data.y_valid)
+        decision_threshold, threshold_metrics = _calibrate_threshold(
+            valid_prob,
+            split_data.y_valid,
+            split_data.valid_regimes,
+        )
         test_logits = model(torch.tensor(split_data.x_test, dtype=torch.float32))
         test_prob = torch.sigmoid(test_logits).cpu().numpy()
         test_pred = (test_prob >= decision_threshold).astype(int)
@@ -255,6 +260,7 @@ def main() -> None:
         "train_rows": int(len(split_data.y_train)),
         "valid_rows": int(len(split_data.y_valid)),
         "test_rows": int(len(split_data.y_test)),
+        "feature_rows": int(len(features)),
         "valid_loss": float(best_state["valid_loss"]),
         "valid_acc": float(best_state["valid_acc"]),
         "calibrated_valid_acc": float(threshold_metrics.get("accuracy", best_state["valid_acc"])),
@@ -346,6 +352,7 @@ def _prepare_split(features: pd.DataFrame) -> SplitData:
         x_test=normalized[test_mask],
         y_test=labels[test_mask],
         train_regimes=data.loc[train_mask, "regime_bucket"].astype(str).to_numpy(),
+        valid_regimes=data.loc[valid_mask, "regime_bucket"].astype(str).to_numpy(),
         test_meta=meta[test_mask].reset_index(drop=True),
         split_meta=meta.reset_index(drop=True),
         feature_mean=feature_mean,
@@ -417,29 +424,95 @@ def _build_monitor_predictions(
     return pd.DataFrame(latest_rows)
 
 
-def _calibrate_threshold(probabilities: np.ndarray, labels: np.ndarray) -> tuple[float, dict]:
+def _calibrate_threshold(
+    probabilities: np.ndarray,
+    labels: np.ndarray,
+    regimes: np.ndarray | None = None,
+) -> tuple[float, dict]:
     probabilities = np.asarray(probabilities, dtype=float)
     labels = np.asarray(labels, dtype=int)
+    regimes = np.asarray(regimes, dtype=str) if regimes is not None else np.full(len(labels), "all", dtype=str)
     if not len(probabilities) or len(np.unique(labels)) < 2:
-        return 0.5, {"objective": "balanced_accuracy", "status": "insufficient_validation_classes"}
+        return 0.5, {"objective": "robust_validation_balanced_accuracy", "status": "insufficient_validation_classes"}
 
     candidates = np.linspace(0.25, 0.75, 101)
-    rows = []
-    for threshold in candidates:
-        prediction = (probabilities >= threshold).astype(int)
+    temporal_blocks = [block for block in np.array_split(np.arange(len(labels)), 4) if len(block) >= 30 and len(np.unique(labels[block])) == 2]
+    regime_blocks = [
+        np.flatnonzero(regimes == regime)
+        for regime in np.unique(regimes)
+        if int((regimes == regime).sum()) >= 30 and len(np.unique(labels[regimes == regime])) == 2
+    ]
+
+    def balanced_accuracy(prediction: np.ndarray, indices: np.ndarray) -> float:
         recalls = []
         for label in (0, 1):
-            actual = labels == label
-            recalls.append(float((prediction[actual] == label).mean()) if actual.any() else np.nan)
-        balanced_accuracy = float(np.nanmean(recalls))
+            actual = labels[indices] == label
+            recalls.append(float((prediction[indices][actual] == label).mean()) if actual.any() else np.nan)
+        return float(np.nanmean(recalls))
+
+    rows = []
+    all_indices = np.arange(len(labels))
+    for threshold in candidates:
+        prediction = (probabilities >= threshold).astype(int)
+        overall_balanced = balanced_accuracy(prediction, all_indices)
+        temporal_scores = [balanced_accuracy(prediction, indices) for indices in temporal_blocks]
+        regime_scores = [balanced_accuracy(prediction, indices) for indices in regime_blocks]
+        temporal_mean = float(np.mean(temporal_scores)) if temporal_scores else overall_balanced
+        regime_mean = float(np.mean(regime_scores)) if regime_scores else overall_balanced
+        temporal_std = float(np.std(temporal_scores)) if len(temporal_scores) > 1 else 0.0
+        regime_std = float(np.std(regime_scores)) if len(regime_scores) > 1 else 0.0
+        predicted_positive_rate = float(prediction.mean())
+        minority_prediction_rate = min(predicted_positive_rate, 1.0 - predicted_positive_rate)
+        class_collapse_penalty = max(0.0, 0.10 - minority_prediction_rate) * 1.5
+        robust_score = (
+            0.50 * overall_balanced
+            + 0.30 * temporal_mean
+            + 0.20 * regime_mean
+            - 0.15 * temporal_std
+            - 0.10 * regime_std
+            - class_collapse_penalty
+            - 0.01 * abs(float(threshold) - 0.5)
+        )
         accuracy = float((prediction == labels).mean())
-        rows.append((balanced_accuracy, accuracy, -abs(float(threshold) - 0.5), float(threshold)))
-    best_balanced, best_accuracy, _, best_threshold = max(rows)
+        rows.append(
+            (
+                robust_score,
+                overall_balanced,
+                accuracy,
+                -abs(float(threshold) - 0.5),
+                float(threshold),
+                temporal_mean,
+                temporal_std,
+                regime_mean,
+                regime_std,
+                predicted_positive_rate,
+            )
+        )
+    (
+        best_score,
+        best_balanced,
+        best_accuracy,
+        _,
+        best_threshold,
+        best_temporal_mean,
+        best_temporal_std,
+        best_regime_mean,
+        best_regime_std,
+        best_positive_rate,
+    ) = max(rows)
     return best_threshold, {
-        "objective": "balanced_accuracy",
+        "objective": "robust_validation_balanced_accuracy",
         "status": "calibrated",
+        "robust_score": best_score,
         "balanced_accuracy": best_balanced,
         "accuracy": best_accuracy,
+        "temporal_balanced_accuracy_mean": best_temporal_mean,
+        "temporal_balanced_accuracy_std": best_temporal_std,
+        "regime_balanced_accuracy_mean": best_regime_mean,
+        "regime_balanced_accuracy_std": best_regime_std,
+        "predicted_positive_rate": best_positive_rate,
+        "temporal_block_count": int(len(temporal_blocks)),
+        "regime_block_count": int(len(regime_blocks)),
         "candidate_min": float(candidates.min()),
         "candidate_max": float(candidates.max()),
         "candidate_count": int(len(candidates)),
