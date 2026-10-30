@@ -20,27 +20,27 @@
   ],
   "training_start_date": "2013-01-01",
   "sample_step": 5,
-  "class_balance_positive_weight": 0.6037344398340249,
+  "class_balance_positive_weight": 0.6062240663900414,
   "regime_balance_method": "inverse_frequency_weighted_sampler",
   "train_regime_counts": {
     "正常／溫和上漲": 1873,
     "高波動／壓力": 784,
     "橫盤／低波動": 553,
-    "明顯下跌趨勢": 458,
+    "明顯下跌趨勢": 464,
     "強勢反彈／轉折": 197
   },
-  "decision_threshold": 0.38,
+  "decision_threshold": 0.355,
   "threshold_calibration": {
     "objective": "robust_validation_balanced_accuracy",
     "status": "calibrated",
-    "robust_score": 0.5658479434037406,
-    "balanced_accuracy": 0.5799484925678134,
-    "accuracy": 0.5909090909090909,
-    "temporal_balanced_accuracy_mean": 0.573388468874925,
-    "temporal_balanced_accuracy_std": 0.04084659645047485,
-    "regime_balanced_accuracy_mean": 0.5895365290429444,
-    "regime_balanced_accuracy_std": 0.06723159883661352,
-    "predicted_positive_rate": 0.5606060606060606,
+    "robust_score": 0.5319892479523969,
+    "balanced_accuracy": 0.5455679786898461,
+    "accuracy": 0.5934343434343434,
+    "temporal_balanced_accuracy_mean": 0.5343567026940867,
+    "temporal_balanced_accuracy_std": 0.04067557187839897,
+    "regime_balanced_accuracy_mean": 0.5567367824324558,
+    "regime_balanced_accuracy_std": 0.04897772905483532,
+    "predicted_positive_rate": 0.672979797979798,
     "temporal_block_count": 4,
     "regime_block_count": 5,
     "candidate_min": 0.25,
@@ -52,52 +52,52 @@
   "train_ratio": 0.7,
   "valid_ratio": 0.15,
   "test_ratio": 0.15,
-  "train_rows": 3865,
+  "train_rows": 3871,
   "valid_rows": 792,
   "test_rows": 792,
-  "feature_rows": 5511,
-  "valid_loss": 0.5145105123519897,
-  "valid_acc": 0.4393939393939394,
-  "calibrated_valid_acc": 0.5909090909090909,
-  "calibrated_valid_balanced_acc": 0.5799484925678134,
-  "test_acc": 0.4671717171717172,
-  "trained_at_utc": "2026-10-29T02:11:58+00:00",
+  "feature_rows": 5512,
+  "valid_loss": 0.5158467292785645,
+  "valid_acc": 0.4065656565656566,
+  "calibrated_valid_acc": 0.5934343434343434,
+  "calibrated_valid_balanced_acc": 0.5455679786898461,
+  "test_acc": 0.47474747474747475,
+  "trained_at_utc": "2026-10-30T02:30:43+00:00",
   "history": [
     {
       "epoch": 1,
-      "train_loss": 0.5268359353594761,
-      "valid_loss": 0.5148007273674011,
-      "valid_acc": 0.40404040404040403
+      "train_loss": 0.5244213982288674,
+      "valid_loss": 0.5158467292785645,
+      "valid_acc": 0.4065656565656566
     },
     {
       "epoch": 2,
-      "train_loss": 0.5174039737990109,
-      "valid_loss": 0.5145105123519897,
-      "valid_acc": 0.4393939393939394
+      "train_loss": 0.5200257253751556,
+      "valid_loss": 0.5160360336303711,
+      "valid_acc": 0.4065656565656566
     },
     {
       "epoch": 3,
-      "train_loss": 0.5126671090779915,
-      "valid_loss": 0.514958918094635,
-      "valid_acc": 0.48863636363636365
+      "train_loss": 0.5164537767789925,
+      "valid_loss": 0.5171418786048889,
+      "valid_acc": 0.44191919191919193
     },
     {
       "epoch": 4,
-      "train_loss": 0.5047176883954743,
-      "valid_loss": 0.5189661383628845,
-      "valid_acc": 0.49747474747474746
+      "train_loss": 0.5070099137960186,
+      "valid_loss": 0.5231977701187134,
+      "valid_acc": 0.47095959595959597
     },
     {
       "epoch": 5,
-      "train_loss": 0.4896206978298868,
-      "valid_loss": 0.5383532643318176,
-      "valid_acc": 0.5366161616161617
+      "train_loss": 0.491198325412768,
+      "valid_loss": 0.5309361219406128,
+      "valid_acc": 0.5075757575757576
     },
     {
       "epoch": 6,
-      "train_loss": 0.4735278235061665,
-      "valid_loss": 0.5568891763687134,
-      "valid_acc": 0.5277777777777778
+      "train_loss": 0.47567721598525897,
+      "valid_loss": 0.5562089681625366,
+      "valid_acc": 0.5113636363636364
     }
   ]
 }
