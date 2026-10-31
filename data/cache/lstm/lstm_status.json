@@ -23,8 +23,8 @@
   "prediction_date": "2026-10-30 00:00:00+00:00",
   "prediction_target_date": "2026-11-27 00:00:00+00:00",
   "prediction_target_date_type": "estimated",
-  "monitor_updated_at_utc": "2026-10-31T02:06:26+00:00",
-  "updated_at_utc": "2026-10-31T02:00:27+00:00",
+  "monitor_updated_at_utc": "2026-10-31T04:17:37+00:00",
+  "updated_at_utc": "2026-10-31T04:17:37+00:00",
   "decision_threshold": 0.28,
   "threshold_calibration_source": "validation_only",
   "train_regime_counts": {
