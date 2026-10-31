@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-30T22:37:37+00:00",
+  "generated_at_utc": "2026-10-31T02:00:23+00:00",
   "candidate_samples": 500,
   "qualified_samples": 254,
   "regimes": [
@@ -56,17 +56,17 @@
   ],
   "sources": {
     "unique_source_count": 1011,
-    "official_article_ratio": 0.4912,
-    "official_event_evidence_count": 1464,
+    "official_article_ratio": 0.493,
+    "official_event_evidence_count": 1497,
     "confirmed_cluster_count": 622,
-    "cross_source_confirmation_ratio": 0.2655,
+    "cross_source_confirmation_ratio": 0.2617,
     "top_source_domain": "sec.gov",
-    "top_source_ratio": 0.1892
+    "top_source_ratio": 0.192
   },
   "missing_reasons": [
     {
       "reason": "缺少跨來源新聞或官方事件",
-      "sample_count": 148
+      "sample_count": 149
     },
     {
       "reason": "缺少後續市場反應",
@@ -74,7 +74,7 @@
     },
     {
       "reason": "基本面：早於至少六家公司可同時比較的 SEC XBRL 起點 2012-07-31，不再等待",
-      "sample_count": 142
+      "sample_count": 141
     },
     {
       "reason": "基本面：僅 5/8 家具備營收與營運現金流",
@@ -99,7 +99,7 @@
     {
       "check": "單一媒體偏重",
       "status": "正常",
-      "count": 18.9
+      "count": 19.2
     }
   ],
   "thresholds": {
