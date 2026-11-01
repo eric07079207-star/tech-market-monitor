@@ -22,7 +22,7 @@
     "always_long_avg_return": 0.027181927990644953,
     "model_directional_avg_return": -0.024765305147536717,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-11-01T01:57:16+00:00",
+    "evaluated_at_utc": "2026-11-01T04:38:23+00:00",
     "directional_return_edge_vs_always_long": -0.05194723313818167,
     "probability_calibration": [
       {
@@ -217,7 +217,7 @@
         "avg_return": 0.01630491332582661
       }
     ],
-    "evaluated_at_utc": "2026-11-01T01:57:16+00:00"
+    "evaluated_at_utc": "2026-11-01T04:38:23+00:00"
   },
   "leakage_audit": {
     "status": "可用",
