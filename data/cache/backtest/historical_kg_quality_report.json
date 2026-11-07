@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-11-06T23:26:38+00:00",
+  "generated_at_utc": "2026-11-07T02:32:20+00:00",
   "candidate_samples": 500,
   "qualified_samples": 272,
   "regimes": [
@@ -56,12 +56,12 @@
   ],
   "sources": {
     "unique_source_count": 1134,
-    "official_article_ratio": 0.536,
-    "official_event_evidence_count": 1952,
+    "official_article_ratio": 0.5371,
+    "official_event_evidence_count": 1982,
     "confirmed_cluster_count": 775,
-    "cross_source_confirmation_ratio": 0.2703,
+    "cross_source_confirmation_ratio": 0.2668,
     "top_source_domain": "sec.gov",
-    "top_source_ratio": 0.1913
+    "top_source_ratio": 0.1932
   },
   "missing_reasons": [
     {
@@ -78,7 +78,7 @@
     },
     {
       "reason": "基本面：僅 5/8 家具備營收與營運現金流",
-      "sample_count": 32
+      "sample_count": 33
     },
     {
       "reason": "基本面：僅 4/8 家具備營收與營運現金流",
@@ -99,7 +99,7 @@
     {
       "check": "單一媒體偏重",
       "status": "正常",
-      "count": 19.1
+      "count": 19.3
     }
   ],
   "thresholds": {
