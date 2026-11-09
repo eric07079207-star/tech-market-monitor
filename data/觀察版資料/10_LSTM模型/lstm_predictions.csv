@@ -1,9 +1,9 @@
 symbol,prediction_date,target_date,target_date_type,horizon_days,model_version,feature_version,predicted_prob_up,predicted_label,prediction_direction,decision_threshold,created_at_utc,prediction_type
-AAPL,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.36694052815437317,0,看跌,0.475,2026-11-08T02:06:28+00:00,real_time_inference
-AMD,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.17929580807685852,0,看跌,0.475,2026-11-08T02:06:28+00:00,real_time_inference
-AMZN,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.2437600940465927,0,看跌,0.475,2026-11-08T02:06:28+00:00,real_time_inference
-GOOGL,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.36158204078674316,0,看跌,0.475,2026-11-08T02:06:28+00:00,real_time_inference
-META,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.18730205297470093,0,看跌,0.475,2026-11-08T02:06:28+00:00,real_time_inference
-MSFT,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.21592648327350616,0,看跌,0.475,2026-11-08T02:06:28+00:00,real_time_inference
-NVDA,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.3304746448993683,0,看跌,0.475,2026-11-08T02:06:28+00:00,real_time_inference
-TSLA,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.3568606376647949,0,看跌,0.475,2026-11-08T02:06:28+00:00,real_time_inference
+AAPL,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.4662182033061981,1,看漲,0.455,2026-11-09T02:27:13+00:00,real_time_inference
+AMD,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.26942017674446106,0,看跌,0.455,2026-11-09T02:27:13+00:00,real_time_inference
+AMZN,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.41382402181625366,0,看跌,0.455,2026-11-09T02:27:13+00:00,real_time_inference
+GOOGL,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.41996803879737854,0,看跌,0.455,2026-11-09T02:27:13+00:00,real_time_inference
+META,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.3759230375289917,0,看跌,0.455,2026-11-09T02:27:13+00:00,real_time_inference
+MSFT,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.27842891216278076,0,看跌,0.455,2026-11-09T02:27:13+00:00,real_time_inference
+NVDA,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.4399520456790924,0,看跌,0.455,2026-11-09T02:27:13+00:00,real_time_inference
+TSLA,2026-11-06 00:00:00+00:00,2026-12-04 00:00:00+00:00,estimated,20,lstm-regime-v4,lstm-regime-v2,0.463386595249176,1,看漲,0.455,2026-11-09T02:27:13+00:00,real_time_inference

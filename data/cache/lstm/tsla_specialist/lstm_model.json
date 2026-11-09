@@ -54,7 +54,7 @@
   "calibrated_valid_acc": 0.5841584158415841,
   "calibrated_valid_balanced_acc": 0.5801886792452831,
   "test_acc": 0.5643564356435643,
-  "trained_at_utc": "2026-11-08T02:07:00+00:00",
+  "trained_at_utc": "2026-11-09T02:28:01+00:00",
   "history": [
     {
       "epoch": 1,
@@ -76,8 +76,8 @@
     },
     {
       "epoch": 4,
-      "train_loss": 0.5770020295664208,
-      "valid_loss": 0.5959713459014893,
+      "train_loss": 0.5770020577096447,
+      "valid_loss": 0.5959714651107788,
       "valid_acc": 0.5544554455445545
     },
     {
