@@ -298,6 +298,7 @@ def main() -> None:
             "prediction_target_date": str(latest_predictions.iloc[-1]["target_date"]) if not latest_predictions.empty else "",
             "prediction_target_date_type": "estimated",
             "monitor_updated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "updated_at_utc": metadata["trained_at_utc"],
         }
     )
     save_lstm_status(status)
