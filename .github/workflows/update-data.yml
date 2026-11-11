@@ -1,6 +1,9 @@
 name: Update market data
 
 on:
+  push:
+    paths:
+      - ".github/workflows/update-data.yml"
   schedule:
     # Refresh every 6 hours so Streamlit Cloud can pick up fresh market/news cache.
     - cron: "0 */6 * * *"
@@ -110,24 +113,46 @@ jobs:
 
           git diff --cached --quiet && exit 0
 
-          staged_bytes=$(
-            git diff --cached --name-only --diff-filter=ACMRTUXB -z |
-              xargs -0 -r du -cb |
-              tail -1 |
-              cut -f1
-          )
-          staged_bytes=${staged_bytes:-0}
           max_staged_bytes=$((40 * 1024 * 1024))
-          if (( staged_bytes > max_staged_bytes )); then
-            echo "Refusing to publish a cache commit larger than 40 MB (${staged_bytes} bytes)."
-            git diff --cached --name-only --diff-filter=ACMRTUXB -z |
-              xargs -0 -r du -h |
-              sort -h |
-              tail -20
-            exit 1
-          fi
+          mapfile -d '' staged_files < <(
+            git diff --cached --name-only --diff-filter=ACDMRTUXB -z
+          )
+          git reset -q
 
-          git commit -m "Update market data cache"
+          # Keep the 40 MB safety limit, but split a large refresh into compact
+          # commits instead of discarding an otherwise successful data run.
+          batch_bytes=0
+          batch_index=1
+          batch_file_count=0
+          commit_batch() {
+            if (( batch_file_count == 0 )); then
+              return
+            fi
+            git commit -m "Update market data cache (batch ${batch_index})"
+            echo "Published cache batch ${batch_index}: ${batch_file_count} files, ${batch_bytes} bytes."
+            batch_index=$((batch_index + 1))
+            batch_bytes=0
+            batch_file_count=0
+          }
+
+          for artifact in "${staged_files[@]}"; do
+            artifact_bytes=0
+            if [[ -f "$artifact" ]]; then
+              artifact_bytes=$(wc -c < "$artifact")
+            fi
+            if (( artifact_bytes > max_staged_bytes )); then
+              echo "Refusing to publish an individual file larger than 40 MB: ${artifact} (${artifact_bytes} bytes)."
+              exit 1
+            fi
+            if (( batch_file_count > 0 && batch_bytes + artifact_bytes > max_staged_bytes )); then
+              commit_batch
+            fi
+            git add -A -- "$artifact"
+            batch_bytes=$((batch_bytes + artifact_bytes))
+            batch_file_count=$((batch_file_count + 1))
+          done
+          commit_batch
+
           for attempt in 1 2 3; do
             # Reproducible training tables stay uncommitted by design. Autostash
             # them while rebasing so concurrent cache jobs can still synchronize.
