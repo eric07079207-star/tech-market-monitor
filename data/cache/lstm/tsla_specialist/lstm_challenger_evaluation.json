@@ -1,0 +1,22 @@
+{
+  "model_version": "lstm-regime-v5",
+  "feature_version": "lstm-regime-v3",
+  "challenger": {
+    "status": "usable",
+    "rows": 101,
+    "accuracy": 0.5148514851485149,
+    "balanced_accuracy": 0.5,
+    "baseline_accuracy": 0.5247524752475248,
+    "edge_vs_baseline": -0.00990099009900991
+  },
+  "promotion": {
+    "promoted": false,
+    "reason": "未超過多數類別基準 1%",
+    "evaluated_at_utc": "2026-11-11T09:05:00+00:00"
+  },
+  "promotion_rules": {
+    "minimum_edge_vs_majority_baseline": 0.01,
+    "minimum_balanced_accuracy": 0.5,
+    "maximum_regression_vs_qualified_incumbent": 0.002
+  }
+}

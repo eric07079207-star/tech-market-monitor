@@ -31,6 +31,7 @@ from src.lstm import (
     build_lstm_monitor_feature_table,
     build_lstm_status_from_artifacts,
     feature_columns,
+    load_lstm_status,
     save_lstm_status,
 )
 from src.data import PRICE_CACHE
@@ -62,6 +63,8 @@ RANDOM_SEED = 42
 ABSTENTION_MARGIN = 0.07
 REGIME_THRESHOLD_MIN_ROWS = 60
 THRESHOLD_MAX_CHANGE = 0.03
+PROMOTION_MIN_EDGE = 0.01
+PROMOTION_MAX_INCUMBENT_REGRESSION = 0.002
 
 
 @dataclass(frozen=True)
@@ -104,6 +107,7 @@ def main() -> None:
     parser.add_argument("--sample-step", type=int, default=5, help="Sample every N trading days.")
     args = parser.parse_args()
     previous_threshold, previous_regime_thresholds = _load_previous_thresholds()
+    incumbent_quality = _load_incumbent_quality()
     np.random.seed(RANDOM_SEED)
     torch.manual_seed(RANDOM_SEED)
 
@@ -219,14 +223,7 @@ def main() -> None:
         test_pred = (test_prob >= test_thresholds).astype(int)
         test_acc = float((test_pred == split_data.y_test).mean()) if len(split_data.y_test) else np.nan
 
-    LSTM_DIR.mkdir(parents=True, exist_ok=True)
-    torch.save(best_state["model_state"], LSTM_MODEL_CACHE)
-    _save_scaler(split_data, LSTM_SCALER_CACHE)
-
     backtest = _build_backtest_frame(split_data.test_meta, test_prob, test_pred, test_thresholds)
-    backtest.to_parquet(LSTM_BACKTEST_CACHE, index=False)
-    split_data.split_meta.to_parquet(LSTM_SPLIT_CACHE, index=False)
-
     monitor_features = build_lstm_monitor_feature_table(
         prices=prices,
         symbols=args.symbols,
@@ -236,6 +233,47 @@ def main() -> None:
         fundamentals=fundamentals,
     )
     monitor_features.to_parquet(LSTM_MONITOR_FEATURE_CACHE, index=False)
+    challenger_quality = _backtest_quality(backtest)
+    promotion = _promotion_decision(challenger_quality, incumbent_quality)
+    _save_challenger_report(challenger_quality, incumbent_quality, promotion, threshold_metrics)
+    if not promotion["promoted"]:
+        incumbent_status = load_lstm_status()
+        incumbent_status.update(
+            {
+                "status": f"正式模型已保留；最新挑戰模型未達升級門檻（{promotion['reason']}）",
+                "last_challenger_at_utc": promotion["evaluated_at_utc"],
+                "last_challenger_version": MODEL_VERSION,
+                "last_challenger_accuracy": challenger_quality.get("accuracy"),
+                "last_challenger_edge_vs_baseline": challenger_quality.get("edge_vs_baseline"),
+                "last_challenger_promoted": False,
+            }
+        )
+        incumbent_predictions = _refresh_incumbent_predictions(monitor_features)
+        if not incumbent_predictions.empty:
+            incumbent_status.update(
+                {
+                    "last_predict_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    "monitor_updated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    "prediction_rows": int(len(incumbent_predictions)),
+                    "monitor_feature_rows": int(len(monitor_features)),
+                    "prediction_date": str(incumbent_predictions.iloc[-1]["prediction_date"]),
+                    "prediction_target_date": str(incumbent_predictions.iloc[-1]["target_date"]),
+                }
+            )
+        save_lstm_status(incumbent_status)
+        print(
+            f"rejected challenger model_version={MODEL_VERSION} reason={promotion['reason']} "
+            f"accuracy={challenger_quality.get('accuracy', float('nan')):.4f} "
+            f"baseline={challenger_quality.get('baseline_accuracy', float('nan')):.4f}"
+        )
+        return
+
+    LSTM_DIR.mkdir(parents=True, exist_ok=True)
+    torch.save(best_state["model_state"], LSTM_MODEL_CACHE)
+    _save_scaler(split_data, LSTM_SCALER_CACHE)
+    backtest.to_parquet(LSTM_BACKTEST_CACHE, index=False)
+    split_data.split_meta.to_parquet(LSTM_SPLIT_CACHE, index=False)
+
     latest_predictions = _build_monitor_predictions(
         model,
         monitor_features,
@@ -243,6 +281,7 @@ def main() -> None:
         split_data.feature_std,
         decision_threshold,
         regime_thresholds,
+        model_version=MODEL_VERSION,
     )
     latest_predictions.to_parquet(LSTM_PREDICTIONS_CACHE, index=False)
 
@@ -315,6 +354,7 @@ def main() -> None:
             "prediction_target_date_type": "estimated",
             "monitor_updated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "updated_at_utc": metadata["trained_at_utc"],
+            "last_challenger_promoted": True,
         }
     )
     save_lstm_status(status)
@@ -426,6 +466,7 @@ def _build_monitor_predictions(
     std: pd.Series,
     decision_threshold: float,
     regime_thresholds: dict[str, float],
+    model_version: str = MODEL_VERSION,
 ) -> pd.DataFrame:
     if monitor_features.empty:
         return pd.DataFrame()
@@ -452,7 +493,7 @@ def _build_monitor_predictions(
                 "target_date": pd.to_datetime(latest.target_date, utc=True),
                 "target_date_type": str(latest.get("target_date_type", "estimated")),
                 "horizon_days": int(latest.horizon_days),
-                "model_version": MODEL_VERSION,
+                "model_version": model_version,
                 "feature_version": str(latest.feature_version),
                 "predicted_prob_up": float(prob),
                 "predicted_label": predicted_label,
@@ -662,6 +703,108 @@ def _load_previous_thresholds() -> tuple[float | None, dict[str, float]]:
     return (float(threshold) if pd.notna(threshold) else None), {
         str(key): float(value) for key, value in regime_thresholds.items() if pd.notna(pd.to_numeric(value, errors="coerce"))
     }
+
+
+def _load_incumbent_quality() -> dict:
+    if not LSTM_BACKTEST_CACHE.exists():
+        return {"status": "missing"}
+    try:
+        return _backtest_quality(pd.read_parquet(LSTM_BACKTEST_CACHE))
+    except (OSError, ValueError):
+        return {"status": "unreadable"}
+
+
+def _refresh_incumbent_predictions(monitor_features: pd.DataFrame) -> pd.DataFrame:
+    if monitor_features.empty or not LSTM_MODEL_CACHE.exists() or not LSTM_SCALER_CACHE.exists() or not LSTM_MODEL_METADATA_CACHE.exists():
+        return pd.DataFrame()
+    try:
+        metadata = json.loads(LSTM_MODEL_METADATA_CACHE.read_text(encoding="utf-8"))
+        scaler = json.loads(LSTM_SCALER_CACHE.read_text(encoding="utf-8"))
+        columns = scaler.get("columns", [])
+        if columns != feature_columns():
+            return pd.DataFrame()
+        mean = pd.Series(scaler["mean"], index=columns, dtype=float)
+        std = pd.Series(scaler["std"], index=columns, dtype=float).replace(0, 1.0)
+        incumbent_model = LSTMClassifier(input_size=len(columns))
+        incumbent_model.load_state_dict(torch.load(LSTM_MODEL_CACHE, map_location="cpu", weights_only=True))
+        incumbent_model.eval()
+        threshold = float(metadata.get("decision_threshold", 0.5))
+        regime_thresholds = metadata.get("decision_thresholds_by_regime", {})
+        if not isinstance(regime_thresholds, dict):
+            regime_thresholds = {}
+        predictions = _build_monitor_predictions(
+            incumbent_model,
+            monitor_features,
+            mean,
+            std,
+            threshold,
+            {str(key): float(value) for key, value in regime_thresholds.items()},
+            model_version=str(metadata.get("model_version", "incumbent")),
+        )
+        predictions.to_parquet(LSTM_PREDICTIONS_CACHE, index=False)
+        return predictions
+    except (OSError, ValueError, KeyError, RuntimeError, json.JSONDecodeError):
+        return pd.DataFrame()
+
+
+def _backtest_quality(backtest: pd.DataFrame) -> dict:
+    if backtest.empty or not {"label", "predicted_label"}.issubset(backtest.columns):
+        return {"status": "insufficient", "rows": int(len(backtest))}
+    labels = pd.to_numeric(backtest["label"], errors="coerce")
+    predictions = pd.to_numeric(backtest["predicted_label"], errors="coerce")
+    valid = labels.notna() & predictions.notna()
+    labels = labels[valid].astype(int).to_numpy()
+    predictions = predictions[valid].astype(int).to_numpy()
+    if not len(labels):
+        return {"status": "insufficient", "rows": 0}
+    accuracy = float((labels == predictions).mean())
+    baseline_accuracy = float(max(labels.mean(), 1.0 - labels.mean()))
+    return {
+        "status": "usable",
+        "rows": int(len(labels)),
+        "accuracy": accuracy,
+        "balanced_accuracy": _balanced_accuracy(labels, predictions),
+        "baseline_accuracy": baseline_accuracy,
+        "edge_vs_baseline": accuracy - baseline_accuracy,
+        "predicted_positive_rate": float(predictions.mean()),
+    }
+
+
+def _promotion_decision(challenger: dict, incumbent: dict) -> dict:
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    if challenger.get("status") != "usable":
+        return {"promoted": False, "reason": "挑戰模型測試資料不足", "evaluated_at_utc": now}
+    challenger_accuracy = float(challenger["accuracy"])
+    challenger_baseline = float(challenger["baseline_accuracy"])
+    challenger_balanced = float(challenger["balanced_accuracy"])
+    if challenger_accuracy < challenger_baseline + PROMOTION_MIN_EDGE:
+        return {"promoted": False, "reason": "未超過多數類別基準 1%", "evaluated_at_utc": now}
+    if challenger_balanced < 0.50:
+        return {"promoted": False, "reason": "平衡準確率低於 50%", "evaluated_at_utc": now}
+    if incumbent.get("status") == "usable" and float(incumbent.get("edge_vs_baseline", -1.0)) > 0:
+        incumbent_floor = float(incumbent["accuracy"]) - PROMOTION_MAX_INCUMBENT_REGRESSION
+        if challenger_accuracy < incumbent_floor:
+            return {"promoted": False, "reason": "明顯差於現行正式模型", "evaluated_at_utc": now}
+    return {"promoted": True, "reason": "通過基準與回歸檢查", "evaluated_at_utc": now}
+
+
+def _save_challenger_report(challenger: dict, incumbent: dict, promotion: dict, threshold_metrics: dict) -> None:
+    payload = {
+        "model_version": MODEL_VERSION,
+        "feature_version": LSTM_FEATURE_VERSION,
+        "challenger": challenger,
+        "incumbent": incumbent,
+        "promotion": promotion,
+        "promotion_rules": {
+            "minimum_edge_vs_majority_baseline": PROMOTION_MIN_EDGE,
+            "minimum_balanced_accuracy": 0.50,
+            "maximum_regression_vs_qualified_incumbent": PROMOTION_MAX_INCUMBENT_REGRESSION,
+        },
+        "threshold_calibration": threshold_metrics,
+    }
+    path = LSTM_DIR / "lstm_challenger_evaluation.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _market_regime_from_sequence(sequence_json: str) -> str:

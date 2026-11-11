@@ -1355,10 +1355,14 @@ with tab_prediction:
             f"回測 {pct(lstm_tsla_specialist.get('backtest_accuracy'))}｜"
             f"訓練/驗證/測試 {lstm_tsla_specialist.get('train_rows', 0)}/{lstm_tsla_specialist.get('valid_rows', 0)}/{lstm_tsla_specialist.get('test_rows', 0)}"
         )
+    evaluation = lstm_evaluation.get("lstm", {}) if isinstance(lstm_evaluation, dict) else {}
     if lstm_predictions.empty:
         st.info("目前沒有即時推論列；下一次模型訓練完成後會產生。")
     else:
         current = lstm_predictions.copy()
+        production_edge = pd.to_numeric(evaluation.get("accuracy_edge_vs_baseline"), errors="coerce") if evaluation else np.nan
+        if pd.notna(production_edge) and float(production_edge) <= 0:
+            current["prediction_direction"] = "模型未超過基準／不預測"
         display_columns = [column for column in ["symbol", "prediction_date", "target_date", "target_date_type", "regime_bucket", "predicted_prob_up", "decision_threshold", "signal_distance", "prediction_direction", "prediction_type"] if column in current]
         st.dataframe(
             current[display_columns].rename(
@@ -1379,7 +1383,6 @@ with tab_prediction:
             },
         )
         st.caption("即時推論不等待未來報酬標籤；目標日是依交易日推估，待期滿後才會進入回測驗證。")
-    evaluation = lstm_evaluation.get("lstm", {}) if isinstance(lstm_evaluation, dict) else {}
     if evaluation:
         st.markdown("#### 預測品質評估")
         eval_cols = st.columns(5)
