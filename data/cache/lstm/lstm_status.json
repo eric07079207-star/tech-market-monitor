@@ -1,13 +1,13 @@
 {
   "enabled": true,
   "mode": "train",
-  "status": "已訓練完成，驗證集校準門檻 0.45，測試準確率 46.66%",
+  "status": "正式模型已保留；最新挑戰模型未達升級門檻（未超過多數類別基準 1%）",
   "model_version": "lstm-regime-v4",
   "feature_version": "lstm-regime-v2",
   "horizon_days": 20,
   "sequence_length": 60,
   "last_train_at_utc": "2026-11-11T02:37:22+00:00",
-  "last_predict_at_utc": "2026-11-11T02:37:22+00:00",
+  "last_predict_at_utc": "2026-11-11T09:16:02+00:00",
   "last_backtest_at_utc": "2026-11-11T02:37:17+00:00",
   "prediction_rows": 8,
   "backtest_rows": 793,
@@ -23,8 +23,8 @@
   "prediction_date": "2026-11-10 00:00:00+00:00",
   "prediction_target_date": "2026-12-08 00:00:00+00:00",
   "prediction_target_date_type": "estimated",
-  "monitor_updated_at_utc": "2026-11-11T07:38:14+00:00",
-  "updated_at_utc": "2026-11-11T07:38:14+00:00",
+  "monitor_updated_at_utc": "2026-11-11T09:16:02+00:00",
+  "updated_at_utc": "2026-11-11T09:11:51+00:00",
   "decision_threshold": 0.45,
   "threshold_calibration_source": "validation_only",
   "train_regime_counts": {
@@ -33,5 +33,10 @@
     "橫盤／低波動": 553,
     "明顯下跌趨勢": 470,
     "強勢反彈／轉折": 197
-  }
+  },
+  "last_challenger_at_utc": "2026-11-11T09:16:02+00:00",
+  "last_challenger_version": "lstm-regime-v5",
+  "last_challenger_accuracy": 0.46532156368221944,
+  "last_challenger_edge_vs_baseline": -0.09205548549810838,
+  "last_challenger_promoted": false
 }

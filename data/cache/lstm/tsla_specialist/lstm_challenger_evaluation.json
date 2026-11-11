@@ -5,18 +5,74 @@
     "status": "usable",
     "rows": 101,
     "accuracy": 0.5148514851485149,
-    "balanced_accuracy": 0.5,
+    "balanced_accuracy": 0.5357704402515724,
     "baseline_accuracy": 0.5247524752475248,
-    "edge_vs_baseline": -0.00990099009900991
+    "edge_vs_baseline": -0.00990099009900991,
+    "predicted_positive_rate": 0.07920792079207921
+  },
+  "incumbent": {
+    "status": "usable",
+    "rows": 101,
+    "accuracy": 0.5643564356435643,
+    "balanced_accuracy": 0.5799921383647799,
+    "baseline_accuracy": 0.5247524752475248,
+    "edge_vs_baseline": 0.03960396039603953,
+    "predicted_positive_rate": 0.18811881188118812
   },
   "promotion": {
     "promoted": false,
     "reason": "未超過多數類別基準 1%",
-    "evaluated_at_utc": "2026-11-11T09:05:00+00:00"
+    "evaluated_at_utc": "2026-11-11T09:16:34+00:00"
   },
   "promotion_rules": {
     "minimum_edge_vs_majority_baseline": 0.01,
     "minimum_balanced_accuracy": 0.5,
     "maximum_regression_vs_qualified_incumbent": 0.002
+  },
+  "threshold_calibration": {
+    "objective": "robust_validation_balanced_accuracy",
+    "status": "calibrated",
+    "robust_score": 0.5879271671724502,
+    "balanced_accuracy": 0.5801886792452831,
+    "accuracy": 0.5841584158415841,
+    "temporal_balanced_accuracy_mean": 0.5801886792452831,
+    "temporal_balanced_accuracy_std": 0.0,
+    "regime_balanced_accuracy_mean": 0.6188811188811189,
+    "regime_balanced_accuracy_std": 0.0,
+    "predicted_positive_rate": 0.4158415841584158,
+    "temporal_block_count": 0,
+    "regime_block_count": 1,
+    "candidate_min": 0.25,
+    "candidate_max": 0.75,
+    "candidate_count": 101,
+    "full_validation_threshold": 0.5,
+    "raw_nested_threshold": 0.515,
+    "stabilized_threshold": 0.515,
+    "previous_threshold": 0.5,
+    "max_threshold_change": 0.03,
+    "walk_forward_folds": [
+      {
+        "fold": 2,
+        "threshold": 0.515,
+        "rows": 20,
+        "balanced_accuracy": 0.55
+      },
+      {
+        "fold": 3,
+        "threshold": 0.515,
+        "rows": 20,
+        "balanced_accuracy": 0.5
+      },
+      {
+        "fold": 4,
+        "threshold": 0.515,
+        "rows": 20,
+        "balanced_accuracy": 0.5
+      }
+    ],
+    "walk_forward_balanced_accuracy_mean": 0.5166666666666667,
+    "regime_threshold_min_rows": 60,
+    "regime_thresholds": {},
+    "regime_threshold_details": {}
   }
 }
