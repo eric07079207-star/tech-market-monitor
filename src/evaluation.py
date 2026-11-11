@@ -63,6 +63,7 @@ def evaluate_lstm_backtest(backtest: pd.DataFrame) -> dict:
     result["by_symbol"] = _by_symbol_metrics(data)
     result["by_regime"] = _by_regime_metrics(data)
     result["qqq_direction_comparison"] = _qqq_direction_comparison(data)
+    result["candidate_target_diagnostics"] = _candidate_target_diagnostics(data)
     result["model_beats_majority_baseline"] = bool(result["accuracy_edge_vs_baseline"] > 0)
     result["confidence_warning"] = _confidence_warning(len(data), result["accuracy_edge_vs_baseline"])
     return result
@@ -175,9 +176,17 @@ def _probability_calibration(data: pd.DataFrame) -> list[dict]:
 
 
 def _abstention_metrics(data: pd.DataFrame, band: float = 0.10) -> dict:
-    confident = data[(data["predicted_prob_up"] <= 0.5 - band) | (data["predicted_prob_up"] >= 0.5 + band)]
+    if "is_actionable" in data:
+        actionable = data["is_actionable"].fillna(False).astype(bool)
+        confident = data[actionable]
+        effective_band = _mean_numeric(data.get("abstention_margin"))
+        method = "calibrated_threshold_distance"
+    else:
+        confident = data[(data["predicted_prob_up"] <= 0.5 - band) | (data["predicted_prob_up"] >= 0.5 + band)]
+        effective_band = band
+        method = "legacy_fixed_50_percent"
     if confident.empty:
-        return {"band": band, "coverage": 0.0, "rows": 0, "accuracy": None, "state": "不交易／資料不足"}
+        return {"band": effective_band, "method": method, "coverage": 0.0, "rows": 0, "accuracy": None, "state": "不交易／資料不足"}
     labels = confident["label"].astype(int)
     predictions = confident["predicted_label"].astype(int)
     accuracy = float((labels == predictions).mean())
@@ -191,7 +200,8 @@ def _abstention_metrics(data: pd.DataFrame, band: float = 0.10) -> dict:
     else:
         state = "可交易候選／仍需校準"
     return {
-        "band": band,
+        "band": effective_band,
+        "method": method,
         "coverage": float(len(confident) / len(data)),
         "rows": int(len(confident)),
         "accuracy": accuracy,
@@ -209,6 +219,8 @@ def _by_symbol_metrics(data: pd.DataFrame) -> list[dict]:
         y_true = group["label"].astype(int).to_numpy()
         y_pred = group["predicted_label"].astype(int).to_numpy()
         returns = group["future_return"].to_numpy(dtype=float)
+        actionable = group[group.get("is_actionable", pd.Series(True, index=group.index)).fillna(False).astype(bool)]
+        actionable_accuracy = float((actionable["label"].astype(int) == actionable["predicted_label"].astype(int)).mean()) if not actionable.empty else None
         rows.append({
             "symbol": str(symbol),
             "rows": int(len(group)),
@@ -217,6 +229,9 @@ def _by_symbol_metrics(data: pd.DataFrame) -> list[dict]:
             "avg_future_return": float(np.mean(returns)),
             "model_directional_avg_return": float(np.mean(np.where(y_pred == 1, returns, -returns))),
             "max_drawdown_proxy": float(np.min(returns)),
+            "actionable_rows": int(len(actionable)),
+            "actionable_coverage": float(len(actionable) / len(group)),
+            "actionable_accuracy": actionable_accuracy,
         })
     return rows
 
@@ -231,6 +246,8 @@ def _by_regime_metrics(data: pd.DataFrame) -> list[dict]:
         baseline_label = int(y_true.mean() >= 0.5)
         accuracy = float((y_true == y_pred).mean())
         baseline_accuracy = float((y_true == baseline_label).mean())
+        actionable = group[group.get("is_actionable", pd.Series(True, index=group.index)).fillna(False).astype(bool)]
+        actionable_accuracy = float((actionable["label"].astype(int) == actionable["predicted_label"].astype(int)).mean()) if not actionable.empty else None
         rows.append(
             {
                 "regime": str(regime),
@@ -241,6 +258,9 @@ def _by_regime_metrics(data: pd.DataFrame) -> list[dict]:
                 "balanced_accuracy": _balanced_accuracy(y_true, y_pred),
                 "baseline_accuracy": baseline_accuracy,
                 "edge_vs_baseline": accuracy - baseline_accuracy,
+                "actionable_rows": int(len(actionable)),
+                "actionable_coverage": float(len(actionable) / len(group)),
+                "actionable_accuracy": actionable_accuracy,
             }
         )
     return rows
@@ -261,6 +281,25 @@ def _qqq_direction_comparison(data: pd.DataFrame) -> dict:
         "qqq_always_long_accuracy": float((qqq == 1).mean()),
         "model_edge_vs_qqq_long": float((model == qqq).mean() - (qqq == 1).mean()),
     }
+
+
+def _candidate_target_diagnostics(data: pd.DataFrame) -> dict:
+    """Measure alternative targets without silently changing the production objective."""
+    result = {
+        "production_target": "future_20d_return_above_zero",
+        "production_positive_rate": float(data["label"].astype(int).mean()),
+    }
+    if "material_up_label" in data:
+        material = pd.to_numeric(data["material_up_label"], errors="coerce").dropna()
+        result["material_up_target"] = "future_20d_return_at_least_2pct_or_beats_qqq_by_1pct"
+        result["material_up_rows"] = int(len(material))
+        result["material_up_positive_rate"] = float(material.mean()) if not material.empty else None
+    if "excess_return_vs_qqq" in data:
+        excess = pd.to_numeric(data["excess_return_vs_qqq"], errors="coerce").dropna()
+        result["beats_qqq_rows"] = int(len(excess))
+        result["beats_qqq_rate"] = float((excess > 0).mean()) if not excess.empty else None
+        result["average_excess_return_vs_qqq"] = float(excess.mean()) if not excess.empty else None
+    return result
 
 
 def _to_bool(value: object) -> bool | None:

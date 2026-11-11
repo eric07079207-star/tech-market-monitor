@@ -1359,13 +1359,14 @@ with tab_prediction:
         st.info("目前沒有即時推論列；下一次模型訓練完成後會產生。")
     else:
         current = lstm_predictions.copy()
-        display_columns = [column for column in ["symbol", "prediction_date", "target_date", "target_date_type", "predicted_prob_up", "decision_threshold", "prediction_direction", "prediction_type"] if column in current]
+        display_columns = [column for column in ["symbol", "prediction_date", "target_date", "target_date_type", "regime_bucket", "predicted_prob_up", "decision_threshold", "signal_distance", "prediction_direction", "prediction_type"] if column in current]
         st.dataframe(
             current[display_columns].rename(
                 columns={
                     "symbol": "標的", "prediction_date": "預測日", "target_date": "目標日（估計）",
                     "target_date_type": "目標日類型", "predicted_prob_up": "上漲機率",
                     "decision_threshold": "方向門檻",
+                    "regime_bucket": "市場環境", "signal_distance": "訊號強度",
                     "prediction_direction": "方向", "prediction_type": "推論類型",
                 }
             ),
@@ -1374,6 +1375,7 @@ with tab_prediction:
             column_config={
                 "上漲機率": st.column_config.NumberColumn(format="%.2%"),
                 "方向門檻": st.column_config.NumberColumn(format="%.2f"),
+                "訊號強度": st.column_config.NumberColumn(format="%.2%"),
             },
         )
         st.caption("即時推論不等待未來報酬標籤；目標日是依交易日推估，待期滿後才會進入回測驗證。")
@@ -1399,7 +1401,8 @@ with tab_prediction:
         abstention = evaluation.get("abstention", {})
         if abstention:
             st.caption(
-                f"低信心／不交易區間：上漲機率落在 40%–60% 時不下方向；目前門檻外覆蓋率 {pct(abstention.get('coverage'))}，"
+                f"低信心／不預測：上漲機率距離當前市場環境的校準門檻不足 {pct(abstention.get('band'))} 時不硬下方向；"
+                f"目前可採用訊號覆蓋率 {pct(abstention.get('coverage'))}，"
                 f"覆蓋樣本 {abstention.get('rows', 0)}，準確率 {pct(abstention.get('accuracy'))}，"
                 f"區間基準 {pct(abstention.get('baseline_accuracy'))}；狀態：{abstention.get('state', '資料不足')}。"
             )
@@ -1407,10 +1410,10 @@ with tab_prediction:
         if not by_symbol.empty:
             st.caption("個股分開評估：避免共享模型的總分掩蓋單一標的失效。")
             st.dataframe(
-                by_symbol.rename(columns={"symbol": "標的", "rows": "樣本數", "accuracy": "準確率", "balanced_accuracy": "平衡準確率", "avg_future_return": "平均後續報酬", "model_directional_avg_return": "模型方向報酬", "max_drawdown_proxy": "最差後續報酬"}),
+                by_symbol.rename(columns={"symbol": "標的", "rows": "樣本數", "accuracy": "全部準確率", "balanced_accuracy": "平衡準確率", "avg_future_return": "平均後續報酬", "model_directional_avg_return": "模型方向報酬", "max_drawdown_proxy": "最差後續報酬", "actionable_rows": "可採用樣本", "actionable_coverage": "訊號覆蓋率", "actionable_accuracy": "可採用準確率"}),
                 hide_index=True,
                 width="stretch",
-                column_config={"準確率": st.column_config.NumberColumn(format="%.2%"), "平衡準確率": st.column_config.NumberColumn(format="%.2%"), "平均後續報酬": st.column_config.NumberColumn(format="%.2%"), "模型方向報酬": st.column_config.NumberColumn(format="%.2%"), "最差後續報酬": st.column_config.NumberColumn(format="%.2%")},
+                column_config={"全部準確率": st.column_config.NumberColumn(format="%.2%"), "平衡準確率": st.column_config.NumberColumn(format="%.2%"), "平均後續報酬": st.column_config.NumberColumn(format="%.2%"), "模型方向報酬": st.column_config.NumberColumn(format="%.2%"), "最差後續報酬": st.column_config.NumberColumn(format="%.2%"), "訊號覆蓋率": st.column_config.NumberColumn(format="%.2%"), "可採用準確率": st.column_config.NumberColumn(format="%.2%")},
             )
         by_regime = pd.DataFrame(evaluation.get("by_regime", []))
         if not by_regime.empty:

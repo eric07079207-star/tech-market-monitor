@@ -29,7 +29,7 @@ LSTM_MODEL_CACHE = LSTM_DIR / "lstm_model.pt"
 LSTM_MODEL_METADATA_CACHE = LSTM_DIR / "lstm_model.json"
 LSTM_SCALER_CACHE = LSTM_DIR / "lstm_scaler.json"
 
-LSTM_FEATURE_VERSION = "lstm-regime-v2"
+LSTM_FEATURE_VERSION = "lstm-regime-v3"
 LSTM_TARGET_HORIZON_DAYS = 20
 LSTM_SEQUENCE_LENGTH = 60
 LSTM_SHARED_SYMBOLS = STOCK_TICKERS.copy()
@@ -217,6 +217,7 @@ def build_lstm_feature_table(
             if seq is None:
                 continue
             qqq_future_return = _benchmark_future_return(wide, "QQQ", current["date"], data.iloc[idx + target_horizon_days]["date"])
+            excess_return_vs_qqq = float(future_return - qqq_future_return) if np.isfinite(qqq_future_return) else np.nan
             rows.append(
                 {
                     "symbol": symbol,
@@ -228,6 +229,10 @@ def build_lstm_feature_table(
                     "label": label,
                     "qqq_future_return": qqq_future_return,
                     "qqq_label": int(qqq_future_return > 0) if np.isfinite(qqq_future_return) else np.nan,
+                    "excess_return_vs_qqq": excess_return_vs_qqq,
+                    # Stored only as an outcome label for offline comparison. It is
+                    # never included in sequence features or real-time inference.
+                    "material_up_label": int(future_return >= 0.02 or excess_return_vs_qqq >= 0.01) if np.isfinite(excess_return_vs_qqq) else int(future_return >= 0.02),
                     "feature_version": LSTM_FEATURE_VERSION,
                     "created_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     "sequence_json": json.dumps(seq, ensure_ascii=False),
@@ -652,6 +657,8 @@ def _empty_feature_table() -> pd.DataFrame:
             "label",
             "qqq_future_return",
             "qqq_label",
+            "excess_return_vs_qqq",
+            "material_up_label",
             "feature_version",
             "created_at_utc",
             "sequence_json",

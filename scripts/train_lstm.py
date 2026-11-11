@@ -45,7 +45,7 @@ except Exception as exc:  # pragma: no cover - surfaced in CI/runtime
     raise RuntimeError("torch is required for LSTM training. Install dependencies first.") from exc
 
 
-MODEL_VERSION = "lstm-regime-v4"
+MODEL_VERSION = "lstm-regime-v5"
 DEFAULT_SYMBOLS = LSTM_SHARED_SYMBOLS
 # GitHub-hosted CPU runners have a bounded job window.  Six epochs preserve
 # more training passes than the previous five-epoch model, while the larger
@@ -59,6 +59,9 @@ TRAIN_RATIO = 0.7
 VALID_RATIO = 0.15
 TEST_RATIO = 0.15
 RANDOM_SEED = 42
+ABSTENTION_MARGIN = 0.07
+REGIME_THRESHOLD_MIN_ROWS = 60
+THRESHOLD_MAX_CHANGE = 0.03
 
 
 @dataclass(frozen=True)
@@ -100,6 +103,7 @@ def main() -> None:
     parser.add_argument("--lookback-years", type=int, default=None, help="Optional rolling lookback; normally leave unset to preserve full regimes.")
     parser.add_argument("--sample-step", type=int, default=5, help="Sample every N trading days.")
     args = parser.parse_args()
+    previous_threshold, previous_regime_thresholds = _load_previous_thresholds()
     np.random.seed(RANDOM_SEED)
     torch.manual_seed(RANDOM_SEED)
 
@@ -201,18 +205,25 @@ def main() -> None:
             valid_prob,
             split_data.y_valid,
             split_data.valid_regimes,
+            previous_threshold=previous_threshold,
+            previous_regime_thresholds=previous_regime_thresholds,
         )
+        regime_thresholds = threshold_metrics.get("regime_thresholds", {})
         test_logits = model(torch.tensor(split_data.x_test, dtype=torch.float32))
         test_prob = torch.sigmoid(test_logits).cpu().numpy()
-        test_pred = (test_prob >= decision_threshold).astype(int)
+        test_thresholds = _thresholds_for_regimes(
+            split_data.test_meta.get("regime_bucket", pd.Series(dtype=str)).astype(str).to_numpy(),
+            decision_threshold,
+            regime_thresholds,
+        )
+        test_pred = (test_prob >= test_thresholds).astype(int)
         test_acc = float((test_pred == split_data.y_test).mean()) if len(split_data.y_test) else np.nan
 
     LSTM_DIR.mkdir(parents=True, exist_ok=True)
     torch.save(best_state["model_state"], LSTM_MODEL_CACHE)
     _save_scaler(split_data, LSTM_SCALER_CACHE)
 
-    backtest = _build_backtest_frame(split_data.test_meta, test_prob, test_pred)
-    backtest["decision_threshold"] = float(decision_threshold)
+    backtest = _build_backtest_frame(split_data.test_meta, test_prob, test_pred, test_thresholds)
     backtest.to_parquet(LSTM_BACKTEST_CACHE, index=False)
     split_data.split_meta.to_parquet(LSTM_SPLIT_CACHE, index=False)
 
@@ -231,6 +242,7 @@ def main() -> None:
         split_data.feature_mean,
         split_data.feature_std,
         decision_threshold,
+        regime_thresholds,
     )
     latest_predictions.to_parquet(LSTM_PREDICTIONS_CACHE, index=False)
 
@@ -251,8 +263,10 @@ def main() -> None:
         "regime_balance_method": "inverse_frequency_weighted_sampler",
         "train_regime_counts": {str(key): int(value) for key, value in regime_counts.items()},
         "decision_threshold": float(decision_threshold),
+        "decision_thresholds_by_regime": regime_thresholds,
+        "abstention_margin": ABSTENTION_MARGIN,
         "threshold_calibration": threshold_metrics,
-        "threshold_calibration_source": "validation_only",
+        "threshold_calibration_source": "nested_walk_forward_validation_only",
         "split_method": "time_series_purged_20d",
         "train_ratio": TRAIN_RATIO,
         "valid_ratio": VALID_RATIO,
@@ -281,9 +295,11 @@ def main() -> None:
             "horizon_days": LSTM_TARGET_HORIZON_DAYS,
             "sequence_length": LSTM_SEQUENCE_LENGTH,
             "last_train_at_utc": metadata["trained_at_utc"],
-            "status": f"已訓練完成，驗證集校準門檻 {decision_threshold:.2f}，測試準確率 {test_acc:.2%}",
+            "status": f"已訓練完成，嵌套驗證門檻 {decision_threshold:.2f}，測試準確率 {test_acc:.2%}",
             "decision_threshold": float(decision_threshold),
-            "threshold_calibration_source": "validation_only",
+            "decision_thresholds_by_regime": regime_thresholds,
+            "abstention_margin": ABSTENTION_MARGIN,
+            "threshold_calibration_source": "nested_walk_forward_validation_only",
             "train_regime_counts": {str(key): int(value) for key, value in regime_counts.items()},
             "prediction_rows": int(len(latest_predictions)),
             "backtest_rows": int(len(backtest)),
@@ -333,7 +349,7 @@ def _prepare_split(features: pd.DataFrame) -> SplitData:
         rows.append(seq)
     sequence_array = np.asarray(rows, dtype=np.float32)
     labels = data["label"].astype(int).to_numpy()
-    meta_columns = [column for column in ["symbol", "date", "target_date", "future_return", "label", "qqq_future_return", "qqq_label", "regime_bucket", "feature_version", "split"] if column in data]
+    meta_columns = [column for column in ["symbol", "date", "target_date", "future_return", "label", "qqq_future_return", "qqq_label", "excess_return_vs_qqq", "material_up_label", "regime_bucket", "feature_version", "split"] if column in data]
     meta = data[meta_columns].copy()
     train_mask = data["split"].to_numpy() == "train"
     train_rows = sequence_array[train_mask]
@@ -372,17 +388,34 @@ def _save_scaler(split: SplitData, path: Path) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _build_backtest_frame(meta: pd.DataFrame, prob: np.ndarray, pred: np.ndarray) -> pd.DataFrame:
+def _build_backtest_frame(
+    meta: pd.DataFrame,
+    prob: np.ndarray,
+    pred: np.ndarray,
+    thresholds: np.ndarray,
+) -> pd.DataFrame:
     if meta.empty:
         return pd.DataFrame()
     frame = meta.copy()
     frame["predicted_prob_up"] = prob
     frame["predicted_label"] = pred
-    frame["prediction_direction"] = np.where(frame["predicted_label"].eq(1), "看漲", "看跌")
+    frame["decision_threshold"] = thresholds
+    frame["abstention_margin"] = ABSTENTION_MARGIN
+    frame["signal_distance"] = np.abs(frame["predicted_prob_up"] - frame["decision_threshold"])
+    frame["is_actionable"] = frame["signal_distance"].ge(ABSTENTION_MARGIN)
+    frame["prediction_direction"] = np.select(
+        [
+            frame["is_actionable"] & frame["predicted_label"].eq(1),
+            frame["is_actionable"] & frame["predicted_label"].eq(0),
+        ],
+        ["看漲", "看跌"],
+        default="低信心／不預測",
+    )
     frame["model_version"] = MODEL_VERSION
     frame["created_at_utc"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     frame["validated_at_utc"] = frame["created_at_utc"]
-    frame["success"] = ((frame["predicted_label"].eq(1) & frame["future_return"].gt(0)) | (frame["predicted_label"].eq(0) & frame["future_return"].lt(0))).astype(bool)
+    success = (frame["predicted_label"].eq(1) & frame["future_return"].gt(0)) | (frame["predicted_label"].eq(0) & frame["future_return"].lt(0))
+    frame["success"] = success.where(frame["is_actionable"], pd.NA).astype("boolean")
     return frame
 
 
@@ -392,6 +425,7 @@ def _build_monitor_predictions(
     mean: pd.Series,
     std: pd.Series,
     decision_threshold: float,
+    regime_thresholds: dict[str, float],
 ) -> pd.DataFrame:
     if monitor_features.empty:
         return pd.DataFrame()
@@ -405,6 +439,12 @@ def _build_monitor_predictions(
         with torch.no_grad():
             logits = model(torch.tensor(normalized[None, :, :], dtype=torch.float32))
             prob = torch.sigmoid(logits).item()
+        regime = _market_regime_from_sequence(latest.sequence_json)
+        threshold = float(regime_thresholds.get(regime, decision_threshold))
+        signal_distance = abs(float(prob) - threshold)
+        actionable = signal_distance >= ABSTENTION_MARGIN
+        predicted_label = int(prob >= threshold)
+        direction = ("看漲" if predicted_label else "看跌") if actionable else "低信心／不預測"
         latest_rows.append(
             {
                 "symbol": symbol,
@@ -415,9 +455,13 @@ def _build_monitor_predictions(
                 "model_version": MODEL_VERSION,
                 "feature_version": str(latest.feature_version),
                 "predicted_prob_up": float(prob),
-                "predicted_label": int(prob >= decision_threshold),
-                "prediction_direction": "看漲" if prob >= decision_threshold else "看跌",
-                "decision_threshold": float(decision_threshold),
+                "predicted_label": predicted_label,
+                "prediction_direction": direction,
+                "decision_threshold": threshold,
+                "abstention_margin": ABSTENTION_MARGIN,
+                "regime_bucket": regime,
+                "signal_distance": signal_distance,
+                "is_actionable": actionable,
                 "created_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "prediction_type": "real_time_inference",
             }
@@ -429,6 +473,8 @@ def _calibrate_threshold(
     probabilities: np.ndarray,
     labels: np.ndarray,
     regimes: np.ndarray | None = None,
+    previous_threshold: float | None = None,
+    previous_regime_thresholds: dict[str, float] | None = None,
 ) -> tuple[float, dict]:
     probabilities = np.asarray(probabilities, dtype=float)
     labels = np.asarray(labels, dtype=int)
@@ -501,7 +547,49 @@ def _calibrate_threshold(
         best_regime_std,
         best_positive_rate,
     ) = max(rows)
-    return best_threshold, {
+    full_validation_threshold = float(best_threshold)
+    chronological_blocks = [block for block in np.array_split(np.arange(len(labels)), 5) if len(block) >= 20]
+    walk_forward_rows = []
+    for fold_index in range(1, len(chronological_blocks)):
+        calibration_indices = np.concatenate(chronological_blocks[:fold_index])
+        evaluation_indices = chronological_blocks[fold_index]
+        if len(calibration_indices) < 30 or len(np.unique(labels[calibration_indices])) < 2 or len(np.unique(labels[evaluation_indices])) < 2:
+            continue
+        fold_threshold = _best_balanced_threshold(probabilities[calibration_indices], labels[calibration_indices], candidates)
+        fold_prediction = (probabilities[evaluation_indices] >= fold_threshold).astype(int)
+        fold_balanced = _balanced_accuracy(labels[evaluation_indices], fold_prediction)
+        walk_forward_rows.append(
+            {"fold": fold_index, "threshold": float(fold_threshold), "rows": int(len(evaluation_indices)), "balanced_accuracy": fold_balanced}
+        )
+
+    raw_thresholds = [full_validation_threshold] + [row["threshold"] for row in walk_forward_rows]
+    raw_nested_threshold = float(np.median(raw_thresholds))
+    stabilized_threshold = _limit_threshold_change(raw_nested_threshold, previous_threshold, THRESHOLD_MAX_CHANGE)
+
+    previous_regime_thresholds = previous_regime_thresholds or {}
+    regime_thresholds: dict[str, float] = {}
+    regime_details: dict[str, dict] = {}
+    for regime in sorted(np.unique(regimes)):
+        indices = np.flatnonzero(regimes == regime)
+        if len(indices) < REGIME_THRESHOLD_MIN_ROWS or len(np.unique(labels[indices])) < 2:
+            continue
+        raw_regime_threshold = _best_balanced_threshold(probabilities[indices], labels[indices], candidates)
+        raw_regime_threshold = float(np.clip(raw_regime_threshold, stabilized_threshold - 0.08, stabilized_threshold + 0.08))
+        regime_threshold = _limit_threshold_change(
+            raw_regime_threshold,
+            previous_regime_thresholds.get(str(regime), stabilized_threshold),
+            THRESHOLD_MAX_CHANGE,
+        )
+        regime_thresholds[str(regime)] = regime_threshold
+        regime_prediction = (probabilities[indices] >= regime_threshold).astype(int)
+        regime_details[str(regime)] = {
+            "rows": int(len(indices)),
+            "raw_threshold": raw_regime_threshold,
+            "threshold": regime_threshold,
+            "balanced_accuracy": _balanced_accuracy(labels[indices], regime_prediction),
+        }
+
+    return stabilized_threshold, {
         "objective": "robust_validation_balanced_accuracy",
         "status": "calibrated",
         "robust_score": best_score,
@@ -517,6 +605,62 @@ def _calibrate_threshold(
         "candidate_min": float(candidates.min()),
         "candidate_max": float(candidates.max()),
         "candidate_count": int(len(candidates)),
+        "full_validation_threshold": full_validation_threshold,
+        "raw_nested_threshold": raw_nested_threshold,
+        "stabilized_threshold": stabilized_threshold,
+        "previous_threshold": previous_threshold,
+        "max_threshold_change": THRESHOLD_MAX_CHANGE,
+        "walk_forward_folds": walk_forward_rows,
+        "walk_forward_balanced_accuracy_mean": float(np.mean([row["balanced_accuracy"] for row in walk_forward_rows])) if walk_forward_rows else None,
+        "regime_threshold_min_rows": REGIME_THRESHOLD_MIN_ROWS,
+        "regime_thresholds": regime_thresholds,
+        "regime_threshold_details": regime_details,
+    }
+
+
+def _best_balanced_threshold(probabilities: np.ndarray, labels: np.ndarray, candidates: np.ndarray) -> float:
+    scored = []
+    for threshold in candidates:
+        prediction = (probabilities >= threshold).astype(int)
+        balanced = _balanced_accuracy(labels, prediction)
+        positive_rate = float(prediction.mean())
+        collapse_penalty = max(0.0, 0.10 - min(positive_rate, 1.0 - positive_rate)) * 1.5
+        scored.append((balanced - collapse_penalty - 0.01 * abs(float(threshold) - 0.5), -abs(float(threshold) - 0.5), float(threshold)))
+    return max(scored)[2]
+
+
+def _balanced_accuracy(labels: np.ndarray, prediction: np.ndarray) -> float:
+    recalls = []
+    for label in (0, 1):
+        actual = labels == label
+        if actual.any():
+            recalls.append(float((prediction[actual] == label).mean()))
+    return float(np.mean(recalls)) if recalls else 0.0
+
+
+def _limit_threshold_change(raw: float, previous: float | None, max_change: float) -> float:
+    if previous is None or not np.isfinite(previous):
+        return float(raw)
+    return float(np.clip(raw, float(previous) - max_change, float(previous) + max_change))
+
+
+def _thresholds_for_regimes(regimes: np.ndarray, default: float, regime_thresholds: dict[str, float]) -> np.ndarray:
+    return np.asarray([float(regime_thresholds.get(str(regime), default)) for regime in regimes], dtype=float)
+
+
+def _load_previous_thresholds() -> tuple[float | None, dict[str, float]]:
+    if not LSTM_MODEL_METADATA_CACHE.exists():
+        return None, {}
+    try:
+        payload = json.loads(LSTM_MODEL_METADATA_CACHE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, {}
+    threshold = pd.to_numeric(payload.get("decision_threshold"), errors="coerce")
+    regime_thresholds = payload.get("decision_thresholds_by_regime", {})
+    if not isinstance(regime_thresholds, dict):
+        regime_thresholds = {}
+    return (float(threshold) if pd.notna(threshold) else None), {
+        str(key): float(value) for key, value in regime_thresholds.items() if pd.notna(pd.to_numeric(value, errors="coerce"))
     }
 
 
