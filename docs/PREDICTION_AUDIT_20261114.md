@@ -105,3 +105,34 @@
 5. 預先指定新檢驗時段及多重試驗修正，最後才研究集成或大型模型。
 
 時間序列切分參考：[scikit-learn 官方說明](https://scikit-learn.org/stable/modules/cross_validation.html#time-series-split)。
+
+## 實際驗證紀錄
+
+- 兩次獨立本機 CPU 訓練：`20261113T165120Z` 與 `20261113T165642Z`。四期限、四模型的全部測試績效逐值一致，沒有為了得到高分挑種子。
+- 14項單元測試通過：未來資料附加不改歷史特徵、標籤成熟隔離、交易日目標、真實淨值／回撤／費用、持現基準、缺價／重複防護、事前發表限制、不可覆寫預測與舊基準修正。
+- 本機 Streamlit AppTest 通過；線上實際開啟「預測驗證」及「量化數據中心 → 樣本外研究」，測試桌面與390px手機版、切換1日／20日。
+- [GitHub 回歸測試通過](https://github.com/eric07079207-star/tech-market-monitor/actions/runs/43473451719)。
+- [GitHub 凍結模型推論與提交通過](https://github.com/eric07079207-star/tech-market-monitor/actions/runs/43473490493)：四模型通過載入和雜湊核對，監控結果已提交至main。
+- 首次雲端測試發現研究環境缺少舊模組相依的requests，已補齊既有應用依賴並重新驗證；失敗Issue建立及修復後關閉均確認。正式模型與最後成功快取未受影響。
+- 原共享與TSLA模型的weights、scaler、backtest對基準commit逐檔無差異。原共享準確率仍46.66%；修正尚未到期標籤後，舊walk-forward多數基準由55.63%改為47.56%，這是診斷修正，不是模型提升。
+- 最新來源含盤中11/13資料，研究僅使用已完整收盤11/12及之前。當下已錯過11/13開盤，因此影子紀錄為0、等待下次有效收盤；不補造歷史預測。雲端已實測推論與監控，完整訓練實測在本機完成。
+- 發布研究快取約1.3MiB；每次完整本機研究快照約5.5MiB。未新增OpenAI／Gemini API呼叫。
+
+## 修改檔案
+
+| 檔案 | 變更 |
+|---|---|
+| `src/prediction_research.py` | 因果時點特徵、分割、四候選、Optuna、校準、交易成本及區塊統計 |
+| `scripts/run_prediction_research.py` | 隔離實驗、baseline備份、版本／雜湊、逐股與環境比較 |
+| `scripts/monitor_prediction_research.py` | 凍結模型部署包、事前推論、不可重寫紀錄、期滿結算及漂移 |
+| `src/research_view.py`, `app.py` | 結論與明細分開、手機可讀表格、舊診斷文字修正 |
+| `scripts/train_lstm.py`, `src/lstm.py` | 最佳權重深拷貝、實際到期隔離、禁止預設自動替換、as-of修正 |
+| `src/evaluation.py`, `scripts/routine_check.py` | 到期多數基準、覆蓋率一致、健康狀態與模型品質分開、唯讀檢查不偷偷同步 |
+| `tests/test_prediction_research.py` | 14項針對性回歸測試 |
+| `.github/workflows/prediction-research.yml` | 雲端排程、失敗告警、同步重試及提交上限 |
+| `.github/workflows/prediction-tests.yml` | 提交後自動測試與Streamlit啟動檢查 |
+| `requirements-research.txt`, `.gitignore` | 獨立固定版本環境、排除大型訓練中間產物 |
+| `scripts/export_prediction_research_report.py`, `docs/` | 從實測JSON產生中文模型比較及診斷 |
+| `data/cache/prediction_research/` | 輕量研究報告、模型部署包及監控狀態 |
+| `data/cache/lstm/lstm_evaluation.json` | 只修正評估診斷，未改正式模型權重 |
+| `data/觀察版資料/13_專案記憶/` | 記錄D-025研究隔離與不得以重複測試提升模型的決策 |
