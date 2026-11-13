@@ -3,12 +3,12 @@
   "feature_version": "lstm-regime-v3",
   "challenger": {
     "status": "usable",
-    "rows": 101,
-    "accuracy": 0.5148514851485149,
-    "balanced_accuracy": 0.5357704402515724,
-    "baseline_accuracy": 0.5247524752475248,
-    "edge_vs_baseline": -0.00990099009900991,
-    "predicted_positive_rate": 0.07920792079207921
+    "rows": 102,
+    "accuracy": 0.5098039215686274,
+    "balanced_accuracy": 0.5347222222222222,
+    "baseline_accuracy": 0.5294117647058824,
+    "edge_vs_baseline": -0.019607843137254943,
+    "predicted_positive_rate": 0.0784313725490196
   },
   "incumbent": {
     "status": "usable",
@@ -22,7 +22,7 @@
   "promotion": {
     "promoted": false,
     "reason": "未超過多數類別基準 1%",
-    "evaluated_at_utc": "2026-11-12T03:38:29+00:00"
+    "evaluated_at_utc": "2026-11-13T03:14:55+00:00"
   },
   "promotion_rules": {
     "minimum_edge_vs_majority_baseline": 0.01,
