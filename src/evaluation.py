@@ -254,7 +254,8 @@ def _by_regime_metrics(data: pd.DataFrame) -> list[dict]:
         baseline_label = int(y_true.mean() >= 0.5)
         accuracy = float((y_true == y_pred).mean())
         baseline_accuracy = float((y_true == baseline_label).mean())
-        actionable = group[group.get("is_actionable", pd.Series(True, index=group.index)).fillna(False).astype(bool)]
+        default_actionable = group["predicted_prob_up"].sub(.5).abs().ge(.1)
+        actionable = group[group.get("is_actionable", default_actionable).fillna(False).astype(bool)]
         actionable_accuracy = float((actionable["label"].astype(int) == actionable["predicted_label"].astype(int)).mean()) if not actionable.empty else None
         rows.append(
             {
@@ -286,6 +287,7 @@ def _qqq_direction_comparison(data: pd.DataFrame) -> dict:
         "status": "可用",
         "rows": int(len(comparable)),
         "model_matches_qqq_direction": float((model == qqq).mean()),
+        "comparison_kind": "ex_post_qqq_co_movement_not_tradeable_benchmark",
         "qqq_always_long_accuracy": float((qqq == 1).mean()),
         "model_edge_vs_qqq_long": float((model == qqq).mean() - (qqq == 1).mean()),
     }

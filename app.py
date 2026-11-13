@@ -1475,14 +1475,14 @@ with tab_prediction:
         qqq_compare = evaluation.get("qqq_direction_comparison", {})
         if qqq_compare.get("status") == "可用":
             st.caption(
-                f"相對 QQQ 方向：模型與 QQQ 同向 {pct(qqq_compare.get('model_matches_qqq_direction'))}；"
-                f"相對 QQQ 持續偏多基準差異 {pct(qqq_compare.get('model_edge_vs_qqq_long'))}。"
+                f"事後共變動診斷：模型與未來 QQQ 同向 {pct(qqq_compare.get('model_matches_qqq_direction'))}。"
+                "這不是可交易的預測基準；當時可知的 QQQ 動能基準請看樣本外研究。"
             )
         audit = lstm_evaluation.get("leakage_audit", {})
         if audit.get("issues"):
             st.error("資料洩漏檢查：" + "；".join(audit["issues"]))
         else:
-            st.success("資料洩漏檢查：目前沒有偵測到即時預測日早於目標日的異常。")
+            st.info("基本欄位檢查通過：即時預測日早於目標日，且監控表未帶入未來標籤；這不代表所有資料洩漏風險均已排除。")
         rule_eval = lstm_evaluation.get("rule_predictions", {})
         by_horizon = rule_eval.get("by_horizon", []) if isinstance(rule_eval, dict) else []
         if by_horizon:

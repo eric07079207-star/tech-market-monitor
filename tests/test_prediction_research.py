@@ -5,7 +5,7 @@ import pandas as pd
 from src.prediction_research import (SYMBOLS, MARKETS, FEATURES, completed_prices, build_panel,
     with_sequences, purged_before, temporal_folds, portfolio, classification, block_interval)
 from src.lstm import _relative_feature
-from src.evaluation import _walk_forward_majority_accuracy, leakage_audit
+from src.evaluation import _walk_forward_majority_accuracy, leakage_audit, _by_symbol_metrics, _by_regime_metrics
 from scripts.monitor_prediction_research import append_locked, forward_window
 
 
@@ -21,6 +21,12 @@ def sample_prices(n=700):
 
 
 class ResearchTests(unittest.TestCase):
+    def test_legacy_signal_coverage_consistent_across_groups(self):
+        f = pd.DataFrame({"symbol": ["TSLA"]*2, "regime_bucket": ["risk_on"]*2,
+                          "label": [1, 0], "predicted_label": [1, 0],
+                          "predicted_prob_up": [.51, .1], "future_return": [.01, -.01]})
+        self.assertEqual(_by_symbol_metrics(f)[0]["actionable_rows"], 1)
+        self.assertEqual(_by_regime_metrics(f)[0]["actionable_rows"], 1)
     def test_forward_predictions_cannot_be_backdated(self):
         import exchange_calendars as xcals
         cal = xcals.get_calendar("XNYS", start="2026-11-01", end="2027-01-31")
