@@ -584,6 +584,18 @@ def load_lstm_evaluation() -> dict:
 
 
 @st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
+def load_lstm_challenger_report() -> dict:
+    path = cache_path("lstm/lstm_challenger_evaluation.json")
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+@st.cache_data(show_spinner=False, ttl=LOCAL_DATA_TTL_SECONDS)
 def load_lstm_specialist_status() -> dict:
     path = cache_path("lstm/tsla_specialist/lstm_status.json")
     if not path.exists():
@@ -894,6 +906,7 @@ lstm_status = build_lstm_status_from_artifacts()
 lstm_predictions = load_lstm_predictions()
 lstm_backtest = load_lstm_backtest()
 lstm_evaluation = load_lstm_evaluation()
+lstm_challenger = load_lstm_challenger_report()
 lstm_tsla_specialist = load_lstm_specialist_status()
 active_news_keywords = load_news_keywords()
 keyword_discovery_news = tsla_keyword_news.copy()
@@ -1348,6 +1361,23 @@ with tab_prediction:
     lstm_quality_cols[1].metric("回測正確率", pct(lstm_status.get("backtest_accuracy")))
     lstm_quality_cols[2].metric("信心等級", str(lstm_status.get("prediction_confidence_level", "低信心")))
     lstm_quality_cols[3].metric("驗證集校準門檻", f"{float(lstm_status.get('decision_threshold', 0.5)):.2f}")
+    evaluation = lstm_evaluation.get("lstm", {}) if isinstance(lstm_evaluation, dict) else {}
+    formal_edge = pd.to_numeric(
+        lstm_status.get("production_edge_vs_baseline", evaluation.get("accuracy_edge_vs_baseline")), errors="coerce"
+    )
+    production_eligible = bool(lstm_status.get("production_eligible", pd.notna(formal_edge) and float(formal_edge) >= 0.01))
+    challenger_metrics = lstm_challenger.get("challenger", {}) if isinstance(lstm_challenger, dict) else {}
+    challenger_promotion = lstm_challenger.get("promotion", {}) if isinstance(lstm_challenger, dict) else {}
+    model_gate_cols = st.columns(5)
+    model_gate_cols[0].metric("正式預測資格", "已通過" if production_eligible else "未通過")
+    model_gate_cols[1].metric("正式相對基準", pct(formal_edge))
+    model_gate_cols[2].metric("挑戰模型準確率", pct(challenger_metrics.get("accuracy")))
+    model_gate_cols[3].metric("挑戰相對基準", pct(challenger_metrics.get("edge_vs_baseline")))
+    model_gate_cols[4].metric("升級結果", "已升級" if challenger_promotion.get("promoted") else "保留原模型")
+    if not production_eligible:
+        st.warning("共享 LSTM 尚未超過簡單基準，目前只保留為研究模型，不提供可操作的個股方向。")
+    if challenger_promotion:
+        st.caption(f"最新挑戰模型：{lstm_challenger.get('model_version', 'n/a')}｜結果：{challenger_promotion.get('reason', 'n/a')}")
     if lstm_tsla_specialist:
         st.caption(
             "TSLA 專屬模型："
@@ -1355,7 +1385,6 @@ with tab_prediction:
             f"回測 {pct(lstm_tsla_specialist.get('backtest_accuracy'))}｜"
             f"訓練/驗證/測試 {lstm_tsla_specialist.get('train_rows', 0)}/{lstm_tsla_specialist.get('valid_rows', 0)}/{lstm_tsla_specialist.get('test_rows', 0)}"
         )
-    evaluation = lstm_evaluation.get("lstm", {}) if isinstance(lstm_evaluation, dict) else {}
     if lstm_predictions.empty:
         st.info("目前沒有即時推論列；下一次模型訓練完成後會產生。")
     else:

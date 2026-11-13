@@ -65,6 +65,7 @@ REGIME_THRESHOLD_MIN_ROWS = 60
 THRESHOLD_MAX_CHANGE = 0.03
 PROMOTION_MIN_EDGE = 0.01
 PROMOTION_MAX_INCUMBENT_REGRESSION = 0.002
+PRODUCTION_MIN_EDGE = 0.01
 
 
 @dataclass(frozen=True)
@@ -238,9 +239,15 @@ def main() -> None:
     _save_challenger_report(challenger_quality, incumbent_quality, promotion, threshold_metrics)
     if not promotion["promoted"]:
         incumbent_status = load_lstm_status()
+        production_eligible = _is_production_eligible(incumbent_quality)
+        model_state_text = "正式模型已保留" if production_eligible else "現行模型未超過基準，僅供研究"
         incumbent_status.update(
             {
-                "status": f"正式模型已保留；最新挑戰模型未達升級門檻（{promotion['reason']}）",
+                "status": f"{model_state_text}；最新挑戰模型未達升級門檻（{promotion['reason']}）",
+                "production_eligible": production_eligible,
+                "production_accuracy": incumbent_quality.get("accuracy"),
+                "production_baseline_accuracy": incumbent_quality.get("baseline_accuracy"),
+                "production_edge_vs_baseline": incumbent_quality.get("edge_vs_baseline"),
                 "last_challenger_at_utc": promotion["evaluated_at_utc"],
                 "last_challenger_version": MODEL_VERSION,
                 "last_challenger_accuracy": challenger_quality.get("accuracy"),
@@ -349,6 +356,10 @@ def main() -> None:
             "valid_rows": int(len(split_data.y_valid)),
             "test_rows": int(len(split_data.y_test)),
             "backtest_accuracy": test_acc,
+            "production_eligible": True,
+            "production_accuracy": challenger_quality.get("accuracy"),
+            "production_baseline_accuracy": challenger_quality.get("baseline_accuracy"),
+            "production_edge_vs_baseline": challenger_quality.get("edge_vs_baseline"),
             "prediction_date": str(latest_predictions.iloc[-1]["prediction_date"]) if not latest_predictions.empty else "",
             "prediction_target_date": str(latest_predictions.iloc[-1]["target_date"]) if not latest_predictions.empty else "",
             "prediction_target_date_type": "estimated",
@@ -505,6 +516,7 @@ def _build_monitor_predictions(
                 "is_actionable": actionable,
                 "created_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "prediction_type": "real_time_inference",
+                "production_eligible": True,
             }
         )
     return pd.DataFrame(latest_rows)
@@ -741,6 +753,14 @@ def _refresh_incumbent_predictions(monitor_features: pd.DataFrame) -> pd.DataFra
             {str(key): float(value) for key, value in regime_thresholds.items()},
             model_version=str(metadata.get("model_version", "incumbent")),
         )
+        quality = _load_incumbent_quality()
+        production_eligible = _is_production_eligible(quality)
+        predictions["raw_prediction_direction"] = predictions["prediction_direction"]
+        predictions["production_eligible"] = production_eligible
+        predictions["production_edge_vs_baseline"] = quality.get("edge_vs_baseline")
+        if not production_eligible:
+            predictions["prediction_direction"] = "研究模型未超過基準／不預測"
+            predictions["is_actionable"] = False
         predictions.to_parquet(LSTM_PREDICTIONS_CACHE, index=False)
         return predictions
     except (OSError, ValueError, KeyError, RuntimeError, json.JSONDecodeError):
@@ -788,6 +808,14 @@ def _promotion_decision(challenger: dict, incumbent: dict) -> dict:
     return {"promoted": True, "reason": "通過基準與回歸檢查", "evaluated_at_utc": now}
 
 
+def _is_production_eligible(quality: dict) -> bool:
+    return bool(
+        quality.get("status") == "usable"
+        and float(quality.get("edge_vs_baseline", -1.0)) >= PRODUCTION_MIN_EDGE
+        and float(quality.get("balanced_accuracy", 0.0)) >= 0.50
+    )
+
+
 def _save_challenger_report(challenger: dict, incumbent: dict, promotion: dict, threshold_metrics: dict) -> None:
     payload = {
         "model_version": MODEL_VERSION,
@@ -805,6 +833,36 @@ def _save_challenger_report(challenger: dict, incumbent: dict, promotion: dict, 
     path = LSTM_DIR / "lstm_challenger_evaluation.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    history_path = LSTM_DIR / "lstm_challenger_history.parquet"
+    history_row = pd.DataFrame(
+        [
+            {
+                "evaluated_at_utc": promotion.get("evaluated_at_utc"),
+                "model_version": MODEL_VERSION,
+                "feature_version": LSTM_FEATURE_VERSION,
+                "promoted": bool(promotion.get("promoted", False)),
+                "reason": promotion.get("reason", ""),
+                "rows": challenger.get("rows"),
+                "accuracy": challenger.get("accuracy"),
+                "balanced_accuracy": challenger.get("balanced_accuracy"),
+                "baseline_accuracy": challenger.get("baseline_accuracy"),
+                "edge_vs_baseline": challenger.get("edge_vs_baseline"),
+                "predicted_positive_rate": challenger.get("predicted_positive_rate"),
+                "incumbent_accuracy": incumbent.get("accuracy"),
+                "incumbent_edge_vs_baseline": incumbent.get("edge_vs_baseline"),
+            }
+        ]
+    )
+    if history_path.exists():
+        try:
+            history_row = pd.concat([pd.read_parquet(history_path), history_row], ignore_index=True)
+        except (OSError, ValueError):
+            pass
+    history_row["evaluated_at_utc"] = pd.to_datetime(history_row["evaluated_at_utc"], errors="coerce", utc=True)
+    history_row = history_row.dropna(subset=["evaluated_at_utc"]).drop_duplicates(
+        subset=["evaluated_at_utc", "model_version"], keep="last"
+    ).sort_values("evaluated_at_utc")
+    history_row.to_parquet(history_path, index=False)
 
 
 def _market_regime_from_sequence(sequence_json: str) -> str:

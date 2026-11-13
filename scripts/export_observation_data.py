@@ -71,6 +71,8 @@ EXPORTS = [
     ExportItem("lstm/lstm_scaler.json", "10_LSTM模型", "LSTM標準化器", "LSTM 特徵標準化參數。"),
     ExportItem("lstm/lstm_status.json", "10_LSTM模型", "LSTM流程狀態", "LSTM 更新狀態、最後訓練時間與工件統計。"),
     ExportItem("lstm/lstm_evaluation.json", "10_LSTM模型", "LSTM預測品質評估", "LSTM 基準比較、分類指標、報酬統計與資料洩漏檢查。"),
+    ExportItem("lstm/lstm_challenger_evaluation.json", "10_LSTM模型", "LSTM挑戰模型評估", "最新挑戰模型與正式模型、多數類別基準的比較及升級結果。"),
+    ExportItem("lstm/lstm_challenger_history.parquet", "10_LSTM模型", "LSTM挑戰模型歷史", "每次訓練的準確率、平衡準確率、基準差、升級結果與拒絕原因。"),
     ExportItem("metadata.json", "00_資料說明", "快取更新資訊", "目前快取更新時間、資料起始日與資料筆數。"),
 ]
 
