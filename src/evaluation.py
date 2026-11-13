@@ -30,7 +30,7 @@ def evaluate_lstm_backtest(backtest: pd.DataFrame) -> dict:
     baseline_label = int(positive_rate >= 0.5)
     baseline_accuracy = float((y_true == baseline_label).mean())
     always_long_accuracy = float((y_true == 1).mean())
-    walk_forward = _walk_forward_majority_accuracy(y_true, min_history=20)
+    walk_forward = _walk_forward_majority_accuracy(data, min_history=20)
     returns = data["future_return"].to_numpy(dtype=float)
     result = {
         "status": "可用",
@@ -39,6 +39,7 @@ def evaluate_lstm_backtest(backtest: pd.DataFrame) -> dict:
         "predicted_positive_rate": float(y_pred.mean()),
         "accuracy": float((y_true == y_pred).mean()),
         "baseline_accuracy": baseline_accuracy,
+        "baseline_kind": "realized_test_majority_oracle_not_tradeable",
         "accuracy_edge_vs_baseline": float((y_true == y_pred).mean() - baseline_accuracy),
         "always_long_accuracy": always_long_accuracy,
         "accuracy_edge_vs_always_long": float((y_true == y_pred).mean() - always_long_accuracy),
@@ -100,6 +101,10 @@ def leakage_audit(features: pd.DataFrame | None, predictions: pd.DataFrame | Non
         result["prediction_date_after_target_rows"] = int((prediction_dates >= target_dates).fillna(False).sum())
     if result["prediction_date_after_target_rows"]:
         result["issues"].append("即時預測列存在預測日不早於目標日")
+    if result["feature_future_label_rows"]:
+        result["issues"].append("即時監控特徵含未來標籤，需隔離檢查")
+    if result["issues"]:
+        result["status"] = "需檢查"
     return result
 
 
@@ -109,16 +114,18 @@ def save_evaluation(payload: dict, path: Path) -> Path:
     return path
 
 
-def _walk_forward_majority_accuracy(labels: np.ndarray, min_history: int) -> float | None:
-    if len(labels) <= min_history:
+def _walk_forward_majority_accuracy(data: pd.DataFrame, min_history: int) -> float | None:
+    if "target_date" not in data:
         return None
-    predictions = []
-    actual = []
-    for index in range(min_history, len(labels)):
-        history = labels[:index]
-        predictions.append(int(history.mean() >= 0.5))
-        actual.append(int(labels[index]))
-    return float(np.mean(np.asarray(predictions) == np.asarray(actual))) if actual else None
+    dates = pd.to_datetime(data["date"], utc=True)
+    maturity = pd.to_datetime(data["target_date"], errors="coerce", utc=True)
+    correct = []
+    for date in dates.drop_duplicates().sort_values():
+        history = data.loc[maturity.lt(date), "label"]
+        if len(history) >= min_history:
+            predicted = int(history.mean() >= .5)
+            correct.extend(data.loc[dates.eq(date), "label"].eq(predicted).tolist())
+    return float(np.mean(correct)) if correct else None
 
 
 def _balanced_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float | None:
@@ -219,7 +226,8 @@ def _by_symbol_metrics(data: pd.DataFrame) -> list[dict]:
         y_true = group["label"].astype(int).to_numpy()
         y_pred = group["predicted_label"].astype(int).to_numpy()
         returns = group["future_return"].to_numpy(dtype=float)
-        actionable = group[group.get("is_actionable", pd.Series(True, index=group.index)).fillna(False).astype(bool)]
+        default_actionable = group["predicted_prob_up"].sub(.5).abs().ge(.1)
+        actionable = group[group.get("is_actionable", default_actionable).fillna(False).astype(bool)]
         actionable_accuracy = float((actionable["label"].astype(int) == actionable["predicted_label"].astype(int)).mean()) if not actionable.empty else None
         rows.append({
             "symbol": str(symbol),

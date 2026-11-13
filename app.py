@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from src.research_view import summary as render_research_summary, detail as render_research_detail
 try:
     from src.api_balance import api_balance_snapshot, load_api_usage_ledger
 except ImportError:  # pragma: no cover - protects Streamlit Cloud during partial redeploys
@@ -1346,6 +1347,7 @@ with tab_news:
 
 with tab_prediction:
     st.subheader("市場預測驗證")
+    render_research_summary()
     st.caption(f"LSTM 狀態：{lstm_status.get('status', 'n/a')}｜模式：{lstm_status.get('mode', 'n/a')}｜模型版本：{lstm_status.get('model_version', 'n/a')}")
     st.markdown("#### LSTM 即時方向預測")
     lstm_time_cols = st.columns(3)
@@ -1416,7 +1418,7 @@ with tab_prediction:
         st.markdown("#### 預測品質評估")
         eval_cols = st.columns(5)
         eval_cols[0].metric("LSTM 測試準確率", pct(evaluation.get("accuracy")))
-        eval_cols[1].metric("多數基準", pct(evaluation.get("baseline_accuracy")))
+        eval_cols[1].metric("事後多數（診斷）", pct(evaluation.get("baseline_accuracy")))
         eval_cols[2].metric("持續偏多基準", pct(evaluation.get("always_long_accuracy")))
         eval_cols[3].metric("Balanced Accuracy", pct(evaluation.get("balanced_accuracy")))
         eval_cols[4].metric("F1（上漲）", pct(evaluation.get("f1_up")))
@@ -2337,9 +2339,11 @@ VOO,,,500
 with tab_quant:
     st.subheader("量化數據中心")
     st.caption("集中查核各模組的原始數字與可回測欄位；文字結論、圖表與研究解讀保留在原本功能頁面。")
-    quant_market, quant_analogs, quant_emotion, quant_model, quant_kg, quant_portfolio, quant_api = st.tabs(
-        ["市場數據", "歷史相似", "情緒數據", "預測數據", "知識圖譜數據", "持倉數據", "API 餘額"]
+    quant_market, quant_analogs, quant_emotion, quant_model, quant_kg, quant_portfolio, quant_api, quant_research = st.tabs(
+        ["市場數據", "歷史相似", "情緒數據", "預測數據", "知識圖譜數據", "持倉數據", "API 餘額", "樣本外研究"]
     )
+    with quant_research:
+        render_research_detail()
 
     with quant_market:
         st.markdown("#### 市場與技術指標")

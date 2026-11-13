@@ -1,0 +1,91 @@
+name: Prediction research and shadow monitoring
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Frozen shadow inference or explicit retrospective experiment
+        type: choice
+        options: [monitor, train]
+        default: monitor
+  schedule:
+    # After US close and the existing midnight UTC data refresh, Tue-Sat UTC.
+    - cron: "40 0 * * 2-6"
+
+concurrency:
+  group: tech-market-monitor-cache-writer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-research.txt
+      - name: Install CPU research dependencies
+        run: |
+          python -m pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements-research.txt
+      - name: Verify temporal isolation and accounting
+        run: python -m unittest discover -s tests -v
+      - name: Explicit research run (never auto-promote)
+        if: inputs.mode == 'train'
+        run: |
+          python scripts/run_prediction_research.py --trials 6
+          run_dir=$(python -c 'import json; print("data/research_runs/" + json.load(open("data/cache/prediction_research/report.json"))["run_id"])')
+          python scripts/monitor_prediction_research.py --publish-run "$run_dir"
+      - name: Update frozen shadow predictions and drift
+        if: inputs.mode != 'train'
+        run: python scripts/monitor_prediction_research.py
+      - name: Archive experiment artifacts
+        if: always() && inputs.mode == 'train'
+        uses: actions/upload-artifact@v4
+        with:
+          name: prediction-research-${{ github.run_id }}
+          path: data/research_runs/
+          retention-days: 90
+      - name: Publish only completed research outputs
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/cache/prediction_research
+          python - <<'PY'
+          import os, subprocess
+          names = subprocess.check_output(['git', 'diff', '--cached', '--name-only', '-z']).decode().split('\0')
+          sizes = [(name, os.path.getsize(name)) for name in names if name and os.path.isfile(name)]
+          if sum(size for _, size in sizes) > 40*1024*1024:
+              raise SystemExit('Research publication exceeds 40 MB: ' + repr(sorted(sizes, key=lambda r: -r[1])[:10]))
+          PY
+          git diff --cached --quiet && exit 0
+          git commit -m 'Update frozen prediction research monitoring'
+          for attempt in 1 2 3; do
+            if git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep $((attempt*3))
+          done
+          exit 1
+      - name: Report failures without replacing last good cache
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title='Prediction research automation needs attention'
+          body="Run failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Existing production model was not promoted."
+          issue=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [[ -n "$issue" ]]; then
+            gh issue comment "$issue" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

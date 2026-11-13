@@ -589,8 +589,8 @@ def _relative_feature(wide_close: pd.DataFrame, symbol: str, date: pd.Timestamp,
     if history.empty:
         return np.nan
     if date not in history.index:
-        pos = history.index.searchsorted(date)
-        if pos >= len(history.index):
+        pos = history.index.searchsorted(date, side="right") - 1
+        if pos < 0:
             return np.nan
         date = history.index[pos]
     base = history.loc[date]

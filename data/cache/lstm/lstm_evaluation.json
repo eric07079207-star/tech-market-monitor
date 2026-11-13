@@ -6,10 +6,11 @@
     "predicted_positive_rate": 0.1223203026481715,
     "accuracy": 0.4665825977301387,
     "baseline_accuracy": 0.5573770491803278,
+    "baseline_kind": "realized_test_majority_oracle_not_tradeable",
     "accuracy_edge_vs_baseline": -0.0907944514501891,
     "always_long_accuracy": 0.5573770491803278,
     "accuracy_edge_vs_always_long": -0.0907944514501891,
-    "walk_forward_majority_accuracy": 0.55627425614489,
+    "walk_forward_majority_accuracy": 0.47560975609756095,
     "balanced_accuracy": 0.5100553041729512,
     "precision_up": 0.5979381443298969,
     "recall_up": 0.13122171945701358,
@@ -22,7 +23,7 @@
     "always_long_avg_return": 0.025592143371222554,
     "model_directional_avg_return": -0.01363005683984938,
     "leakage_rows": 0,
-    "evaluated_at_utc": "2026-11-13T16:37:13+00:00",
+    "evaluated_at_utc": "2026-11-13T16:55:02+00:00",
     "directional_return_edge_vs_always_long": -0.039222200211071936,
     "probability_calibration": [
       {
@@ -65,9 +66,9 @@
         "avg_future_return": 0.0192641056889379,
         "model_directional_avg_return": -0.01650434718996064,
         "max_drawdown_proxy": -0.12100292563551518,
-        "actionable_rows": 99,
-        "actionable_coverage": 1.0,
-        "actionable_accuracy": 0.3838383838383838
+        "actionable_rows": 83,
+        "actionable_coverage": 0.8383838383838383,
+        "actionable_accuracy": 0.3855421686746988
       },
       {
         "symbol": "AMD",
@@ -77,9 +78,9 @@
         "avg_future_return": 0.07152815853679095,
         "model_directional_avg_return": -0.028234519364582232,
         "max_drawdown_proxy": -0.24321058764271009,
-        "actionable_rows": 99,
-        "actionable_coverage": 1.0,
-        "actionable_accuracy": 0.494949494949495
+        "actionable_rows": 88,
+        "actionable_coverage": 0.8888888888888888,
+        "actionable_accuracy": 0.48863636363636365
       },
       {
         "symbol": "AMZN",
@@ -89,9 +90,9 @@
         "avg_future_return": 0.014488486946266647,
         "model_directional_avg_return": -0.013969196739704511,
         "max_drawdown_proxy": -0.160303462129886,
-        "actionable_rows": 99,
-        "actionable_coverage": 1.0,
-        "actionable_accuracy": 0.3838383838383838
+        "actionable_rows": 87,
+        "actionable_coverage": 0.8787878787878788,
+        "actionable_accuracy": 0.3793103448275862
       },
       {
         "symbol": "GOOGL",
@@ -101,9 +102,9 @@
         "avg_future_return": 0.030361121732855084,
         "model_directional_avg_return": -0.020727100415535254,
         "max_drawdown_proxy": -0.17566335898493224,
-        "actionable_rows": 99,
-        "actionable_coverage": 1.0,
-        "actionable_accuracy": 0.45454545454545453
+        "actionable_rows": 79,
+        "actionable_coverage": 0.797979797979798,
+        "actionable_accuracy": 0.46835443037974683
       },
       {
         "symbol": "META",
@@ -137,9 +138,9 @@
         "avg_future_return": 0.02044370957800205,
         "model_directional_avg_return": -0.010325006952008503,
         "max_drawdown_proxy": -0.17872226869844232,
-        "actionable_rows": 99,
-        "actionable_coverage": 1.0,
-        "actionable_accuracy": 0.4444444444444444
+        "actionable_rows": 70,
+        "actionable_coverage": 0.7070707070707071,
+        "actionable_accuracy": 0.42857142857142855
       },
       {
         "symbol": "TSLA",
@@ -149,9 +150,9 @@
         "avg_future_return": 0.023961571365262998,
         "model_directional_avg_return": 0.005530538221543474,
         "max_drawdown_proxy": -0.33335214848834227,
-        "actionable_rows": 99,
-        "actionable_coverage": 1.0,
-        "actionable_accuracy": 0.5858585858585859
+        "actionable_rows": 84,
+        "actionable_coverage": 0.8484848484848485,
+        "actionable_accuracy": 0.5595238095238095
       }
     ],
     "by_regime": [
@@ -244,24 +245,24 @@
         "rows": 127,
         "validated_rows": 107,
         "accuracy": 0.40186915887850466,
-        "avg_return": -0.005063038613340884
+        "avg_return": -0.005063038613340878
       },
       {
         "horizon": "5D",
         "rows": 127,
         "validated_rows": 122,
         "accuracy": 0.5655737704918032,
-        "avg_return": -0.0005298273859413321
+        "avg_return": -0.0005298273859413282
       },
       {
         "horizon": "60D",
         "rows": 127,
         "validated_rows": 67,
         "accuracy": 0.5223880597014925,
-        "avg_return": 0.00480724281545358
+        "avg_return": 0.004807242815453586
       }
     ],
-    "evaluated_at_utc": "2026-11-13T16:37:13+00:00"
+    "evaluated_at_utc": "2026-11-13T16:55:02+00:00"
   },
   "leakage_audit": {
     "status": "可用",

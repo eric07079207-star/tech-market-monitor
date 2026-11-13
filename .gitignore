@@ -5,3 +5,4 @@ __pycache__/
 .streamlit/secrets.toml
 data/cache/*.log
 tools/
+data/research_runs/

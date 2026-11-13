@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import argparse
 import sys
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,7 +47,7 @@ except Exception as exc:  # pragma: no cover - surfaced in CI/runtime
     raise RuntimeError("torch is required for LSTM training. Install dependencies first.") from exc
 
 
-MODEL_VERSION = "lstm-regime-v5"
+MODEL_VERSION = "lstm-regime-v6-audit"
 DEFAULT_SYMBOLS = LSTM_SHARED_SYMBOLS
 # GitHub-hosted CPU runners have a bounded job window.  Six epochs preserve
 # more training passes than the previous five-epoch model, while the larger
@@ -106,6 +107,7 @@ def main() -> None:
     parser.add_argument("--start-date", default="2013-01-01", help="Earliest point-in-time training date.")
     parser.add_argument("--lookback-years", type=int, default=None, help="Optional rolling lookback; normally leave unset to preserve full regimes.")
     parser.add_argument("--sample-step", type=int, default=5, help="Sample every N trading days.")
+    parser.add_argument("--allow-promotion", action="store_true", help="Explicit reviewed promotion; default preserves incumbent.")
     args = parser.parse_args()
     previous_threshold, previous_regime_thresholds = _load_previous_thresholds()
     incumbent_quality = _load_incumbent_quality()
@@ -192,7 +194,7 @@ def main() -> None:
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
             best_state = {
-                "model_state": model.state_dict(),
+                "model_state": deepcopy(model.state_dict()),
                 "epoch": epoch,
                 "valid_loss": valid_loss,
                 "valid_acc": valid_acc,
@@ -236,6 +238,8 @@ def main() -> None:
     monitor_features.to_parquet(LSTM_MONITOR_FEATURE_CACHE, index=False)
     challenger_quality = _backtest_quality(backtest)
     promotion = _promotion_decision(challenger_quality, incumbent_quality)
+    if not args.allow_promotion:
+        promotion.update(promoted=False, reason="研究隔離：未經樣本外審查，不自動替換既有模型")
     _save_challenger_report(challenger_quality, incumbent_quality, promotion, threshold_metrics)
     if not promotion["promoted"]:
         incumbent_status = load_lstm_status()
@@ -393,6 +397,9 @@ def _prepare_split(features: pd.DataFrame) -> SplitData:
     data.loc[data["date"] <= train_cutoff, "split"] = "train"
     data.loc[(data["date"] >= valid_start) & (data["date"] <= valid_cutoff), "split"] = "valid"
     data.loc[data["date"] >= test_start, "split"] = "test"
+    # Actual label maturity, not a weekday approximation, defines isolation.
+    data.loc[data["split"].eq("train") & data["target_date"].ge(valid_start), "split"] = "purged"
+    data.loc[data["split"].eq("valid") & data["target_date"].ge(test_start), "split"] = "purged"
     data = data[data["split"].isin(["train", "valid", "test"])].reset_index(drop=True)
     rows = []
     for row in data.itertuples():

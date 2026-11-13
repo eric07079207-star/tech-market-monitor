@@ -192,7 +192,10 @@ def main() -> None:
 
     cache_dir = cache_path("")
     metadata = _read_json(cache_dir / "metadata.json", {})
-    sync_applied, sync_message, remote_metadata = _sync_remote_cache_if_newer(metadata)
+    if args.check_only:
+        sync_applied, sync_message, remote_metadata = False, "read-only check; remote sync skipped", {}
+    else:
+        sync_applied, sync_message, remote_metadata = _sync_remote_cache_if_newer(metadata)
     if sync_applied:
         metadata = _read_json(cache_dir / "metadata.json", {})
     ai_summary = _read_json(cache_dir / "ai_summary.json", {})
@@ -246,6 +249,13 @@ def main() -> None:
     print(f"- attention_items: {', '.join(stale_items) if stale_items else 'none'}")
     print(f"- repair_mode: {'check-only' if args.check_only else 'auto-repair'}")
     print(f"- repair_actions: {'；'.join(repair_actions) if repair_actions else 'none'}")
+    research = _read_json(cache_dir / "prediction_research/report.json", {})
+    monitor = _read_json(cache_dir / "prediction_research/monitor.json", {})
+    if research:
+        print(f"- prediction_research: run={research.get('run_id')} baseline_unchanged={research.get('baseline_unchanged')}")
+        print(f"- prediction_quality: research_only; promotion={research.get('promotion')}; historical test is not new evidence")
+        print(f"- shadow_monitor: status={monitor.get('status')} scanned={monitor.get('scanned_at_utc')} rows={monitor.get('rows', 0)}")
+        print(f"- feature_drift_warnings: {monitor.get('current_drift_warning_count', 'unknown')}")
 
 
 if __name__ == "__main__":
