@@ -1,0 +1,53 @@
+name: Mobile research jobs
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Research only; production models are never replaced
+        type: choice
+        options: [monitor, retrain, backtest]
+        default: monitor
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-research-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-research.txt
+      - name: Install CPU dependencies
+        run: |
+          python -m pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements.txt -r requirements-research.txt
+      - name: Tests
+        run: python -m unittest discover -s tests -v
+      - name: Frozen model monitoring
+        if: inputs.task == 'monitor'
+        run: python scripts/monitor_prediction_research.py
+      - name: Isolated research and backtest
+        if: inputs.task != 'monitor'
+        run: python scripts/run_prediction_research.py --trials 6
+      - name: Downloadable results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-research-${{ github.run_id }}
+          path: |
+            data/research_runs/
+            data/cache/prediction_research/report.json
+            data/cache/prediction_research/monitor.json
+          retention-days: 14
+          if-no-files-found: error
+
