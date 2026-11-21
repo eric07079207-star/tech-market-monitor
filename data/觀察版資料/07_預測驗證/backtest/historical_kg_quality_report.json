@@ -1,12 +1,12 @@
 {
-  "generated_at_utc": "2026-11-20T23:44:14+00:00",
+  "generated_at_utc": "2026-11-21T00:09:04+00:00",
   "candidate_samples": 500,
-  "qualified_samples": 261,
+  "qualified_samples": 266,
   "regimes": [
     {
       "market_regime": "高波動／壓力",
       "candidate_samples": 100,
-      "qualified_samples": 57,
+      "qualified_samples": 58,
       "diagnostic_target": 30,
       "weight_target": 50,
       "diagnostic_completion_pct": 100.0,
@@ -16,7 +16,7 @@
     {
       "market_regime": "明顯下跌趨勢",
       "candidate_samples": 125,
-      "qualified_samples": 53,
+      "qualified_samples": 55,
       "diagnostic_target": 30,
       "weight_target": 50,
       "diagnostic_completion_pct": 100.0,
@@ -46,7 +46,7 @@
     {
       "market_regime": "正常／溫和上漲",
       "candidate_samples": 150,
-      "qualified_samples": 68,
+      "qualified_samples": 70,
       "diagnostic_target": 30,
       "weight_target": 50,
       "diagnostic_completion_pct": 100.0,
@@ -55,18 +55,18 @@
     }
   ],
   "sources": {
-    "unique_source_count": 1179,
-    "official_article_ratio": 0.6108,
+    "unique_source_count": 1182,
+    "official_article_ratio": 0.618,
     "official_event_evidence_count": 2694,
-    "confirmed_cluster_count": 945,
-    "cross_source_confirmation_ratio": 0.2629,
+    "confirmed_cluster_count": 963,
+    "cross_source_confirmation_ratio": 0.2679,
     "top_source_domain": "sec.gov",
-    "top_source_ratio": 0.2201
+    "top_source_ratio": 0.2199
   },
   "missing_reasons": [
     {
       "reason": "缺少跨來源新聞或官方事件",
-      "sample_count": 128
+      "sample_count": 123
     },
     {
       "reason": "缺少後續市場反應",
