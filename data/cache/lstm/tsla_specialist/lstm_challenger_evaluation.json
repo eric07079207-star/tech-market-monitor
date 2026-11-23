@@ -22,7 +22,7 @@
   "promotion": {
     "promoted": false,
     "reason": "研究隔離：未經樣本外審查，不自動替換既有模型",
-    "evaluated_at_utc": "2026-11-22T02:54:12+00:00"
+    "evaluated_at_utc": "2026-11-23T03:33:28+00:00"
   },
   "promotion_rules": {
     "minimum_edge_vs_majority_baseline": 0.01,
