@@ -3,12 +3,12 @@
   "feature_version": "lstm-regime-v3",
   "challenger": {
     "status": "usable",
-    "rows": 808,
-    "accuracy": 0.49133663366336633,
-    "balanced_accuracy": 0.5071146488954708,
-    "baseline_accuracy": 0.5420792079207921,
-    "edge_vs_baseline": -0.05074257425742579,
-    "predicted_positive_rate": 0.3131188118811881
+    "rows": 799,
+    "accuracy": 0.4718397997496871,
+    "balanced_accuracy": 0.48712439581519196,
+    "baseline_accuracy": 0.541927409261577,
+    "edge_vs_baseline": -0.07008760951188991,
+    "predicted_positive_rate": 0.3166458072590738
   },
   "incumbent": {
     "status": "usable",
@@ -22,7 +22,7 @@
   "promotion": {
     "promoted": false,
     "reason": "研究隔離：未經樣本外審查，不自動替換既有模型",
-    "evaluated_at_utc": "2026-11-24T06:47:45+00:00"
+    "evaluated_at_utc": "2026-11-25T05:19:30+00:00"
   },
   "promotion_rules": {
     "minimum_edge_vs_majority_baseline": 0.01,
@@ -32,89 +32,89 @@
   "threshold_calibration": {
     "objective": "robust_validation_balanced_accuracy",
     "status": "calibrated",
-    "robust_score": 0.5587872584329548,
-    "balanced_accuracy": 0.5723809523809523,
-    "accuracy": 0.5439900867410161,
-    "temporal_balanced_accuracy_mean": 0.5665308910910465,
-    "temporal_balanced_accuracy_std": 0.04986845072747715,
-    "regime_balanced_accuracy_mean": 0.5674585670925284,
-    "regime_balanced_accuracy_std": 0.03273930894219485,
-    "predicted_positive_rate": 0.4275092936802974,
+    "robust_score": 0.5386007402592541,
+    "balanced_accuracy": 0.5467557251908397,
+    "accuracy": 0.4810606060606061,
+    "temporal_balanced_accuracy_mean": 0.5439981698186457,
+    "temporal_balanced_accuracy_std": 0.03915064906751229,
+    "regime_balanced_accuracy_mean": 0.5745534611259059,
+    "regime_balanced_accuracy_std": 0.06864668146814022,
+    "predicted_positive_rate": 0.31186868686868685,
     "temporal_block_count": 4,
     "regime_block_count": 5,
     "candidate_min": 0.25,
     "candidate_max": 0.75,
     "candidate_count": 101,
-    "full_validation_threshold": 0.49,
-    "raw_nested_threshold": 0.49,
+    "full_validation_threshold": 0.515,
+    "raw_nested_threshold": 0.51,
     "stabilized_threshold": 0.48,
     "previous_threshold": 0.45,
     "max_threshold_change": 0.03,
     "walk_forward_folds": [
       {
         "fold": 1,
-        "threshold": 0.45999999999999996,
-        "rows": 162,
-        "balanced_accuracy": 0.5882196162046909
+        "threshold": 0.52,
+        "rows": 159,
+        "balanced_accuracy": 0.5410943730615861
       },
       {
         "fold": 2,
-        "threshold": 0.49,
-        "rows": 161,
-        "balanced_accuracy": 0.5629251700680272
+        "threshold": 0.5,
+        "rows": 158,
+        "balanced_accuracy": 0.5266690856313497
       },
       {
         "fold": 3,
-        "threshold": 0.49,
-        "rows": 161,
-        "balanced_accuracy": 0.6401821862348178
+        "threshold": 0.495,
+        "rows": 158,
+        "balanced_accuracy": 0.5730415146777835
       },
       {
         "fold": 4,
-        "threshold": 0.49,
-        "rows": 161,
-        "balanced_accuracy": 0.47175141242937857
+        "threshold": 0.51,
+        "rows": 158,
+        "balanced_accuracy": 0.4341671009206184
       }
     ],
-    "walk_forward_balanced_accuracy_mean": 0.5657695962342286,
+    "walk_forward_balanced_accuracy_mean": 0.5187430185728344,
     "regime_threshold_min_rows": 60,
     "regime_thresholds": {
-      "強勢反彈／轉折": 0.44999999999999996,
-      "明顯下跌趨勢": 0.51,
-      "橫盤／低波動": 0.485,
-      "正常／溫和上漲": 0.475,
-      "高波動／壓力": 0.46499999999999997
+      "強勢反彈／轉折": 0.49,
+      "明顯下跌趨勢": 0.485,
+      "橫盤／低波動": 0.51,
+      "正常／溫和上漲": 0.51,
+      "高波動／壓力": 0.495
     },
     "regime_threshold_details": {
       "強勢反彈／轉折": {
         "rows": 70,
-        "raw_threshold": 0.44,
-        "threshold": 0.44999999999999996,
-        "balanced_accuracy": 0.6122792262405383
+        "raw_threshold": 0.49,
+        "threshold": 0.49,
+        "balanced_accuracy": 0.7250000000000001
       },
       "明顯下跌趨勢": {
-        "rows": 107,
-        "raw_threshold": 0.51,
-        "threshold": 0.51,
-        "balanced_accuracy": 0.6368292682926829
-      },
-      "橫盤／低波動": {
-        "rows": 138,
+        "rows": 117,
         "raw_threshold": 0.485,
         "threshold": 0.485,
-        "balanced_accuracy": 0.5700332963374029
+        "balanced_accuracy": 0.5402298850574713
+      },
+      "橫盤／低波動": {
+        "rows": 101,
+        "raw_threshold": 0.52,
+        "threshold": 0.51,
+        "balanced_accuracy": 0.4967213114754098
       },
       "正常／溫和上漲": {
-        "rows": 356,
-        "raw_threshold": 0.475,
-        "threshold": 0.475,
-        "balanced_accuracy": 0.5987577639751553
+        "rows": 387,
+        "raw_threshold": 0.51,
+        "threshold": 0.51,
+        "balanced_accuracy": 0.5398054958724415
       },
       "高波動／壓力": {
-        "rows": 136,
-        "raw_threshold": 0.46499999999999997,
-        "threshold": 0.46499999999999997,
-        "balanced_accuracy": 0.55981703026038
+        "rows": 117,
+        "raw_threshold": 0.495,
+        "threshold": 0.495,
+        "balanced_accuracy": 0.6396551724137931
       }
     }
   }
