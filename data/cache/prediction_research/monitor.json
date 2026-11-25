@@ -1,14 +1,14 @@
 {
-  "scanned_at_utc": "2026-11-24T10:22:27.836629+00:00",
-  "source_last_date": "2026-11-23",
-  "rows": 192,
-  "settled": 40,
+  "scanned_at_utc": "2026-11-25T09:03:28.731202+00:00",
+  "source_last_date": "2026-11-24",
+  "rows": 224,
+  "settled": 56,
   "waiting": [],
   "status": "shadow_updated",
   "model_status": "unproven_no_production_promotion",
   "integrity": {
     "unfinished_or_non_session_rows_excluded": 2,
-    "last_completed_session": "2026-11-23",
+    "last_completed_session": "2026-11-24",
     "missing_sessions_policy": "no forward-fill of prices or targets"
   },
   "last_research_drift_warning_count": 82,
@@ -18,127 +18,127 @@
     {
       "horizon": 1,
       "feature": "ret1",
-      "psi": 0.054861447482592,
+      "psi": 0.06037981373878858,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "ret5",
-      "psi": 0.025477899369758243,
+      "psi": 0.027969277264530752,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "ret20",
-      "psi": 0.06762190862862356,
+      "psi": 0.07943445801048493,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "ret60",
-      "psi": 0.10541242249700254,
+      "psi": 0.10317257945092002,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "dist20",
-      "psi": 0.07331634658191129,
+      "psi": 0.07926122230030291,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "dist50",
-      "psi": 0.07464387623671084,
+      "psi": 0.07684930785731306,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "dist200",
-      "psi": 0.23743809672523558,
-      "warning": false
+      "psi": 0.2500776528533831,
+      "warning": true
     },
     {
       "horizon": 1,
       "feature": "vol20",
-      "psi": 0.4438049034091667,
+      "psi": 0.4436010202717968,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "vol60",
-      "psi": 1.0837275712518706,
+      "psi": 1.0715925664536508,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "volume_ratio",
-      "psi": 0.06528256914373781,
+      "psi": 0.07092944131103678,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "range",
-      "psi": 0.2462845000823016,
-      "warning": false
+      "psi": 0.2504303955739586,
+      "warning": true
     },
     {
       "horizon": 1,
       "feature": "gap",
-      "psi": 0.16168013325804353,
+      "psi": 0.16674739466527902,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "drawdown252",
-      "psi": 0.3398300277711774,
+      "psi": 0.3110742049654423,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "QQQ_ret5",
-      "psi": 0.8625393064637638,
+      "psi": 0.8776633506516817,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "QQQ_ret20",
-      "psi": 0.5594236671831552,
+      "psi": 0.58039820335268,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "QQQ_vol20",
-      "psi": 2.4735174980010095,
+      "psi": 2.498406281041076,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "SPY_ret5",
-      "psi": 0.3159287009482291,
+      "psi": 0.3237385272603023,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "SPY_ret20",
-      "psi": 1.2173273454831848,
+      "psi": 1.2989252584270325,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "SPY_vol20",
-      "psi": 2.6879495242186127,
+      "psi": 2.724944221289028,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "SMH_ret5",
-      "psi": 0.6511674215467289,
+      "psi": 0.723532138918332,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "SMH_ret20",
-      "psi": 0.9640711057416343,
+      "psi": 1.5320988327483631,
       "warning": true
     },
     {
@@ -150,199 +150,199 @@
     {
       "horizon": 1,
       "feature": "TLT_ret5",
-      "psi": 0.03815701016961699,
+      "psi": 0.028311016243690243,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "TLT_ret20",
-      "psi": 0.35651138551907424,
+      "psi": 0.34861575266767253,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "TLT_vol20",
-      "psi": 4.332444941348083,
+      "psi": 4.351058988498952,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "HYG_ret5",
-      "psi": 1.013943062551834,
+      "psi": 1.058189531469079,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "HYG_ret20",
-      "psi": 1.6848041872425805,
+      "psi": 1.716505966657364,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "HYG_vol20",
-      "psi": 3.917924902746916,
+      "psi": 3.939199105432148,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "^VIX_ret5",
-      "psi": 0.18574355639662662,
+      "psi": 0.18031507812701444,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "^VIX_ret20",
-      "psi": 1.0076368516076346,
+      "psi": 1.0439647617355752,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "^VIX_vol20",
-      "psi": 1.3185213107269074,
+      "psi": 1.3126917793874417,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "qqq_dist200",
-      "psi": 0.9727576219123475,
+      "psi": 0.9249189011468946,
       "warning": true
     },
     {
       "horizon": 1,
       "feature": "relative20",
-      "psi": 0.10653346021592469,
+      "psi": 0.10963650335551359,
       "warning": false
     },
     {
       "horizon": 1,
       "feature": "relative60",
-      "psi": 0.16126118045251123,
+      "psi": 0.1737369714352023,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "ret1",
-      "psi": 0.05486183220113919,
+      "psi": 0.06037864898660213,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "ret5",
-      "psi": 0.02549814760898394,
+      "psi": 0.02798620472412221,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "ret20",
-      "psi": 0.06759836480300774,
+      "psi": 0.0794118803998563,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "ret60",
-      "psi": 0.1056872999141464,
+      "psi": 0.10334223472466418,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "dist20",
-      "psi": 0.0719080217246475,
+      "psi": 0.0779141719919261,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "dist50",
-      "psi": 0.07572208277228396,
+      "psi": 0.07786738015200799,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "dist200",
-      "psi": 0.24135831681755807,
-      "warning": false
+      "psi": 0.2540292777795016,
+      "warning": true
     },
     {
       "horizon": 5,
       "feature": "vol20",
-      "psi": 0.44380851641688646,
+      "psi": 0.443603555456407,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "vol60",
-      "psi": 1.0827868841007118,
+      "psi": 1.0706771771770516,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "volume_ratio",
-      "psi": 0.06479156397282587,
+      "psi": 0.07025588511855965,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "range",
-      "psi": 0.24631694244211838,
-      "warning": false
+      "psi": 0.2504676516091621,
+      "warning": true
     },
     {
       "horizon": 5,
       "feature": "gap",
-      "psi": 0.16162885571409388,
+      "psi": 0.16669622687685748,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "drawdown252",
-      "psi": 0.34098373917810787,
+      "psi": 0.3122255863079856,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "QQQ_ret5",
-      "psi": 0.8623975443176454,
+      "psi": 0.8776198989578812,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "QQQ_ret20",
-      "psi": 0.6035652876283489,
+      "psi": 0.6245347109550774,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "QQQ_vol20",
-      "psi": 2.4761259864364877,
+      "psi": 2.5010071677663945,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "SPY_ret5",
-      "psi": 0.31566963789359187,
+      "psi": 0.3233803291744206,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "SPY_ret20",
-      "psi": 1.2175527274802151,
+      "psi": 1.2991116573219168,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "SPY_vol20",
-      "psi": 2.7433336444368486,
+      "psi": 2.7803081326236905,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "SMH_ret5",
-      "psi": 0.6520630609895388,
+      "psi": 0.7244023990182202,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "SMH_ret20",
-      "psi": 0.9639949388243478,
+      "psi": 1.5316653438926346,
       "warning": true
     },
     {
@@ -354,199 +354,199 @@
     {
       "horizon": 5,
       "feature": "TLT_ret5",
-      "psi": 0.0376571102144689,
+      "psi": 0.027916759380866213,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "TLT_ret20",
-      "psi": 0.36338598813742967,
+      "psi": 0.3535771224308951,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "TLT_vol20",
-      "psi": 4.332854505566636,
+      "psi": 4.351618975859362,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "HYG_ret5",
-      "psi": 1.0131783108558992,
+      "psi": 1.0573299666457825,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "HYG_ret20",
-      "psi": 1.6823244006446765,
+      "psi": 1.7085903222313474,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "HYG_vol20",
-      "psi": 3.898716068277792,
+      "psi": 3.9192309252286313,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "^VIX_ret5",
-      "psi": 0.18577065724307562,
+      "psi": 0.1804540238214401,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "^VIX_ret20",
-      "psi": 1.0242792493366808,
+      "psi": 1.077850383265095,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "^VIX_vol20",
-      "psi": 1.3191263206097061,
+      "psi": 1.3133732563242342,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "qqq_dist200",
-      "psi": 0.972550516685639,
+      "psi": 0.9247326046296924,
       "warning": true
     },
     {
       "horizon": 5,
       "feature": "relative20",
-      "psi": 0.1067214512160067,
+      "psi": 0.10998775143015228,
       "warning": false
     },
     {
       "horizon": 5,
       "feature": "relative60",
-      "psi": 0.16054018173573614,
+      "psi": 0.17282735543284042,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "ret1",
-      "psi": 0.05486183373404405,
+      "psi": 0.06037864501894226,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "ret5",
-      "psi": 0.02677083710608986,
+      "psi": 0.02939424252521243,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "ret20",
-      "psi": 0.06759828139023935,
+      "psi": 0.07941180041703107,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "ret60",
-      "psi": 0.10605497314124841,
+      "psi": 0.10348419233288621,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "dist20",
-      "psi": 0.07154070659698437,
+      "psi": 0.07757866854258505,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "dist50",
-      "psi": 0.07535348840222607,
+      "psi": 0.07844522722879303,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "dist200",
-      "psi": 0.24516675358326676,
-      "warning": false
+      "psi": 0.2578390355174389,
+      "warning": true
     },
     {
       "horizon": 10,
       "feature": "vol20",
-      "psi": 0.44502096026346766,
+      "psi": 0.44476802818019134,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "vol60",
-      "psi": 1.0833551430751938,
+      "psi": 1.0712299908763794,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "volume_ratio",
-      "psi": 0.06479457052359515,
+      "psi": 0.0702620080979601,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "range",
-      "psi": 0.2469172480726093,
-      "warning": false
+      "psi": 0.25107009145941234,
+      "warning": true
     },
     {
       "horizon": 10,
       "feature": "gap",
-      "psi": 0.16162867384775667,
+      "psi": 0.16669604540013877,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "drawdown252",
-      "psi": 0.3443433100107696,
+      "psi": 0.3154040639529948,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "QQQ_ret5",
-      "psi": 0.8624026435757093,
+      "psi": 0.8776253101419086,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "QQQ_ret20",
-      "psi": 0.559283901705043,
+      "psi": 0.5802536220591931,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "QQQ_vol20",
-      "psi": 2.476126377086349,
+      "psi": 2.501007599181532,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "SPY_ret5",
-      "psi": 0.3156703947627823,
+      "psi": 0.32338075325218885,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "SPY_ret20",
-      "psi": 1.217557861854643,
+      "psi": 1.2991173666686422,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "SPY_vol20",
-      "psi": 2.7445146360940758,
+      "psi": 2.7814892326539935,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "SMH_ret5",
-      "psi": 0.6591661819225102,
+      "psi": 0.731505905059508,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "SMH_ret20",
-      "psi": 0.963998386574462,
+      "psi": 1.53166438317368,
       "warning": true
     },
     {
@@ -558,199 +558,199 @@
     {
       "horizon": 10,
       "feature": "TLT_ret5",
-      "psi": 0.03765621155324685,
+      "psi": 0.02791584233984004,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "TLT_ret20",
-      "psi": 0.4252922800807918,
+      "psi": 0.42046787986848166,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "TLT_vol20",
-      "psi": 4.332860648561568,
+      "psi": 4.351625380082163,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "HYG_ret5",
-      "psi": 1.013179521808027,
+      "psi": 1.0573312599805944,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "HYG_ret20",
-      "psi": 1.6420417605641093,
+      "psi": 1.7085956352059781,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "HYG_vol20",
-      "psi": 3.8816485059634074,
+      "psi": 3.9012953298409716,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "^VIX_ret5",
-      "psi": 0.19132356917412235,
+      "psi": 0.1860073505649444,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "^VIX_ret20",
-      "psi": 1.0065188680212256,
+      "psi": 1.0429899268687217,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "^VIX_vol20",
-      "psi": 1.3113962332855666,
+      "psi": 1.3056431626150058,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "qqq_dist200",
-      "psi": 0.9725506519439069,
+      "psi": 0.9247333371419221,
       "warning": true
     },
     {
       "horizon": 10,
       "feature": "relative20",
-      "psi": 0.10704489338500098,
+      "psi": 0.110311199397555,
       "warning": false
     },
     {
       "horizon": 10,
       "feature": "relative60",
-      "psi": 0.16288076209691035,
+      "psi": 0.1751624811673409,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "ret1",
-      "psi": 0.05486183683634951,
+      "psi": 0.06037863700211964,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "ret5",
-      "psi": 0.026770995696534548,
+      "psi": 0.0293943773679526,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "ret20",
-      "psi": 0.07086791063564933,
+      "psi": 0.08339824593677422,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "ret60",
-      "psi": 0.1175056709761351,
+      "psi": 0.11493486611635546,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "dist20",
-      "psi": 0.07402517769778551,
+      "psi": 0.08006618080225626,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "dist50",
-      "psi": 0.08245050514318876,
+      "psi": 0.0855421840694113,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "dist200",
-      "psi": 0.24268684818801617,
-      "warning": false
+      "psi": 0.2554225502713135,
+      "warning": true
     },
     {
       "horizon": 20,
       "feature": "vol20",
-      "psi": 0.45120494133401623,
+      "psi": 0.45067187305025336,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "vol60",
-      "psi": 1.0829294660797852,
+      "psi": 1.0708201329452016,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "volume_ratio",
-      "psi": 0.06369389411314234,
+      "psi": 0.06929855496362784,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "range",
-      "psi": 0.24763786209135188,
-      "warning": false
+      "psi": 0.25198799525556953,
+      "warning": true
     },
     {
       "horizon": 20,
       "feature": "gap",
-      "psi": 0.16259743467111082,
+      "psi": 0.16783190650838065,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "drawdown252",
-      "psi": 0.3487161196730178,
+      "psi": 0.31903224379412953,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "QQQ_ret5",
-      "psi": 0.8624129517051627,
+      "psi": 0.8776362488176155,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "QQQ_ret20",
-      "psi": 0.6114075374530837,
+      "psi": 0.6288430900853735,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "QQQ_vol20",
-      "psi": 2.489362378067799,
+      "psi": 2.514243682568012,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "SPY_ret5",
-      "psi": 0.315671924942284,
+      "psi": 0.3233816107069231,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "SPY_ret20",
-      "psi": 1.2175682409640658,
+      "psi": 1.2991289080597401,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "SPY_vol20",
-      "psi": 2.679120475267531,
+      "psi": 2.6791204752675313,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "SMH_ret5",
-      "psi": 0.6820948286636888,
+      "psi": 0.7544353302815211,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "SMH_ret20",
-      "psi": 0.9987471569836768,
+      "psi": 1.5664042420762634,
       "warning": true
     },
     {
@@ -762,7 +762,7 @@
     {
       "horizon": 20,
       "feature": "TLT_ret5",
-      "psi": 0.04739480151642354,
+      "psi": 0.03765439514913311,
       "warning": false
     },
     {
@@ -774,63 +774,63 @@
     {
       "horizon": 20,
       "feature": "TLT_vol20",
-      "psi": 3.7828051358746206,
+      "psi": 4.351638326143739,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "HYG_ret5",
-      "psi": 1.0301551281700387,
+      "psi": 1.074307032875211,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "HYG_ret20",
-      "psi": 1.6420522330993066,
+      "psi": 1.7086063753319167,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "HYG_vol20",
-      "psi": 3.916684827472421,
+      "psi": 3.9380250683404148,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "^VIX_ret5",
-      "psi": 0.19132038715917815,
+      "psi": 0.1860050070763171,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "^VIX_ret20",
-      "psi": 1.024283134241777,
+      "psi": 1.0778546211931257,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "^VIX_vol20",
-      "psi": 1.3113936859813005,
+      "psi": 1.3056406024035903,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "qqq_dist200",
-      "psi": 0.9648232355762936,
+      "psi": 0.917007128097288,
       "warning": true
     },
     {
       "horizon": 20,
       "feature": "relative20",
-      "psi": 0.10723363092350313,
+      "psi": 0.11049994865726182,
       "warning": false
     },
     {
       "horizon": 20,
       "feature": "relative60",
-      "psi": 0.16407460662182333,
+      "psi": 0.17664666263861026,
       "warning": false
     }
   ],
-  "current_drift_warning_count": 80
+  "current_drift_warning_count": 88
 }
