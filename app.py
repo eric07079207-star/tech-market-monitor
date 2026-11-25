@@ -1299,7 +1299,9 @@ with tab_news:
     else:
         st.subheader("新聞對持倉影響")
         news_portfolio_config = load_portfolio_config(st.secrets)
-        if news_portfolio_config is not None and not news_portfolio_config.positions.empty:
+        if (news_portfolio_config is not None and news_portfolio_config.password
+                and st.session_state.get("portfolio_unlocked", False)
+                and not news_portfolio_config.positions.empty):
             impact_base = news_portfolio_config.positions.rename(columns={"ticker": "ticker"})
             impact = portfolio_news_impact(news, impact_base, max_items=8)
             if impact.empty:
@@ -1320,7 +1322,7 @@ with tab_news:
                     width="stretch",
                 )
         else:
-            st.caption("尚未設定持倉 Secrets，因此先顯示一般新聞摘要。")
+            st.caption("私人持倉影響僅於持倉頁解鎖後顯示。")
 
         filtered_symbols = st.multiselect("標的", options=list(NEWS_QUERIES), default=list(NEWS_QUERIES)[:6])
         news_view = news[news["symbol"].isin(filtered_symbols)] if filtered_symbols else news
@@ -1346,6 +1348,7 @@ with tab_news:
             st.markdown(f"`{row.tags}` · {row.source} · {published}  \n[{row.title}]({row.link})")
 
 with tab_prediction:
+    st.link_button("雲端研究任務", "https://github.com/eric07079207-star/tech-market-monitor/actions/workflows/mobile-research.yml")
     st.subheader("市場預測驗證")
     render_research_summary()
     st.caption(f"LSTM 狀態：{lstm_status.get('status', 'n/a')}｜模式：{lstm_status.get('mode', 'n/a')}｜模型版本：{lstm_status.get('model_version', 'n/a')}")
@@ -2136,7 +2139,7 @@ VOO,,,500
             language="toml",
         )
     else:
-        portfolio_unlocked = True
+        portfolio_unlocked = False
         if portfolio_config.password:
             if "portfolio_unlocked" not in st.session_state:
                 st.session_state["portfolio_unlocked"] = False
@@ -2149,7 +2152,7 @@ VOO,,,500
                 portfolio_unlocked = st.session_state["portfolio_unlocked"]
 
         if not portfolio_unlocked:
-            st.info("請輸入密碼後查看私人持倉資料。")
+            st.info("請先設定持倉密碼並解鎖，才能查看私人持倉資料。")
         else:
             if st_autorefresh is not None:
                 st_autorefresh(
