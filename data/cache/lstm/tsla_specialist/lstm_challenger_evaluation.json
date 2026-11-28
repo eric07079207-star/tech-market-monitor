@@ -4,11 +4,11 @@
   "challenger": {
     "status": "usable",
     "rows": 102,
-    "accuracy": 0.5196078431372549,
-    "balanced_accuracy": 0.5361956103195995,
-    "baseline_accuracy": 0.5196078431372549,
-    "edge_vs_baseline": 0.0,
-    "predicted_positive_rate": 0.0784313725490196
+    "accuracy": 0.5686274509803921,
+    "balanced_accuracy": 0.575,
+    "baseline_accuracy": 0.5098039215686274,
+    "edge_vs_baseline": 0.05882352941176472,
+    "predicted_positive_rate": 0.17647058823529413
   },
   "incumbent": {
     "status": "usable",
@@ -22,7 +22,7 @@
   "promotion": {
     "promoted": false,
     "reason": "研究隔離：未經樣本外審查，不自動替換既有模型",
-    "evaluated_at_utc": "2026-11-27T04:52:35+00:00"
+    "evaluated_at_utc": "2026-11-28T04:36:20+00:00"
   },
   "promotion_rules": {
     "minimum_edge_vs_majority_baseline": 0.01,
@@ -32,22 +32,22 @@
   "threshold_calibration": {
     "objective": "robust_validation_balanced_accuracy",
     "status": "calibrated",
-    "robust_score": 0.5853146853146852,
-    "balanced_accuracy": 0.5769230769230769,
-    "accuracy": 0.58,
-    "temporal_balanced_accuracy_mean": 0.5769230769230769,
+    "robust_score": 0.6083998834498835,
+    "balanced_accuracy": 0.5953525641025641,
+    "accuracy": 0.6,
+    "temporal_balanced_accuracy_mean": 0.5953525641025641,
     "temporal_balanced_accuracy_std": 0.0,
-    "regime_balanced_accuracy_mean": 0.6188811188811189,
+    "regime_balanced_accuracy_mean": 0.6608391608391608,
     "regime_balanced_accuracy_std": 0.0,
-    "predicted_positive_rate": 0.42,
+    "predicted_positive_rate": 0.38,
     "temporal_block_count": 0,
     "regime_block_count": 1,
     "candidate_min": 0.25,
     "candidate_max": 0.75,
     "candidate_count": 101,
-    "full_validation_threshold": 0.5,
-    "raw_nested_threshold": 0.515,
-    "stabilized_threshold": 0.515,
+    "full_validation_threshold": 0.505,
+    "raw_nested_threshold": 0.505,
+    "stabilized_threshold": 0.505,
     "previous_threshold": 0.5,
     "max_threshold_change": 0.03,
     "walk_forward_folds": [
@@ -55,22 +55,22 @@
         "fold": 2,
         "threshold": 0.515,
         "rows": 20,
-        "balanced_accuracy": 0.55
+        "balanced_accuracy": 0.5454545454545454
       },
       {
         "fold": 3,
-        "threshold": 0.515,
+        "threshold": 0.48,
         "rows": 20,
         "balanced_accuracy": 0.5
       },
       {
         "fold": 4,
-        "threshold": 0.515,
+        "threshold": 0.505,
         "rows": 20,
-        "balanced_accuracy": 0.5
+        "balanced_accuracy": 0.6309523809523809
       }
     ],
-    "walk_forward_balanced_accuracy_mean": 0.5166666666666667,
+    "walk_forward_balanced_accuracy_mean": 0.5588023088023087,
     "regime_threshold_min_rows": 60,
     "regime_thresholds": {},
     "regime_threshold_details": {}
